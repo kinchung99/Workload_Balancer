@@ -1,0 +1,50 @@
+{
+  "name": "ballast",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "tokens:check": "node scripts/verify-tokens.mjs",
+    "model:check": "node scripts/check-model.mjs",
+    "render:check": "node scripts/check-render.mjs",
+    "figma:canvas": "node scripts/figma-canvas.mjs"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.15",
+    "expo": "~57.0.19",
+    "expo-constants": "~57.0.17",
+    "expo-font": "~57.0.3",
+    "expo-haptics": "~57.0.2",
+    "expo-linking": "~57.0.9",
+    "expo-router": "~57.0.18",
+    "expo-splash-screen": "~57.0.8",
+    "expo-status-bar": "~57.0.1",
+    "nativewind": "^4.2.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0",
+    "zustand": "^5.0.15"
+  },
+  "expo": {
+    "install": {
+      "exclude": []
+    }
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "babel-preset-expo": "~57.0.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~6.0.3"
+  }
+}

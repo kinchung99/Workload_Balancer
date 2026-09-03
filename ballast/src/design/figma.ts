@@ -1,0 +1,95 @@
+/**
+ * The Figma bridge.
+ *
+ * This file is the contract between the codebase and the design file. It exists
+ * so that "convert this to Figma" is a mechanical job rather than a redraw.
+ *
+ * Four rules the whole component library obeys, and they are the reason the
+ * conversion works:
+ *
+ *   1. AUTO-LAYOUT ONLY. Every container is a <Stack>, which is a flex row or
+ *      column with a gap and padding and nothing else. No absolute positioning,
+ *      no negative margins, no transforms, no fixed heights on text. A <Stack>
+ *      pastes into Figma as an auto-layout frame with the same three settings.
+ *
+ *   2. NO RAW VALUES. Every colour, size, radius and type step is a token from
+ *      figma/tokens.json. There is no `#fff` and no `13` anywhere in a screen,
+ *      so every property in Figma can be bound to a variable rather than typed.
+ *
+ *   3. ONE NAME. A component's file name, its exported name and its Figma
+ *      component name are the same string. FIGMA_COMPONENTS below is the index.
+ *
+ *   4. FLAT FRAMES. Each screen renders inside a 390x844 box, which is the
+ *      artboard size, so a screenshot drops onto a frame at 1:1 with no scaling.
+ */
+import { frame } from './tokens';
+
+export const ARTBOARD = {
+  width: frame.width,
+  height: frame.height,
+  /** iPhone 16 / 14 Pro. The device the deck's mockups are drawn at. */
+  device: 'iPhone 16 — 390 x 844',
+} as const;
+
+/**
+ * Screen -> Figma frame name. Numbering follows the interface study so a
+ * reviewer can hold the PDF next to the file and match them page by page.
+ */
+export const FIGMA_FRAMES = [
+  { route: '/',                     frame: '01 Home — battery and areas',    page: 3,  note: 'One battery, then the part of you that is empty.' },
+  { route: '/add',                  frame: '02 Add anything — capture',      page: 4,  note: 'One box, no fields. Guesses shown as chips.' },
+  { route: '/plan',                 frame: '03 Plan — 14 day forecast',      page: 5,  note: 'The only screen that can prevent anything.' },
+  { route: '/rebalance',            frame: '04 Rebalance — trade sheet',     page: 6,  note: 'Live battery. Hard deadlines locked, recovery protected.' },
+  { route: '/recover',              frame: '05 Recover — ledger',            page: 7,  note: 'Rest is a credit you are owed.' },
+  { route: '/prescription',         frame: '06 Recover — matched',           page: 7,  note: 'Matched to the area that still has room.' },
+  { route: '/decline/w11-birthday', frame: '07 Saying no — drafter',         page: 8,  note: 'Three tones. Going is a first-class option.' },
+  { route: '/areas/social',         frame: '08 Social — people and circle',  page: 9,  note: 'Contact gaps, one word each, cohort context.' },
+  { route: '/calm',                 frame: '09 Calm mode — above 90%',       page: 10, note: 'One number, one sentence, one button.' },
+  { route: '/widget',               frame: '10 Lock screen — widget',        page: 10, note: 'The product on most days.' },
+  { route: '/areas',                frame: '11 Areas — five batteries',      page: 3,  note: 'The hub. Emptiest area first.' },
+  { route: '/actions',              frame: '12 What if I… — simulator',      page: 0,  note: 'Drag a slider, watch the battery move.' },
+  { route: '/areas/mental',         frame: '13 Mental — mood grid',          page: 0,  note: 'Energy against pleasantness, in two taps.' },
+  { route: '/areas/time',           frame: '14 Time — week grid',            page: 0,  note: 'Committed hours and protected recovery.' },
+  { route: '/areas/physical',       frame: '15 Physical — body log',         page: 0,  note: 'Meals logged qualitatively, steps read passively.' },
+  { route: '/areas/errands',        frame: '16 Errands — batched list',      page: 0,  note: 'Said in one breath, sorted into trips.' },
+  { route: '/foundations',          frame: '17 Foundations — quality floor', page: 11, note: 'Bands, patterns, type scale. The design file cover page.' },
+] as const;
+
+/**
+ * Component -> Figma component name, and the variant properties each one needs.
+ * Build these as Figma components with exactly these variant names and the
+ * export from code lands on top of them.
+ */
+export const FIGMA_COMPONENTS = {
+  'primitives/Stack':      { name: 'Layout / Stack',        variants: ['direction', 'gap', 'pad', 'align', 'justify'], note: 'Auto-layout frame. Not a real Figma component - it is what every frame is.' },
+  'primitives/Text':       { name: 'Type / Text',           variants: ['variant', 'tone'] },
+  'primitives/Card':       { name: 'Surface / Card',        variants: ['tone'] },
+  'primitives/Button':     { name: 'Control / Button',      variants: ['kind'] },
+  'primitives/Chip':       { name: 'Control / Chip',        variants: ['tone', 'selected'] },
+  'primitives/Toggle':     { name: 'Control / Toggle',      variants: ['state'] },
+  'primitives/DreadDots':  { name: 'Data / Dread dots',     variants: ['value'] },
+  'primitives/Divider':    { name: 'Surface / Divider',     variants: [] },
+  'primitives/ItemRow':    { name: 'Data / Item row',       variants: ['showDread', 'showBand'] },
+  'primitives/Slider':     { name: 'Control / Slider',      variants: ['tone'], note: 'Draggable, tappable and screen-reader adjustable.' },
+  'primitives/Checkbox':   { name: 'Control / Checkbox',    variants: ['checked'] },
+  'primitives/MoodGrid':   { name: 'Control / Mood grid',   variants: ['quadrant'], note: 'Energy against pleasantness. Two taps.' },
+  'primitives/AreaTile':   { name: 'Data / Area tile',      variants: ['band'] },
+  'charts/BandPattern':    { name: 'Foundations / Pattern', variants: ['band'], note: 'Four SVG swatches. The non-colour half of every band.' },
+  'charts/Bar':            { name: 'Data / Bar',            variants: ['band', 'overCeiling'] },
+  'charts/Battery':        { name: 'Data / Battery',        variants: ['band', 'size'], note: 'The headline reading. Charge, not load.' },
+  'charts/WeekGrid':       { name: 'Data / Week grid',      variants: [], note: 'Committed blocks and protected recovery.' },
+  'charts/ForecastStrip':  { name: 'Data / Forecast strip', variants: [] },
+  'layout/TabBar':         { name: 'Navigation / Tab bar',  variants: ['active'] },
+  'layout/PhoneFrame':     { name: 'Frame / Device',        variants: ['surface'], note: 'Web preview only. Delete the chrome layer after importing.' },
+} as const;
+
+/**
+ * Figma variable collections to create, and which token group fills each.
+ * Tokens Studio creates these for you from figma/tokens.json; this is the map
+ * for anyone doing it by hand.
+ */
+export const FIGMA_COLLECTIONS = [
+  { collection: 'Colour',    from: 'color.*',          modes: ['Light', 'Dark'], note: 'Dark mode swaps band.* to band.*.onDark and surface.page to surface.night.' },
+  { collection: 'Dimension', from: 'dimension.*',      modes: ['Default'],       note: 'space, radius, target, bar, frame.' },
+  { collection: 'Type',      from: 'typography.style', modes: ['Default'],       note: 'One Figma text style per key. Not variables - styles.' },
+] as const;

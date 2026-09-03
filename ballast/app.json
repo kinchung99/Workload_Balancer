@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Ballast",
+    "slug": "ballast",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "ballast",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ballast.app"
+    },
+    "android": {
+      "package": "com.ballast.app",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
