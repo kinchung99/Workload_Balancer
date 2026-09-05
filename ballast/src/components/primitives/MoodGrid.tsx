@@ -7,6 +7,7 @@
  */
 import { Pressable, View } from 'react-native';
 import type { MoodQuadrant } from '@/lib/types';
+import { tapFeedback } from '@/lib/haptics';
 import { Stack } from './Stack';
 import { Text } from './Text';
 
@@ -50,7 +51,7 @@ export function MoodGrid({
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
                     accessibilityLabel={quadrant.label}
-                    onPress={() => onChange(quadrant.id)}
+                    onPress={() => { tapFeedback(); onChange(quadrant.id); }}
                     className={`h-24 flex-1 items-center justify-center rounded-md border-2 ${
                       selected ? tint.on : `${tint.off} border-transparent`
                     }`}

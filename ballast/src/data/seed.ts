@@ -63,7 +63,7 @@ export const seedItems: Item[] = [
   { id: 'bus',       title: 'Bus to campus',              bucket: 'time',    hours: 8,    dread: 2, commitment: 'hard', date: d(W10, 0), when: '50 minutes each way', repeats: true, spread: true },
 
   // Errands. Small, many, mostly batchable.
-  { id: 'books',     title: 'Return the library books',   bucket: 'errands', hours: 0.33, dread: 1, commitment: 'self', date: d(W10, 0), when: '20m' },
+  { id: 'books',     title: 'Return the library books',   bucket: 'errands', hours: 0.33, dread: 1, commitment: 'self', date: d(W10, 0) },
   { id: 'laundry',   title: 'Laundry and shopping',       bucket: 'errands', hours: 2,    dread: 2, commitment: 'self', date: d(W10, 6), when: 'Sunday, 2h', repeats: true },
   { id: 'kitchen',   title: 'Kitchen and bins',           bucket: 'errands', hours: 1.5,  dread: 2, commitment: 'self', date: d(W10, 3), repeats: true },
   { id: 'cook',      title: 'Cook and prep for the week', bucket: 'errands', hours: 2,    dread: 2, commitment: 'self', date: d(W10, 6), repeats: true },
@@ -135,10 +135,10 @@ export const DEFICIT_DAYS = 9;
  * it is another thing to organise.
  */
 export const prescriptions: Prescription[] = [
-  { id: 'river', title: 'Walk the river loop', detail: '40 minutes. Free. Six minutes from your block. No phone needed.', refills: 'physical', credit: 2, tags: ['Costs nothing', 'Under an hour', 'Alone'], best: true },
-  { id: 'nap',   title: 'Nap, 25 minutes',     detail: 'Between your 2pm and your shift', refills: 'mental',   credit: 3 },
-  { id: 'pool',  title: 'Campus pool, Thursday', detail: 'Already in your calendar',      refills: 'physical', credit: 4 },
-  { id: 'empty', title: 'An evening with nothing in it', detail: 'Wednesday is now free', refills: 'mental',   credit: 6 },
+  { id: 'river', title: 'Walk the river loop', detail: '40 minutes. Free. Six minutes from your block. No phone needed.', refills: 'physical', credit: 2, slot: 'today at 5pm', tags: ['Costs nothing', 'Under an hour', 'Alone'], best: true },
+  { id: 'nap',   title: 'Nap, 25 minutes',     detail: 'Between your 2pm and your shift', refills: 'mental',   credit: 3, slot: 'this afternoon' },
+  { id: 'pool',  title: 'Campus pool, Thursday', detail: 'Already in your calendar',      refills: 'physical', credit: 4, slot: 'Thursday, 7am' },
+  { id: 'empty', title: 'An evening with nothing in it', detail: 'Wednesday is now free', refills: 'mental',   credit: 6, slot: 'Wednesday evening' },
 ];
 
 /** Seeded: needs other people. Bands only, never a task, never a number, never a mood. */

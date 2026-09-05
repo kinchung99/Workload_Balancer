@@ -22,12 +22,13 @@ export default function CalmPreview() {
 
   return (
     <CalmMode
+      back="/"
       percent={Math.max(PREVIEW_PERCENT, threshold.calmMode)}
       today={tuesday}
       focus={focus}
       onHide={() => {
         setMinimumViableWeek(true);
-        router.back();
+        router.replace('/');
       }}
       onShowEverything={() => {
         setShowEverything(true);

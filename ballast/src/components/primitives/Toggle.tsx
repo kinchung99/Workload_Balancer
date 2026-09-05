@@ -7,6 +7,7 @@
  * off, and both are announced differently to a screen reader.
  */
 import { Pressable, View } from 'react-native';
+import { tapFeedback } from '@/lib/haptics';
 
 export type ToggleState = 'on' | 'off' | 'locked' | 'protected';
 
@@ -39,7 +40,7 @@ export function Toggle({ state, onPress, label }: ToggleProps) {
       accessibilityState={{ checked: state === 'on', disabled }}
       accessibilityHint={HINT[state]}
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => { tapFeedback(); onPress?.(); }}
       // 44pt target around a 30pt control, which is the WCAG rule people skip.
       className="min-h-min min-w-min items-end justify-center"
     >

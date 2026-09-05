@@ -36,12 +36,166 @@ newer. See *A note on Expo Go and SDK versions* if it isn't.
 Verification, all of which runs without a device:
 
 ```bash
-npm run typecheck      # tsc --noEmit, strict
-npm run tokens:check   # figma/tokens.json and src/design/tokens.ts have not drifted
-npm run model:check    # the load model reproduces the study's stated figures
-npm run render:check   # those figures actually reach the rendered screens
-npm run figma:canvas   # build figma/canvas.html — all 17 frames, ready to import
+npm run preflight        # all five checks below, in order — what `deploy` runs first
+npm run typecheck        # tsc --noEmit, strict
+npm run tokens:check     # figma/tokens.json and src/design/tokens.ts have not drifted
+npm run model:check      # the load model reproduces the study's stated figures
+npm run behaviour:check  # every button actually changes the state it claims to
+npm run render:check     # those figures actually reach the rendered screens
+npm run figma:canvas   # build figma/canvas.html — all 18 frames, ready to import
 ```
+
+---
+
+## Sharing it with teammates
+
+`npm start` serves Metro from your own machine, so the QR code points at your
+laptop's LAN address. That is why only you can open it: teammates need to be on
+the same Wi-Fi, with your laptop awake, and on iOS 16.4+ for Expo Go 57.
+
+**The app is deployed as a website instead:**
+
+> **https://load-balancer-ballast.expo.app**
+
+Any browser, any device, no install and no Expo Go version to worry about. Every
+screen is there and the routes are real, so
+`/actions`, `/areas/mental` and `/foundations` can be linked directly.
+
+To push changes:
+
+```bash
+cd ballast
+npm run deploy        # expo export --platform web && eas-cli deploy --prod
+```
+
+That rebuilds and promotes to the same URL. The EAS project is
+`@kc699/load-balancer-ballast`; its dashboard is on expo.dev under the kc699
+account, and it can be transferred to `kc699s-team` if teammates need to deploy
+it themselves.
+
+The hosting subdomain is fixed on a project's **first** deployment and
+`eas deploy --dev-domain` refuses to change it afterwards, so renaming the URL
+meant creating a new EAS project and claiming the domain on its first deploy.
+The earlier `kc699-ballast.expo.app` is still serving a stale build; delete that
+project from the dashboard when you no longer want it reachable.
+
+**What the web build cannot tell you.** It is React Native Web, so the simulator
+sliders respond to a mouse rather than a finger, and 44pt touch targets, dynamic
+type at 200% and VoiceOver all behave differently on a real handset. For those,
+run it in Expo Go on a phone.
+
+---
+
+## The first run, and the one idea
+
+The app's only original claim is that **an hour of laundry and an hour of a group
+presentation are not the same hour**. `load = hours × dread`. Everything else —
+the forecast, the trades, the battery — is downstream of that one multiplication,
+and no calendar, habit tracker or mood journal does it.
+
+That idea used to be invisible. A new user landed on a home screen reading
+*"13% · Running on empty"* over five batteries and had no way to know what 13%
+was a percentage of, let alone why mental and physical differed. The interface
+assumed you had read the twelve-page study.
+
+`/welcome` fixes that by teaching the idea instead of explaining it. Three steps,
+skippable, and it runs once:
+
+1. **Two tasks, two dials.** A 3-hour group presentation and 6 hours of reading
+   you enjoy, each with a dread control you drag. The bars move as you drag and
+   the headline recomputes — *"Half the hours. Twice the load."* Nobody reads a
+   paragraph about weighted hours; everybody understands a bar that overtakes
+   another one while they are holding it.
+2. **Why one number is not enough.** Amira's battery, then her five areas. Her
+   head is empty and her body still has 69% left, and that pairing has a specific
+   fix a timetable cannot see.
+3. **Your turn.** One thing you are dreading, with hours and a dread dial, and a
+   live load readout. It goes into your week, so the app is yours before you
+   reach the home screen.
+
+The redirect is a client-side effect rather than a `<Redirect>`, because every
+route is prerendered in Node where `onboarded` is still false — rendering the
+redirect would bake it into the static HTML for everyone.
+
+Three specific things a fresh reader tripped on, now fixed: the battery says
+**"of your week left"** rather than a bare `13%`; a strained area reads
+**"over its limit by 4%"** instead of the genuinely misleading `−104%`; and a
+20-minute task no longer renders as `20m, 20m`.
+
+---
+
+## Feeling finished without a backend
+
+- **It remembers.** Zustand persists to AsyncStorage — device-local, no server.
+  A week you rebalanced stays rebalanced and the intro does not run twice. The
+  storage adapter degrades to an in-memory stub during prerender, because
+  `expo export` renders every route in Node where there is no localStorage.
+- **It responds.** Every control that changes something buzzes: dread dots,
+  sliders (once per notch crossed, not per pixel), checkboxes, toggles, the mood
+  grid. All routed through `lib/haptics.ts`, which no-ops on web and in Node.
+- **It confirms.** Applying a rebalance used to navigate away silently. It now
+  reports what it did — changes applied, load returned, the new battery, and that
+  two messages are drafted and nothing was sent.
+- **It animates, once.** The battery fills on mount and tweens on change. That is
+  still the only animation in the app, and reduced motion cuts it to the value.
+- **It resets.** No settings screen — cut on purpose — so *Replay the intro*,
+  *Design foundations* and *Reset to the seeded week* live at the bottom of
+  Areas. A demo you cannot reset is a demo you get one take at.
+- **Every screen has a way out.** Tab screens have the tab bar; the fourteen that
+  do not now carry a labelled back control — *Areas*, *Plan*, *Recovery*, *Home*
+  — and it falls back to a real destination rather than `router.back()`, because
+  a link opened from a share has no history to pop. `render:check` fails if any
+  route loses its exit.
+
+---
+
+## Nothing is a dead button
+
+An audit found nine controls that looked functional and were not, including two
+of the app's headline promises. All of them now do the thing they say, and
+`npm run behaviour:check` drives the real store through each one so they cannot
+quietly rot back.
+
+| Was | Is |
+|---|---|
+| Recover → *What would actually help* → *Put it in Thursday, 5pm* → back to Recover, forever, with nothing booked | Booking writes a **protected block into the week** and credits the ledger. The balance moves, the prescription stops being offered, and Home swaps its suggestion card for *Recovery booked* |
+| *Tap anything to fix it* — five chips that did nothing | Each chip opens a correction panel: area, hours, date, commitment. One tap to fix, and it closes. Retyping the sentence clears the corrections |
+| *Copy it* / *Open in WhatsApp* / *Actually, I'm going* — all `router.back()` | Real clipboard write, a real `wa.me` link with a clipboard fallback, and *going* actually re-plans — the chapter 9 reading moves to Sunday |
+| *Send "Hey, thinking of you"* opened the recovery screen | Copies the message and resets the contact gap to zero |
+| *Suggest it to them* — a literal no-op | Marks the window suggested and reports who has it |
+| *Put this plan in my week* opened the recovery screen | Books every charge-positive slider as protected time and credits the ledger |
+| `minimumViableWeek` — set by Calm mode, read by nothing | Hides all but the things that matter, with a banner saying how many and one tap to bring them back |
+| `dayReports` — recorded, read by nothing | Feeds `recalibrate`. Report *hard* twice below your line and the line comes down; the widget says so and Home shows where it sits |
+
+The three fake surfaces that remain are labelled as such: the microphone buttons
+on the physical and errands screens are affordances with no speech API behind
+them, and the sleep, step and cohort figures are seeded. Those are documented in
+*What is real, what is seeded, what is cut* rather than dressed up.
+
+---
+
+## Building and deploying it later
+
+```bash
+npm run preflight     # typecheck → tokens → model → rendered output
+npm run deploy        # preflight, then export, then promote to production
+```
+
+`deploy` will not publish if any check fails, so a broken build cannot reach the
+URL. `eas-cli` is a pinned devDependency rather than an `npx eas-cli@latest`
+call, so the deploy uses the same version every time.
+
+The things most likely to break later, and where they are handled:
+
+| Risk | Handling |
+|---|---|
+| Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
+| A component hard-codes a number | `render:check` asserts 166 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 26 actions |
+| A screen becomes a dead end | `render:check` asserts all 14 non-tab routes carry an exit |
+| Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
+| Typed routes go stale after adding a screen | `expo start` regenerates `.expo/types`; typecheck fails loudly until it does |
+| SDK upgrade breaks the build | See *A note on Expo Go and SDK versions* |
 
 ---
 
@@ -192,7 +346,7 @@ ballast/
 │
 ├── figma/
 │   ├── tokens.json             W3C DTCG. The source of truth for every value.
-│   └── canvas.html             Generated: 17 frames, one page, import-ready
+│   └── canvas.html             Generated: 18 frames, one page, import-ready
 │
 └── scripts/                    Four verification/build scripts, no build step
 ```
@@ -272,6 +426,7 @@ errands is exempt from that floor, because nothing is given up.
 
 | # | Route | Source | What it does |
 |---|---|---|---|
+| 00 | `/welcome` | **new** | The intro. Teaches `load = hours × dread` by letting you feel it |
 | 01 | `/` | study p.3 | Battery, five areas, what's pulling you down, today |
 | 02 | `/add` | study p.4 | One box, plain language, guesses as fixable chips |
 | 03 | `/plan` | study p.5 | 14-day strip, clustering flag, 8 days of lead time |
@@ -334,7 +489,7 @@ enforced throughout and documented in `src/design/figma.ts`:
 
 ```bash
 cd ballast
-npm run figma:canvas          # writes figma/canvas.html — all 17 frames
+npm run figma:canvas          # writes figma/canvas.html — all 18 frames
 npx serve figma               # serve it (html.to.design needs a URL)
 ```
 
@@ -347,7 +502,7 @@ npx serve figma               # serve it (html.to.design needs a URL)
    text stays editable; the band patterns arrive as vector fills, not bitmaps.
 3. Bind the imported hex values to the variables from step 1. They match exactly,
    because both came out of the same file.
-4. `/foundations` is frame 17 and doubles as the design file's cover page — every
+4. `/foundations` is frame 17 of 18 and doubles as the design file's cover page — every
    band, pattern, type step and dread state rendered from the same tokens.
 
 `figma/canvas.html` is generated and safe to delete; regenerate it any time the
@@ -430,8 +585,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 151 strings against
-the rendered HTML of all sixteen screens.
+figures against the model, and `npm run render:check` asserts 166 strings against
+the rendered HTML of all seventeen screens, and `npm run behaviour:check` asserts
+26 state changes behind the buttons.
 
 ---
 
@@ -443,7 +599,11 @@ two scripts below check the things that would actually be wrong.
 - `scripts/check-model.mjs` — loads the real `seed.ts` and `load.ts` through
   Node's native TypeScript stripping and asserts the study's numbers. It catches
   a seed edit that silently moves Amira off 87%.
-- `scripts/check-render.mjs` — statically renders all 25 routes, strips the HTML
+- `scripts/check-behaviour.mjs` — drives the real Zustand store through the
+  actions the buttons call and asserts the state moved: 26 checks covering
+  booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
+  capture and the area logs. This is the one that catches a button going dead.
+- `scripts/check-render.mjs` — statically renders every route, strips the HTML
   (keeping `aria-label` values, since a spoken chart is rendered content too) and
   asserts the figures reach the screen. It catches a component that hard-codes a
   percentage the model never produced.

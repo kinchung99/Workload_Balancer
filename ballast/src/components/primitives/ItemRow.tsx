@@ -15,7 +15,9 @@ import { Text } from './Text';
 
 function meta(item: Item): string {
   const hours = item.hours < 1 ? `${Math.round(item.hours * 60)}m` : `${item.hours}h`;
-  return [hours, item.when ?? COMMITMENT_LABEL[item.commitment].toLowerCase()].join(', ');
+  const detail = item.when ?? COMMITMENT_LABEL[item.commitment].toLowerCase();
+  // A `when` of "20m" on a 20-minute task would otherwise render "20m, 20m".
+  return detail === hours ? hours : `${hours}, ${detail}`;
 }
 
 export function ItemRow({ item, onPress }: { item: Item; onPress?: () => void }) {

@@ -12,11 +12,16 @@
     "tokens:check": "node scripts/verify-tokens.mjs",
     "model:check": "node scripts/check-model.mjs",
     "render:check": "node scripts/check-render.mjs",
-    "figma:canvas": "node scripts/figma-canvas.mjs"
+    "figma:canvas": "node scripts/figma-canvas.mjs",
+    "deploy": "npm run preflight && expo export --platform web && eas deploy --prod",
+    "preflight": "npm run typecheck && npm run tokens:check && npm run model:check && npm run behaviour:check && npm run render:check",
+    "behaviour:check": "node scripts/check-behaviour.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.19",
+    "expo-clipboard": "~57.0.1",
     "expo-constants": "~57.0.17",
     "expo-font": "~57.0.3",
     "expo-haptics": "~57.0.2",
@@ -44,6 +49,7 @@
   "devDependencies": {
     "@types/react": "~19.2.0",
     "babel-preset-expo": "~57.0.0",
+    "eas-cli": "^23.2.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~6.0.3"
   }

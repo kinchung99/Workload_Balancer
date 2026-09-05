@@ -10,6 +10,7 @@
  */
 import { Pressable, View } from 'react-native';
 import type { Dread } from '@/lib/types';
+import { tapFeedback } from '@/lib/haptics';
 import { Text } from './Text';
 import { Stack } from './Stack';
 
@@ -53,7 +54,7 @@ export function DreadPicker({ value, onChange }: { value: Dread; onChange: (d: D
             accessibilityRole="radio"
             accessibilityState={{ selected: value === step }}
             accessibilityLabel={`Dread ${step} out of 5`}
-            onPress={() => onChange(step)}
+            onPress={() => { tapFeedback(); onChange(step); }}
             className="min-h-min min-w-min items-center justify-center"
           >
             <View className={`h-7 w-7 rounded-pill border-2 ${value === step ? FILL[step] : 'border-line-strong bg-transparent'}`} />

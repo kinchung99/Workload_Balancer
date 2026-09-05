@@ -8,10 +8,12 @@
  * Drawn as SVG so it arrives in Figma as vector, and filled with the band's
  * pattern so it still reads at a glance in greyscale or on a cracked screen.
  */
+import { useEffect, useRef, useState } from 'react';
 import Svg, { Defs, G, Rect, ClipPath } from 'react-native-svg';
-import { View } from 'react-native';
-import { color, radius } from '@design/tokens';
+import { Animated, View } from 'react-native';
+import { color, motion, radius } from '@design/tokens';
 import { bandFor } from '@/lib/load';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { PatternFill } from './BandPattern';
 
 export interface BatteryProps {
@@ -26,12 +28,37 @@ export interface BatteryProps {
 
 export function Battery({ charge, loadPercent, width = 200, height = 92, label }: BatteryProps) {
   const band = bandFor(loadPercent);
+  // Fills on mount and tweens on change, so a battery that moves reads as a
+  // battery moving rather than as a new screen. Reduced motion cuts straight to
+  // the value, which is the whole rule this app applies to animation.
+  const reduceMotion = useReducedMotion();
+  const progress = useRef(new Animated.Value(reduceMotion ? charge : 0)).current;
+  const [shown, setShown] = useState(reduceMotion ? charge : 0);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.setValue(charge);
+      setShown(charge);
+      return;
+    }
+    const animation = Animated.timing(progress, {
+      toValue: charge,
+      duration: motion.meter,
+      useNativeDriver: false,
+    });
+    animation.start();
+    const id = progress.addListener(({ value }) => setShown(value));
+    return () => {
+      animation.stop();
+      progress.removeListener(id);
+    };
+  }, [charge, reduceMotion, progress]);
   const nub = 10;
   const body = width - nub - 4;
   const inset = 7;
   const innerW = body - inset * 2;
   const innerH = height - inset * 2;
-  const filled = Math.max(charge > 0 ? 10 : 0, (charge / 100) * innerW);
+  const filled = Math.max(shown > 0 ? 10 : 0, (shown / 100) * innerW);
 
   return (
     <View

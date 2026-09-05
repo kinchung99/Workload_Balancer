@@ -39,7 +39,11 @@ export default function Area() {
   const Body = AREA[bucket];
 
   return (
-    <Screen footer={<Button label="Rebalance the week" kind="secondary" onPress={() => router.push('/rebalance')} />}>
+    <Screen
+      back="/areas"
+      backLabel="Areas"
+      footer={<Button label="Rebalance the week" kind="secondary" onPress={() => router.push('/rebalance')} />}
+    >
       <Stack gap={6} className="pt-4">
         <Stack gap={1}>
           <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].toUpperCase()}</Text>

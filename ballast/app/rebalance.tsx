@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { successFeedback } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import {
   Battery, Button, Card, Divider, Screen, Stack, Text, Toggle,
@@ -28,6 +29,8 @@ export default function Rebalance() {
   const [selected, setSelected] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(trades.map((t) => [t.id, t.selected])),
   );
+  /** Set once changes are applied, so the screen can report what it did. */
+  const [applied, setApplied] = useState<{ count: number; saved: number; charge: number } | null>(null);
 
   const before = weekReading(items, anchor, ceilings).overall;
   const after = overallPercent(percentByBucket(applySelection(week, trades, selected), ceilings));
@@ -36,15 +39,65 @@ export default function Rebalance() {
 
   const toggle = (id: string) => setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
 
+  if (applied) {
+    return (
+      <Screen
+        footer={
+          <>
+            <Button label="See the fortnight" onPress={() => router.replace('/plan')} />
+            <Button label="Back home" kind="secondary" onPress={() => router.replace('/')} />
+          </>
+        }
+      >
+        <Stack gap={6} className="pt-8">
+          <Text variant="micro" tone="steady">DONE</Text>
+          <Text variant="title" accessibilityRole="header" accessibilityLiveRegion="polite">
+            {applied.count} change{applied.count === 1 ? '' : 's'} applied.
+          </Text>
+
+          <Card tone="steady" gap={5}>
+            <Stack direction="row" gap={5} align="center">
+              <Battery
+                charge={applied.charge}
+                loadPercent={100 - applied.charge}
+                width={140}
+                height={68}
+                label={`Now at ${applied.charge} percent`}
+              />
+              <Stack gap={1} grow>
+                <Text variant="display" tone="steady">{applied.charge}%</Text>
+                <Text variant="micro" tone="subtle">of next week left</Text>
+              </Stack>
+            </Stack>
+            <Text variant="callout" tone="muted">You got {applied.saved} load back.</Text>
+          </Card>
+
+          <Card gap={3}>
+            <Text variant="heading">Wednesday evening is free.</Text>
+            <Text variant="footnote" tone="muted">Your first free evening in eleven days.</Text>
+          </Card>
+
+          <Card tone="sunken" gap={2}>
+            <Text variant="footnote" weight="semibold">Two messages are drafted and waiting.</Text>
+            <Text variant="footnote" tone="muted">Nothing has been sent. You read them first.</Text>
+          </Card>
+        </Stack>
+      </Screen>
+    );
+  }
+
   return (
     <Screen
+      back="/plan"
+      backLabel="Plan"
       footer={
         <>
           <Button
             label={`Apply ${chosen} change${chosen === 1 ? '' : 's'}`}
             onPress={() => {
+              setApplied({ count: chosen, saved, charge: chargeOf(after) });
               applyTrades(trades.map((t) => ({ ...t, selected: !!selected[t.id] })));
-              router.replace('/plan');
+              successFeedback();
             }}
           />
           {/* Declining the plan is a legitimate answer, at the same weight. */}

@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { successFeedback } from '@/lib/haptics';
 import { Bar, Button, Card, Chip, Divider, Stack, Text } from '@/components';
 import { BAND_LABEL } from '@/lib/load';
 import { circle, cohort, freeEveningWindow } from '@/data/seed';
@@ -21,7 +24,8 @@ const STATE_TONE = { none: 'plain', talked: 'steady', saw: 'recovery' } as const
  */
 export function SocialArea() {
   const router = useRouter();
-  const { contacts, cycleContact } = useStore();
+  const { contacts, cycleContact, markContacted, windowSuggested, suggestWindow } = useStore();
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const sorted = [...contacts].sort((a, b) => b.lastSpokeDays - a.lastSpokeDays);
   const dropped = sorted[0];
   const noticed = circle.find((person) => !person.isYou && person.heavyForDays);
@@ -35,7 +39,22 @@ export function SocialArea() {
             <Text variant="heading">{dropped.name}</Text>
             <Text variant="footnote" tone="muted">{dropped.lastSpokeDays} days since you spoke</Text>
           </Stack>
-          <Button label={`Send "Hey, thinking of you"`} onPress={() => router.push('/prescription')} />
+          {sentTo === dropped.id ? (
+            <Text variant="callout" weight="semibold" tone="recovery" accessibilityLiveRegion="polite">
+              Copied. Send it whenever — the gap is reset either way.
+            </Text>
+          ) : (
+            <Button
+              label={`Send "Hey, thinking of you"`}
+              onPress={async () => {
+                // Drafts and copies. Ballast never sends anything itself.
+                await Clipboard.setStringAsync(`Hey ${dropped.name.split(' ')[0]}, thinking of you. How have you been?`);
+                markContacted(dropped.id);
+                successFeedback();
+                setSentTo(dropped.id);
+              }}
+            />
+          )}
         </Card>
       ) : null}
 
@@ -91,7 +110,23 @@ export function SocialArea() {
         <Text variant="heading">
           {freeEveningWindow.people.slice(0, -1).join(', ')} and {freeEveningWindow.people.at(-1)} are free {freeEveningWindow.day}.
         </Text>
-        <Button label="Suggest it to them" kind="steady" onPress={() => {}} />
+        {windowSuggested ? (
+          <Stack gap={2} accessibilityLiveRegion="polite">
+            <Text variant="callout" weight="semibold" tone="steady">Suggested.</Text>
+            <Text variant="footnote" tone="muted">
+              {freeEveningWindow.people.slice(1).join(' and ')} have it. Nobody had to do the asking.
+            </Text>
+          </Stack>
+        ) : (
+          <Button
+            label="Suggest it to them"
+            kind="steady"
+            onPress={() => {
+              suggestWindow();
+              successFeedback();
+            }}
+          />
+        )}
       </Card>
 
       <Card gap={4}>

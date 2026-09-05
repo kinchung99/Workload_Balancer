@@ -36,6 +36,7 @@ export const ARTBOARD = {
  * reviewer can hold the PDF next to the file and match them page by page.
  */
 export const FIGMA_FRAMES = [
+  { route: '/welcome',              frame: '00 Intro — the whole idea',      page: 2,  note: 'Teaches load = hours x dread by letting you feel it. First run.' },
   { route: '/',                     frame: '01 Home — battery and areas',    page: 3,  note: 'One battery, then the part of you that is empty.' },
   { route: '/add',                  frame: '02 Add anything — capture',      page: 4,  note: 'One box, no fields. Guesses shown as chips.' },
   { route: '/plan',                 frame: '03 Plan — 14 day forecast',      page: 5,  note: 'The only screen that can prevent anything.' },

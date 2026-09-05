@@ -8,6 +8,7 @@
  * One number, one sentence, one button. The list, the charts, the forecast and
  * the circle are all still there and all deliberately out of the way.
  */
+import type { Href } from 'expo-router';
 import { Battery, Button, Screen, Stack, Text } from '@/components';
 import { bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
@@ -21,12 +22,19 @@ export interface CalmModeProps {
   focus: Item;
   onHide: () => void;
   onShowEverything: () => void;
+  /**
+   * Set when this is the standalone preview route rather than Home's own state.
+   * Home is already the bottom of the stack and has nowhere to go back to.
+   */
+  back?: Href;
 }
 
-export function CalmMode({ percent, today, focus, onHide, onShowEverything }: CalmModeProps) {
+export function CalmMode({ percent, today, focus, onHide, onShowEverything, back }: CalmModeProps) {
   return (
     <Screen
       scroll={false}
+      back={back}
+      backLabel="Home"
       footer={
         <>
           <Button label="Hide the rest until Friday" onPress={onHide} />

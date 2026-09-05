@@ -8,6 +8,7 @@
 import { useRef, useState } from 'react';
 import { PanResponder, Pressable, View } from 'react-native';
 import { color, target } from '@design/tokens';
+import { tapFeedback } from '@/lib/haptics';
 
 export interface SliderProps {
   value: number;
@@ -36,9 +37,19 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
     return Math.round(clamped / step) * step;
   };
 
+  const lastRef = useRef(value);
+  /** Ticks once per notch crossed, not once per pixel of drag. */
+  const emit = (next: number) => {
+    if (next !== lastRef.current) {
+      lastRef.current = next;
+      tapFeedback();
+    }
+    return next;
+  };
+
   const fromX = (x: number) => {
     if (widthRef.current <= 0) return value;
-    return quantise(min + (x / widthRef.current) * (max - min));
+    return emit(quantise(min + (x / widthRef.current) * (max - min)));
   };
 
   const pan = useRef(

@@ -4,7 +4,7 @@ import { Bar, Screen, Stack, Text } from '@/components';
 import { formatLong } from '@/lib/dates';
 import { bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
-import { itemsOnDay, useStore, weekReading } from '@/state/store';
+import { itemsOnDay, liveCeiling, useStore, weekReading } from '@/state/store';
 import { WEEK_NUMBER } from '@/data/seed';
 import { addDays } from '@/lib/dates';
 
@@ -22,7 +22,7 @@ const FELT = ['Fine', 'Meh', 'Hard'] as const;
  * notification.
  */
 export default function Widget() {
-  const { items, ceilings, today, reportDay } = useStore();
+  const { items, ceilings, today, reportDay, dayReports, overallCeiling } = useStore();
   const { overall } = weekReading(items, today, ceilings);
   const [answered, setAnswered] = useState<(typeof FELT)[number] | null>(null);
   const band = bandFor(overall);
@@ -35,7 +35,7 @@ export default function Widget() {
   )[0];
 
   return (
-    <Screen surface="night" scroll={false}>
+    <Screen surface="night" scroll={false} back="/foundations" backLabel="Back">
       <Stack gap={8} className="pt-8">
         <Stack gap={2} align="center">
           <Text variant="footnote" tone="nightMuted">{formatLong(tomorrow)}</Text>
@@ -96,9 +96,17 @@ export default function Widget() {
           </Stack>
         </View>
 
-        <Text variant="footnote" tone="nightMuted" className="text-center">
-          That tap is the entire daily commitment.
-        </Text>
+        {answered ? (
+          <Text variant="footnote" tone="nightMuted" className="text-center" accessibilityLiveRegion="polite">
+            {answered === 'Hard'
+              ? `Noted. Your line is at ${liveCeiling(overallCeiling, dayReports)}% — report hard below it twice and it moves.`
+              : 'Noted. That is the whole daily commitment.'}
+          </Text>
+        ) : (
+          <Text variant="footnote" tone="nightMuted" className="text-center">
+            That tap is the entire daily commitment.
+          </Text>
+        )}
       </Stack>
     </Screen>
   );

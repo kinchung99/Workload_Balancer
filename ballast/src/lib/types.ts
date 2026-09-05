@@ -57,6 +57,8 @@ export interface Prescription {
   /** Which empty bucket this refills. */
   refills: BucketKey;
   credit: number;
+  /** When it goes in the calendar. An unscheduled suggestion is one you ignore. */
+  slot: string;
   tags?: string[];
   best?: boolean;
 }

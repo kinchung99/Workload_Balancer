@@ -2,6 +2,7 @@
 import { Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { color } from '@design/tokens';
+import { tapFeedback } from '@/lib/haptics';
 import { Stack } from './Stack';
 import { Text } from './Text';
 
@@ -19,7 +20,7 @@ export function Checkbox({
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={() => { tapFeedback(); onPress(); }}
       className="min-h-min justify-center active:opacity-70"
     >
       <Stack direction="row" gap={4} align="center">

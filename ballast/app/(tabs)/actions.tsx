@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { successFeedback } from '@/lib/haptics';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Battery, Button, Card, Chip, Divider, Screen, Slider, Stack, Text,
 } from '@/components';
-import { ACTIONS, initialSim, note, project, readout, totalPoints } from '@/lib/simulate';
+import { ACTIONS, initialSim, note, pointsOf, project, readout, totalPoints } from '@/lib/simulate';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
 import { useStore, weekReading } from '@/state/store';
@@ -20,20 +21,72 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export default function Actions() {
   const router = useRouter();
-  const { items, ceilings, today } = useStore();
+  const { items, ceilings, today, applyPlan } = useStore();
   const { overall } = weekReading(items, today, ceilings);
 
   const now = chargeOf(overall);
   const [sim, setSim] = useState(initialSim);
+  const [committed, setCommitted] = useState<{ blocks: number; points: number } | null>(null);
   const projected = project(now, sim);
   const delta = totalPoints(sim);
   const projectedLoad = 100 - projected;
+
+  // Only the actions that give charge back become blocks. A study session and
+  // late-night scrolling are things you do, not things worth protecting time for.
+  const gains = ACTIONS.filter((action) => pointsOf(action, sim[action.id]) > 0).map((action) => ({
+    id: action.id,
+    label: action.label,
+    bucket: action.bucket,
+    hours: action.unit === 'min' ? sim[action.id] / 60 : Math.max(0.5, sim[action.id] - action.baseline),
+    credit: pointsOf(action, sim[action.id]),
+  }));
+
+  if (committed) {
+    return (
+      <Screen
+        footer={
+          <>
+            <Button label="See the ledger" onPress={() => router.push('/recover')} />
+            <Button
+              label="Plan something else"
+              kind="secondary"
+              onPress={() => {
+                setCommitted(null);
+                setSim(initialSim());
+              }}
+            />
+          </>
+        }
+      >
+        <Stack gap={6} className="pt-8">
+          <Text variant="micro" tone="steady">IN YOUR WEEK</Text>
+          <Text variant="title" accessibilityRole="header" accessibilityLiveRegion="polite">
+            {committed.blocks} block{committed.blocks === 1 ? '' : 's'} booked.
+          </Text>
+          <Card tone="steady" gap={3}>
+            <Text variant="callout">
+              They are protected time now. Rebalancing moves work around them, never through them.
+            </Text>
+            <Text variant="footnote" tone="muted">+{committed.points} charge points credited to the ledger.</Text>
+          </Card>
+        </Stack>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
       footer={
         <>
-          <Button label="Put this plan in my week" onPress={() => router.push('/prescription')} />
+          <Button
+            label={gains.length ? `Put ${gains.length} block${gains.length === 1 ? '' : 's'} in my week` : 'Nothing to book yet'}
+            onPress={() => {
+              if (!gains.length) return;
+              applyPlan(gains);
+              successFeedback();
+              setCommitted({ blocks: gains.length, points: delta });
+            }}
+          />
           <Button label="Reset" kind="quiet" onPress={() => setSim(initialSim())} />
         </>
       }

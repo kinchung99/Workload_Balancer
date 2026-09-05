@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import { Battery, Card, Screen, Stack, Text } from '@/components';
+import { Battery, Button, Card, Screen, Stack, Text } from '@/components';
 import { BUCKETS, BUCKET_LABEL, bandFor, speakBuckets } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
@@ -23,7 +23,7 @@ const WHAT: Record<BucketKey, string> = {
  */
 export default function Areas() {
   const router = useRouter();
-  const { items, ceilings, today } = useStore();
+  const { items, ceilings, today, reset } = useStore();
   const { percents } = weekReading(items, today, ceilings);
 
   const sorted = [...BUCKETS].sort((a, b) => percents[b] - percents[a]);
@@ -66,6 +66,24 @@ export default function Areas() {
             );
           })}
         </Stack>
+
+        {/* The app has no settings screen, cut on purpose. These three live here
+            because a demo needs to be resettable and the intro rewatchable. */}
+        <Card tone="sunken" gap={4}>
+          <Text variant="micro" tone="subtle">ABOUT THIS BUILD</Text>
+          <Stack gap={3}>
+            <Button label="Replay the intro" kind="secondary" onPress={() => router.push('/welcome')} />
+            <Button label="Design foundations" kind="secondary" onPress={() => router.push('/foundations')} />
+            <Button
+              label="Reset to the seeded week"
+              kind="quiet"
+              onPress={() => {
+                reset();
+                router.replace('/');
+              }}
+            />
+          </Stack>
+        </Card>
 
         <View className="h-4" />
       </Stack>

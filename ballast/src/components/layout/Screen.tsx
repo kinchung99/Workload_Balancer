@@ -6,12 +6,17 @@
  *
  * Everything inside one thumb: `footer` is where primary actions go, pinned to
  * the lower half, because the moment that matters most is one-handed on a bus.
+ * `back` is the exception and belongs at the top left, where every platform puts
+ * it and where nobody looks for anything else.
  */
 import type { ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { space } from '@design/tokens';
+import Svg, { Path } from 'react-native-svg';
+import { color, space } from '@design/tokens';
 import { Stack } from '../primitives/Stack';
+import { Text } from '../primitives/Text';
 
 const SURFACE = { page: 'bg-page', sunken: 'bg-sunken', night: 'bg-night' } as const;
 
@@ -21,10 +26,21 @@ export interface ScreenProps {
   footer?: ReactNode;
   surface?: keyof typeof SURFACE;
   scroll?: boolean;
+  /**
+   * Where back goes when there is no history to pop - a deep link, a shared URL,
+   * a browser tab opened straight onto this route. Passing this is what makes a
+   * screen reachable *out of* as well as into.
+   */
+  back?: Href;
+  /** Optional word next to the chevron. Defaults to "Back". */
+  backLabel?: string;
 }
 
-export function Screen({ children, footer, surface = 'page', scroll = true }: ScreenProps) {
+export function Screen({ children, footer, surface = 'page', scroll = true, back, backLabel }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const onNight = surface === 'night';
+
   const body = (
     <Stack gap={5} padX={5} className="w-full">
       {children}
@@ -35,6 +51,34 @@ export function Screen({ children, footer, surface = 'page', scroll = true }: Sc
     <View className={`flex-1 items-center ${SURFACE[surface]}`}>
       {/* max-w-frame keeps the web preview at exactly one artboard wide. */}
       <View className="w-full max-w-frame flex-1" style={{ paddingTop: insets.top || space[5] }}>
+        {back ? (
+          <View className="w-full px-5 pb-1 pt-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={backLabel ?? 'Back'}
+              onPress={() => {
+                // Popping history is right in-app; the fallback is what rescues
+                // anyone who arrived here from a shared link with no history.
+                if (router.canGoBack()) router.back();
+                else router.replace(back);
+              }}
+              className="min-h-min flex-row items-center gap-2 self-start pr-4 active:opacity-60"
+            >
+              <Svg width={20} height={20} viewBox="0 0 20 20">
+                <Path
+                  d="M12.5 4 6.5 10l6 6"
+                  stroke={onNight ? color.ink.inverse : color.ink.default}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </Svg>
+              <Text variant="callout" tone={onNight ? 'inverse' : 'default'}>{backLabel ?? 'Back'}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {scroll ? (
           <ScrollView
             className="flex-1"

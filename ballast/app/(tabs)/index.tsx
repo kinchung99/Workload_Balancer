@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import {
@@ -6,8 +7,9 @@ import {
 import { CalmMode } from '@/features/home/CalmMode';
 import { CHARGE_LABEL, CHARGE_NOTE, chargeOf, drains } from '@/lib/battery';
 import { BUCKETS, BUCKET_LABEL, bandFor, isCalm } from '@/lib/load';
-import { itemsOnDay, useStore, weekReading } from '@/state/store';
-import { WEEK_NUMBER, prescriptions, recoveryLedger } from '@/data/seed';
+import { itemsOnDay, liveCeiling, restOwedFrom, useStore, weekReading } from '@/state/store';
+import { WEEK_NUMBER, prescriptions } from '@/data/seed';
+import { useHydrated } from '@/hooks/useHydrated';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -27,15 +29,33 @@ const greeting = () => {
  */
 export default function Home() {
   const router = useRouter();
-  const { items, ceilings, today, showEverythingAnyway, setShowEverything, setMinimumViableWeek } = useStore();
+  const { items, ceilings, today, onboarded, recovery, booked, dayReports, overallCeiling,
+    minimumViableWeek, showEverythingAnyway, setShowEverything, setMinimumViableWeek } = useStore();
+
+  // First run goes to the intro. Deliberately an effect rather than a <Redirect>:
+  // every route is prerendered in Node with `onboarded` still false, and a
+  // redirect at render time would bake one into the static HTML for everyone.
+  const hydrated = useHydrated();
+  useEffect(() => {
+    if (hydrated && !onboarded) router.replace('/welcome');
+  }, [hydrated, onboarded, router]);
 
   const { percents, overall } = weekReading(items, today, ceilings);
   const charge = chargeOf(overall);
   const band = bandFor(overall);
-  const todayItems = itemsOnDay(items, today);
+  const allToday = itemsOnDay(items, today);
+  // Minimum viable week: everything but the things that genuinely matter is out
+  // of sight until Sunday. Nothing is deleted, and one tap brings it all back.
+  const todayItems = minimumViableWeek
+    ? [...allToday].sort((a, b) => (b.commitment === 'hard' ? 1 : 0) - (a.commitment === 'hard' ? 1 : 0)).slice(0, 2)
+    : allToday;
+  const hidden = allToday.length - todayItems.length;
+  // Your ceiling moves: two hard days below your line and the line comes down.
+  const ceiling = liveCeiling(overallCeiling, dayReports);
   const pulling = drains(percents).slice(0, 3);
-  const suggestion = prescriptions.find((entry) => entry.best) ?? prescriptions[0];
-  const restOwed = Math.abs(recoveryLedger.reduce((total, row) => total + (row.hours ?? 0), 0));
+  const unbooked = prescriptions.filter((entry) => !booked.includes(entry.id));
+  const suggestion = unbooked.find((entry) => entry.best) ?? unbooked[0];
+  const restOwed = restOwedFrom(recovery);
 
   if (isCalm(overall) && !showEverythingAnyway) {
     return (
@@ -70,6 +90,8 @@ export default function Home() {
             <Stack gap={1} grow>
               <Text variant="display" tone={TONE[band]}>{charge}%</Text>
               <Text variant="footnote" weight="semibold">{CHARGE_LABEL[band]}</Text>
+              <Text variant="micro" tone="subtle">of your week left</Text>
+              <Text variant="micro" tone="subtle">your line sits at {ceiling}%</Text>
             </Stack>
           </Stack>
           <Text variant="callout" tone="muted">{CHARGE_NOTE[band]}</Text>
@@ -102,12 +124,17 @@ export default function Home() {
                   {index > 0 ? <Divider /> : null}
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${BUCKET_LABEL[row.bucket]}, ${row.cost}% of its ceiling`}
+                    accessibilityLabel={`${BUCKET_LABEL[row.bucket]}, ${row.cost}% of its limit used`}
                     onPress={() => router.push(`/areas/${row.bucket}`)}
                     className="min-h-row flex-row items-center justify-between gap-4 py-4 active:opacity-70"
                   >
-                    <Text variant="body" weight="semibold">{BUCKET_LABEL[row.bucket]}</Text>
-                    <Text variant="body" weight="semibold" tone={TONE[bandFor(row.cost)]}>−{row.cost}%</Text>
+                    <Stack gap={1} grow>
+                      <Text variant="body" weight="semibold">{BUCKET_LABEL[row.bucket]}</Text>
+                      <Text variant="footnote" tone="subtle">
+                        {row.cost > 100 ? `over its limit by ${row.cost - 100}%` : `${row.cost}% of its limit used`}
+                      </Text>
+                    </Stack>
+                    <Text variant="body" weight="semibold" tone={TONE[bandFor(row.cost)]}>{row.cost}%</Text>
                   </Pressable>
                 </Stack>
               ))}
@@ -115,15 +142,22 @@ export default function Home() {
           </Stack>
         ) : null}
 
-        {/* One thing, booked, with a time on it. */}
-        <Card tone="recovery" gap={4}>
-          <Text variant="micro" tone="recovery">SUGGESTED FOR YOU</Text>
-          <Stack gap={2}>
-            <Text variant="heading">{suggestion.title}</Text>
-            <Text variant="footnote" tone="muted">{suggestion.detail}</Text>
-          </Stack>
-          <Button label="Start now" kind="primary" onPress={() => router.push('/prescription')} />
-        </Card>
+        {/* One thing, booked, with a time on it. Disappears once it is in. */}
+        {suggestion ? (
+          <Card tone="recovery" gap={4}>
+            <Text variant="micro" tone="recovery">SUGGESTED FOR YOU</Text>
+            <Stack gap={2}>
+              <Text variant="heading">{suggestion.title}</Text>
+              <Text variant="footnote" tone="muted">{suggestion.detail}</Text>
+            </Stack>
+            <Button label={`Put it in ${suggestion.slot}`} onPress={() => router.push('/prescription')} />
+          </Card>
+        ) : (
+          <Card tone="steady" gap={2}>
+            <Text variant="micro" tone="steady">RECOVERY BOOKED</Text>
+            <Text variant="callout">All four blocks are in your week. Nothing left to schedule.</Text>
+          </Card>
+        )}
 
         <Stack gap={3}>
           <Stack direction="row" justify="between" align="center">
@@ -139,6 +173,18 @@ export default function Home() {
             ))}
           </Card>
         </Stack>
+
+        {hidden > 0 ? (
+          <Card tone="sunken" gap={3}>
+            <Stack gap={1}>
+              <Text variant="callout" weight="semibold">Minimum viable week is on.</Text>
+              <Text variant="footnote" tone="muted">
+                {hidden} thing{hidden === 1 ? '' : 's'} hidden until Sunday. Nothing was deleted.
+              </Text>
+            </Stack>
+            <Button label="Show everything again" kind="secondary" onPress={() => setMinimumViableWeek(false)} />
+          </Card>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"

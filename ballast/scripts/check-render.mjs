@@ -38,10 +38,24 @@ const EXPECTATIONS = [
     'YOUR AREAS', 'Mental', 'Time', 'Errands', 'Social', 'Physical',
     '0% left',                                // mental is over its ceiling
     '69% left',                               // physical has room
-    "WHAT'S PULLING YOU DOWN", '\u2212104%', '\u221282%',
-    'SUGGESTED FOR YOU', 'Walk the river loop', 'Start now',
+    'of your week left',                      // the unit "13%" was missing
+    "WHAT'S PULLING YOU DOWN",
+    'over its limit by 4%',                   // mental, stated plainly
+    '82% of its limit used',
+    'SUGGESTED FOR YOU', 'Walk the river loop',
+    'Put it in today at 5pm',                 // books for real; no longer a dead 'Start now'
+    'your line sits at 85%',                  // the ceiling the daily tap moves
     'Operating systems, part 2', 'Caf\u00e9 shift', 'Return the library books',
     '11h of rest owed',
+  ]],
+  ['welcome.html', 'Intro', [
+    'THE WHOLE IDEA',
+    'Not every hour costs the same.',
+    'Group presentation', '3 hours',
+    'Reading you enjoy', '6 hours',
+    'Half the hours. Twice the load.',        // the selling point, computed live
+    'Every planner measures hours',
+    'Skip the intro',
   ]],
   ['areas.html', 'Areas', [
     'Your areas', 'EMPTIEST FIRST',
@@ -49,12 +63,13 @@ const EXPECTATIONS = [
     'Mental', 'Mood check-ins and what is contributing',
     'Physical', 'Meals, movement and sleep',
     'Errands', 'Batched into trips you can actually do',
+    'ABOUT THIS BUILD', 'Replay the intro', 'Reset to the seeded week',
   ]],
   ['actions.html', 'Simulator', [
     'What if I', 'NOW', 'PROJECTED', 'YOUR ACTIONS',
     'Sleep tonight', '6 hrs', 'Take a walk', 'Text a friend', 'Study session', 'Late-night screen',
     'Drag the sliders to see how tonight changes your level.',
-    'Put this plan in my week',
+    'Nothing to book yet',                    // becomes a real count once a slider moves
   ]],
   ['areas/mental.html', 'Mental area', [
     'LOG YOUR MOOD', 'HIGH ENERGY', 'LOW ENERGY',
@@ -105,10 +120,36 @@ const EXPECTATIONS = [
     'How much are you dreading it?', 'Already counted, set once', 'Repeats',
   ]],
   ['recover.html', 'Recover', ['Balance, last 14 days', '11h', 'deficit for 9 days straight', 'Last full day off', '23 days ago']],
-  ['prescription.html', 'Prescription', ['Walk the river loop', 'Costs nothing', 'Under an hour', 'Alone', 'Put it in Thursday, 5pm']],
+  ['prescription.html', 'Prescription', [
+    'Walk the river loop', 'Costs nothing', 'Under an hour', 'Alone',
+    'Put it in today at 5pm',               // writes a protected block and credits the ledger
+    'Show me something else',
+  ]],
   ['decline/w11-birthday.html', 'Drafter', ["Aisyah's birthday dinner", 'Warm', 'Brief', 'Fully honest', "Actually, I'm going", 'Open in WhatsApp']],
   ['widget.html', 'Widget', ['Ballast', 'week 10', 'One thing today. The networks lab report', 'How was today?', '13%', 'Running on empty', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
   ['foundations.html', 'Foundations', ['Colour is never the only signal', 'flat fill', 'diagonal hatch', 'cross hatch', 'vertical rule', 'colour taken away', '44 by 44 point minimum']],
+];
+
+/**
+ * Every route outside the tab bar must offer a way out. Tab screens have the tab
+ * bar; these do not, so without this a shared link is a dead end - which is
+ * exactly what happened on the area screens.
+ */
+const EXITS = [
+  ['areas/mental.html', 'Areas'],
+  ['areas/time.html', 'Areas'],
+  ['areas/physical.html', 'Areas'],
+  ['areas/social.html', 'Areas'],
+  ['areas/errands.html', 'Areas'],
+  ['add.html', 'Home'],
+  ['rebalance.html', 'Plan'],
+  ['recover.html', 'Home'],
+  ['prescription.html', 'Recovery'],
+  ['foundations.html', 'Areas'],
+  ['decline/w11-birthday.html', 'Plan'],
+  ['widget.html', 'Back'],
+  ['calm.html', 'Home'],
+  ['welcome.html', 'Skip the intro'],
 ];
 
 let failures = 0;
@@ -120,6 +161,14 @@ for (const [file, name, needles] of EXPECTATIONS) {
     failures += 1;
     console.log(`          missing: "${needle}"`);
   }
+}
+
+console.log('');
+const missingExits = EXITS.filter(([file, label]) => !textOf(file).includes(label));
+console.log(`  ${missingExits.length ? 'FAIL' : 'ok  '}  ${'every route has a way out'.padEnd(14)} ${EXITS.length - missingExits.length}/${EXITS.length}`);
+for (const [file, label] of missingExits) {
+  failures += 1;
+  console.log(`          ${file} has no "${label}" exit`);
 }
 
 rmSync(out, { recursive: true, force: true });

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Ballast",
-    "slug": "ballast",
+    "slug": "load-balancer-ballast",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "ballast",
@@ -32,6 +32,13 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "owner": "kc699",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "04e096f1-4ec2-4626-93ea-7f1ecabc4b6e"
+      }
     }
   }
 }

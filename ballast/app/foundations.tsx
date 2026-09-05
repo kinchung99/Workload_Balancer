@@ -28,6 +28,8 @@ export default function Foundations() {
   const router = useRouter();
   return (
     <Screen
+      back="/areas"
+      backLabel="Areas"
       footer={
         <>
           <Button label="Lock screen and widget" kind="secondary" onPress={() => router.push('/widget')} />

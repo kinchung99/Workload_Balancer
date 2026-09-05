@@ -1,54 +1,71 @@
 import { useMemo, useState } from 'react';
-import { Pressable, TextInput } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Button, Card, Chip, Divider, DreadPicker, Screen, Stack, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { parse, titleFrom } from '@/lib/parser';
-import { BUCKET_LABEL, COMMITMENT_LABEL, loadOf } from '@/lib/load';
-import type { Dread } from '@/lib/types';
+import { BUCKETS, BUCKET_LABEL, COMMITMENT_LABEL, loadOf } from '@/lib/load';
+import { addDays, formatShort } from '@/lib/dates';
+import { successFeedback, tapFeedback } from '@/lib/haptics';
+import type { BucketKey, CommitmentKind, Dread } from '@/lib/types';
 import { useStore } from '@/state/store';
 
 const PLACEHOLDER = 'OS assignment due thurs, about 8 hours, really not looking forward to it';
-
-/** When the parser has no idea it says so and asks one question, not five. */
+const HOUR_OPTIONS = [0.5, 1, 2, 4, 8];
 const RANGES: Array<[string, number]> = [['Under an hour', 0.5], ['An hour or two', 1.5], ['Half a day', 4], ['A full day', 8]];
 
+type Field = 'bucket' | 'hours' | 'date' | 'commitment';
+
 /**
- * Screen 2 — If adding a task feels like a task, nobody adds the task.
+ * Screen 2 — if adding a task feels like a task, nobody adds the task.
  *
- * Every workload app dies at data entry. So there is one field, it takes plain
- * language, and a wrong guess costs a single tap to correct rather than a form
- * to fill in.
+ * One field, plain language, and every guess the parser makes is shown back as a
+ * chip you can tap to change. That is what makes the parser safe to be wrong:
+ * nothing is applied silently and a bad guess costs one tap, not a form.
  */
 export default function Add() {
   const router = useRouter();
   const { today, items, addItem } = useStore();
   const [text, setText] = useState('');
-  const [dreadOverride, setDreadOverride] = useState<Dread | null>(null);
+  const [editing, setEditing] = useState<Field | null>(null);
+  const [override, setOverride] = useState<Partial<Record<Field | 'dread', unknown>>>({});
 
-  const draft = useMemo(() => parse(text || PLACEHOLDER, today), [text, today]);
-  const dread = dreadOverride ?? draft.dread;
-  const load = loadOf({ hours: draft.hours, dread });
+  const parsed = useMemo(() => parse(text || PLACEHOLDER, today), [text, today]);
 
-  const repeating = items.filter((i) => i.repeats).slice(0, 3);
-  const hoursUnknown = draft.unknown.includes('hours') && text.length > 0;
+  // The parse is the starting point; anything the student corrected wins.
+  const bucket = (override.bucket as BucketKey) ?? parsed.bucket;
+  const hours = (override.hours as number) ?? parsed.hours;
+  const date = (override.date as string) ?? parsed.date ?? today;
+  const commitment = (override.commitment as CommitmentKind) ?? parsed.commitment;
+  const dread = (override.dread as Dread) ?? parsed.dread;
+  const load = loadOf({ hours, dread });
+
+  const correct = (field: Field | 'dread', value: unknown) => {
+    tapFeedback();
+    setOverride((prev) => ({ ...prev, [field]: value }));
+    if (field !== 'dread') setEditing(null);
+  };
+
+  const toggle = (field: Field) => {
+    tapFeedback();
+    setEditing((current) => (current === field ? null : field));
+  };
+
+  const repeating = items.filter((item) => item.repeats).slice(0, 3);
+  const hoursUnknown = parsed.unknown.includes('hours') && text.length > 0 && override.hours === undefined;
 
   return (
     <Screen
+      back="/"
+      backLabel="Home"
       footer={
         <Button
           label="Add it"
           onPress={() => {
-            addItem({
-              title: titleFrom(text || PLACEHOLDER),
-              bucket: draft.bucket,
-              hours: draft.hours,
-              dread,
-              commitment: draft.commitment,
-              date: draft.date ?? today,
-            });
+            addItem({ title: titleFrom(text || PLACEHOLDER), bucket, hours, dread, commitment, date });
+            successFeedback();
             router.back();
           }}
         />
@@ -62,14 +79,14 @@ export default function Add() {
           </Pressable>
         </Stack>
 
-        {/* a. One box, no fields. An on-device parser pulls out the bucket, the
-            hours, the deadline and the dread from how a student would actually
-            type it at a bus stop. No dropdowns, no date picker unless you want
-            one. The same field takes dictation, because a lot of this gets
-            logged walking between buildings or on the bus home from a shift. */}
         <TextInput
           value={text}
-          onChangeText={setText}
+          onChangeText={(next) => {
+            setText(next);
+            // A new sentence means a new parse; old corrections no longer apply.
+            setOverride({});
+            setEditing(null);
+          }}
           placeholder={PLACEHOLDER}
           placeholderTextColor={color.ink.subtle}
           multiline
@@ -77,41 +94,86 @@ export default function Add() {
           className="min-h-row rounded-md border border-line-strong bg-page px-5 py-4 text-body text-ink-default"
         />
 
-        {/* b. Guesses are shown as chips, not applied silently. Six things
-            inferred from one sentence and all six are one tap from being fixed.
-            This is what makes the parser safe to be wrong. */}
         <Stack gap={3}>
           <Text variant="footnote" tone="subtle">Ballast read that as — tap anything to fix it</Text>
           <Stack direction="row" gap={3} wrap>
-            <Chip label={BUCKET_LABEL[draft.bucket]} tone="guess" onPress={() => {}} accessibilityHint="Change the bucket" />
-            <Chip label={`${draft.hours} hours`} onPress={() => {}} accessibilityHint="Change the estimate" />
-            <Chip label={draft.dateLabel ?? 'No date'} onPress={() => {}} accessibilityHint="Change the date" />
-            <Chip label={COMMITMENT_LABEL[draft.commitment]} onPress={() => {}} accessibilityHint="Change the commitment type" />
-            <Chip label={`Dread ${dread}`} tone="guess" onPress={() => {}} accessibilityHint="Change the dread" />
+            <Chip
+              label={BUCKET_LABEL[bucket]}
+              tone={editing === 'bucket' ? 'selected' : 'guess'}
+              onPress={() => toggle('bucket')}
+              accessibilityHint="Change the area"
+            />
+            <Chip
+              label={hours < 1 ? `${Math.round(hours * 60)} minutes` : `${hours} hours`}
+              tone={editing === 'hours' ? 'selected' : 'plain'}
+              onPress={() => toggle('hours')}
+              accessibilityHint="Change the estimate"
+            />
+            <Chip
+              label={formatShort(date)}
+              tone={editing === 'date' ? 'selected' : 'plain'}
+              onPress={() => toggle('date')}
+              accessibilityHint="Change the date"
+            />
+            <Chip
+              label={COMMITMENT_LABEL[commitment]}
+              tone={editing === 'commitment' ? 'selected' : 'plain'}
+              onPress={() => toggle('commitment')}
+              accessibilityHint="Change the commitment type"
+            />
+            <Chip label={`Dread ${dread}`} tone="guess" readOnly />
             <Chip label={`Load ${load}`} readOnly />
           </Stack>
+
+          {/* The correction panel. One tap to open, one tap to fix, and it closes. */}
+          {editing ? (
+            <Card tone="sunken" gap={3}>
+              <Text variant="micro" tone="subtle">
+                {editing === 'bucket' ? 'WHICH AREA' : editing === 'hours' ? 'HOW LONG' : editing === 'date' ? 'WHEN' : 'WHAT KIND'}
+              </Text>
+              <Stack direction="row" gap={3} wrap>
+                {editing === 'bucket'
+                  ? BUCKETS.map((option) => (
+                      <Chip key={option} label={BUCKET_LABEL[option]} tone={option === bucket ? 'selected' : 'plain'} onPress={() => correct('bucket', option)} />
+                    ))
+                  : null}
+                {editing === 'hours'
+                  ? HOUR_OPTIONS.map((option) => (
+                      <Chip key={option} label={option < 1 ? `${option * 60}m` : `${option}h`} tone={option === hours ? 'selected' : 'plain'} onPress={() => correct('hours', option)} />
+                    ))
+                  : null}
+                {editing === 'date'
+                  ? Array.from({ length: 7 }, (_, offset) => addDays(today, offset)).map((option) => (
+                      <Chip key={option} label={formatShort(option)} tone={option === date ? 'selected' : 'plain'} onPress={() => correct('date', option)} />
+                    ))
+                  : null}
+                {editing === 'commitment'
+                  ? (['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
+                      <Chip key={option} label={COMMITMENT_LABEL[option]} tone={option === commitment ? 'selected' : 'plain'} onPress={() => correct('commitment', option)} />
+                    ))
+                  : null}
+              </Stack>
+            </Card>
+          ) : null}
         </Stack>
 
-        {/* An empty state is an invitation, not an error. */}
+        {/* When the parser has no idea it asks one question rather than guessing. */}
         {hoursUnknown ? (
           <Card gap={4}>
             <Text variant="heading">How long, roughly?</Text>
             <Stack direction="row" gap={3} wrap>
-              {RANGES.map(([label]) => <Chip key={label} label={label} onPress={() => {}} />)}
+              {RANGES.map(([label, value]) => (
+                <Chip key={label} label={label} onPress={() => correct('hours', value)} />
+              ))}
             </Stack>
           </Card>
         ) : null}
 
-        {/* c. Dread is the one thing a calendar cannot know. It is a single tap
-            and it is the entire reason the capacity number means anything. We
-            ask for it once per task and never again. */}
         <Card gap={5}>
           <Text variant="heading">How much are you dreading it?</Text>
-          <DreadPicker value={dread} onChange={setDreadOverride} />
+          <DreadPicker value={dread} onChange={(next) => correct('dread', next)} />
         </Card>
 
-        {/* d. The invisible half of the week. For a student working twelve hours
-            a week this is the load that no planner has ever shown them. */}
         <Card gap={4}>
           <Stack gap={2}>
             <Text variant="heading">Already counted, set once</Text>
@@ -136,6 +198,7 @@ export default function Add() {
         <Text variant="footnote" tone="subtle">
           Add nothing for a fortnight and this still works. Silence is a supported state.
         </Text>
+        <View className="h-2" />
       </Stack>
     </Screen>
   );
