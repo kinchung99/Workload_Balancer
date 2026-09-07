@@ -16,6 +16,13 @@ import { bandFor } from '@/lib/load';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { PatternFill } from './BandPattern';
 
+export interface BatterySegment {
+  key: string;
+  /** That area's own charge, 0-100. */
+  charge: number;
+  loadPercent: number;
+}
+
 export interface BatteryProps {
   /** Charge remaining, 0-100. */
   charge: number;
@@ -24,16 +31,26 @@ export interface BatteryProps {
   width?: number;
   height?: number;
   label: string;
+  /**
+   * Draw the cells the headline number is made of instead of one solid fill.
+   *
+   * The overall reading is a blend of five areas and used to look like a single
+   * undifferentiated bar, so it was impossible to see that it was a summary of
+   * anything. One column per area, each filled to its own level, makes the
+   * composition the picture: mental flat, physical nearly full.
+   */
+  segments?: BatterySegment[];
 }
 
-export function Battery({ charge, loadPercent, width = 200, height = 92, label }: BatteryProps) {
+export function Battery({ charge, loadPercent, width = 200, height = 92, label, segments }: BatteryProps) {
   const band = bandFor(loadPercent);
   // Fills on mount and tweens on change, so a battery that moves reads as a
   // battery moving rather than as a new screen. Reduced motion cuts straight to
   // the value, which is the whole rule this app applies to animation.
   const reduceMotion = useReducedMotion();
-  const progress = useRef(new Animated.Value(reduceMotion ? charge : 0)).current;
-  const [shown, setShown] = useState(reduceMotion ? charge : 0);
+  const progress = useRef(new Animated.Value(charge)).current;
+  // Start full rather than empty so a prerendered page shows the real reading.
+  const [shown, setShown] = useState(charge);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -92,10 +109,33 @@ export function Battery({ charge, loadPercent, width = 200, height = 92, label }
         </G>
       </Svg>
 
-      {/* The patterned fill sits on top, clipped to the charged portion. */}
-      <View style={{ position: 'absolute', left: inset, top: inset }} pointerEvents="none">
-        <PatternFill band={band} width={filled} height={innerH} radius={radius.sm} />
-      </View>
+      {segments && segments.length > 0 ? (
+        // One cell per area, each filled from the bottom to its own charge.
+        <View
+          style={{ position: 'absolute', left: inset, top: inset, width: innerW, height: innerH, flexDirection: 'row', gap: 2 }}
+          pointerEvents="none"
+        >
+          {segments.map((segment) => {
+            const cellW = (innerW - 2 * (segments.length - 1)) / segments.length;
+            const cellH = Math.max(3, (Math.max(0, Math.min(100, segment.charge)) / 100) * innerH);
+            return (
+              <View key={segment.key} style={{ width: cellW, height: innerH, justifyContent: 'flex-end' }}>
+                <PatternFill
+                  band={bandFor(segment.loadPercent)}
+                  width={cellW}
+                  height={cellH}
+                  radius={3}
+                />
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        /* The patterned fill sits on top, clipped to the charged portion. */
+        <View style={{ position: 'absolute', left: inset, top: inset }} pointerEvents="none">
+          <PatternFill band={band} width={filled} height={innerH} radius={radius.sm} />
+        </View>
+      )}
     </View>
   );
 }

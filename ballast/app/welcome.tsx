@@ -10,6 +10,7 @@ import { chargeOf } from '@/lib/battery';
 import { tapFeedback, successFeedback } from '@/lib/haptics';
 import type { Dread } from '@/lib/types';
 import { useStore, weekReading } from '@/state/store';
+import { useReading } from '@/state/selectors';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 const HOURS = [1, 2, 4, 8];
@@ -43,7 +44,7 @@ export default function Welcome() {
   const reading = loadOf({ hours: 6, dread: readingDread });
   const mine = loadOf({ hours, dread });
 
-  const { percents, overall } = weekReading(items, today, ceilings);
+  const { percents, overall } = useReading();
 
   const verdict = useMemo(() => {
     if (presentation > reading) return 'Half the hours. Twice the load.';

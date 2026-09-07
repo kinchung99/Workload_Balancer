@@ -149,6 +149,230 @@ Three specific things a fresh reader tripped on, now fixed: the battery says
 
 ---
 
+## Time, and logging that moves the number
+
+Four things were missing, and the first one was structural.
+
+**The app knew what, never when.** `Item` had a date and no clock time, and the
+week grid rendered a *separate seeded block list* — so the timetable on screen
+was not your week. Items now carry `startHour`, the grid is drawn from the same
+`items` as everything else, and `src/lib/schedule.ts` derives the rest: a day in
+clock order, the gaps between things, committed against free hours.
+
+That one addition is what makes the other three possible.
+
+- **A day reads as a day.** Home opens on a timeline — 1pm to 5pm coursework,
+  5pm to 11pm shift, with `6h free` shown as real space in between rather than
+  as absence. Anything without a slot sits under *Anytime today* instead of being
+  jumbled in with the fixed blocks, because a floating task is not late, it is
+  unscheduled, and treating those the same is what makes a full week read as
+  noise. The forecast's collision list now says `Wed 19 Nov · 9am–3pm` rather
+  than just naming a day.
+- **Logging moves the battery, immediately.** Sleep and meals are logged where
+  you already are — one tap on waking, one per meal — and each option shows what
+  it *would* do before you touch it (`8h · +7`). Under it, `src/lib/logs.ts`
+  turns today's logs into signed load: a five-hour night is strain you are
+  already carrying, a good one gives some back. An unlogged day contributes
+  exactly zero, which is why the seeded week still reads as the study says.
+- **Recovery is bookable, not fixed.** It offered one hard-coded slot and told
+  you nothing until after you committed. Now you pick the length, pick from the
+  gaps that actually exist in your day, and see the resulting battery *and* where
+  the block lands in your timeline before anything is written.
+- **A social planner that does the coordinating.** Friends carry a battery and
+  real free evenings. Choose who and what, and it intersects their time with the
+  gaps in your own week and offers only windows that exist. Inviting puts the
+  gathering in your week as social load — seeing people occupies an evening, and
+  hiding that would be the same lie every other planner tells.
+
+### Putting things into the day, and into the list
+
+Two follow-ons, both about the app accepting input rather than only showing it.
+
+- **Anything floating can be given a time.** An *Anytime today* task now carries
+  a **Give it a time** control that offers only the gaps it would actually fit
+  into — a four-hour task is never offered a two-hour hole. Scheduled blocks get
+  **Move** and **Unschedule** in return. It is tap-to-place rather than
+  drag-and-drop on purpose: dragging is fragile across touch and mouse in React
+  Native Web and effectively unusable with a screen reader, and the tap version
+  is the one that works everywhere.
+- **Errands can be added, and they count.** A real field replaced the dead
+  microphone. What you type is sorted into Groceries, Admin, Academic or Home by
+  the same kind of keyword dictionary the capture parser uses — shown as a chip
+  you can tap to change, never applied silently — and priced by a size you pick.
+  **Your** errands then weigh something against the errands ceiling, and ticking
+  one off gives the weight back. Seeded errands stay weightless so the study's
+  figures still hold exactly.
+
+  That last part is the app's own thesis applied to its smallest objects:
+  burnout is rarely one big item, it is a pile of twenty-minute ones nobody was
+  counting. A checklist that costs nothing to keep would have contradicted the
+  entire premise.
+
+### Making it time-specific end to end
+
+The time layer existed but only the *seed* used it. Everything a student created
+came out timeless: `/add`, the intro and the simulator all called `addItem`
+without a `startHour`, so anything you made landed in an undifferentiated pile.
+That is now closed on every path.
+
+- **Capture asks when.** `/add` has a **day** chip and a **time** chip. The time
+  picker lists only the gaps that would actually hold the thing, and *No time
+  yet* is a first-class answer rather than an omission — some work genuinely has
+  no slot, and pretending otherwise is what makes a calendar lie.
+- **Gaps are where you add things.** Every free stretch in a day is a button:
+  `6h free · + Add here` opens capture with that day and hour already filled in.
+  So "what can I add, and to when" has a literal answer you tap.
+- **Plan is a week planner, not a picture.** The fortnight strip is now a day
+  picker showing dates, and below it sits that day in full — committed against
+  free hours, the timeline hour by hour, gaps open for adding, and a flag when
+  the day is part of the collision. The forecast still does the thing only a
+  forecast can, but you can now walk into any of the fourteen days and see
+  exactly what it holds.
+- **Actions says what it will do.** A **What this puts in your week** list names
+  each block and the time it would take before you commit — and the blocks now
+  get real slots, chosen so they do not collide with each other or with your day.
+  Sleep is committed as a log rather than a block, because it is the night, not
+  an appointment. The confirmation shows the updated day rather than a count.
+
+### Repeating yourself does not pile things up
+
+Three related bugs, all found by driving the store the way a person does rather
+than the way a test does.
+
+**Things accumulated.** Applying the same simulator plan three times left three
+walks stacked at 7am, 8am and 9am, and the ledger credited all three. Plan blocks
+now carry an id that is stable per activity per day, so re-applying **replaces**
+rather than appends. Booking the same recovery twice books it once; proposing the
+same gathering to the same people on the same evening is one gathering.
+
+**Things happened at the wrong hour.** Placement used "first free gap", which for
+Amira's Monday is 7am — so a walk, and anything else, went to dawn. Every
+activity now carries the window it belongs in: a walk 12–7, a nap 1–4, a swim
+7–10, an evening off 6–10. When that window is genuinely full, the fallback is
+the *nearest* hour to it rather than the earliest of the day, which is the actual
+line that produced the 7am river walk.
+
+**Sleep was being treated as an appointment.** It is the night, not a block, and
+placing it on a timeline is how it ended up scheduled for the morning. `SimAction`
+now carries `logOnly`, sleep is the only thing that has it, and committing a plan
+moves the sleep *log* while never creating an item. Applying a plan of nothing but
+sleep adds no block at all — which is asserted.
+
+A day built entirely by pressing every button now reads:
+
+```
+10am  Nap, 25 minutes
+11am  Walk the river loop
+12pm  Take a walk
+1pm   Operating systems, part 2
+5pm   Café shift
+7pm   Dinner with Amin
+```
+
+One of each, in a plausible order, however many times you tapped.
+
+### Why a fix can look like it did not work
+
+Two things survived the de-duplication work, and one of them is the reason a
+phone can still show the old bug after the code is right.
+
+**Saved state outlived the fix.** State persists to the device, so a browser that
+had already stacked three walks at 7am — or written a *Sleep tonight* block from
+before sleep became log-only — kept them forever. Correct code cannot clean data
+the old code wrote. The store now carries a `SCHEMA_VERSION`; raising it drops
+saves written by older builds and starts from the seeded semester again, keeping
+only whether the intro has been seen. Anyone on a stale save is repaired on their
+next load, with no cache-clearing and no reinstall.
+
+Raise `SCHEMA_VERSION` in `src/state/storage.ts` whenever a fix changes what a
+saved week may legitimately contain. It is the difference between fixing a bug
+and shipping a fix.
+
+**Applying twice moved things.** De-duplication stopped blocks *accumulating*,
+but placement still read the previous block as occupied territory, so a walk hopped
+12pm → 10am → 12pm on repeated presses. Placement now excludes the blocks this
+same plan would replace, which makes it idempotent: press apply five times and the
+walk stays at 12pm.
+
+### The week you could not see, and a button that did nothing
+
+**Apply on the rebalance sheet changed nothing at all.** The screen kept its
+selection in local React state and passed it down on the trades; the store read a
+different field — `state.trades` — that nothing ever wrote to. The set of taken
+trades was therefore always empty. You could toggle four things, watch the meter
+fall to 84%, press Apply, and the week was exactly as before. The selection now
+travels on the trades themselves, and applying routes through the same
+`applySelection` the preview uses, so the batched errand trip is created rather
+than the errands simply vanishing.
+
+**The rest of the week was invisible from Home.** A week strip now sits above
+today: seven bars scaled against the heaviest day, dates, committed hours, today
+inverted, collision days tinted red, and each one tappable straight into that day
+on Plan. Under it, a one-line collision banner. `M 10 · 10.3h`, `T 11 · 6.8h`,
+`W 12 · 9.5h` — the shape of your week in one glance.
+
+**The collision was a list of four rows**, which reads as four ordinary tasks —
+and they *are* ordinary, which is the point. It is now three columns, one per day
+of the seventy-two hours, with each item placed on its day, load bars per column,
+and hard versus movable colour-coded with a legend. The pile-up is a shape now
+rather than a description of one.
+
+**The ledger stacked debts and credits into one pile.** Split into *What you're
+down* and *What you've banked*, each row with a bar scaled against the largest, a
+single owed-versus-banked bar under the balance, and the "last full day off"
+line pulled out as its own card.
+
+**Rebalance now says what a trade costs and buys.** Every row carries the day and
+hour of the thing it touches. A week strip previews next week as it would be if
+you applied, with chips for each day that gets lighter (`Wed 19 −7h`). And the
+confirmation answers the question the screen exists for: whether the wall it was
+opened to fix is gone.
+
+That last one exposed a real subtlety. Clearing week 11 makes a *smaller* Monday
+to Wednesday cluster surface in week 10 — it was always there and simply was not
+the worst. Reporting "the wall is still there" would have been wrong, so the
+check is scoped to the flagged window and a separate line names whatever surfaced
+underneath.
+
+### Charts that were not drawn, and a task that added itself
+
+**The forecast chart was missing entirely.** Its bars are SVG, SVG needs a
+numeric width, and the width came from `onLayout` — which reports nothing during
+prerender. So the served HTML contained day letters and no chart at all, and the
+graph only appeared once JavaScript had run, if it ran. Charts now start at the
+artboard width and let the real measurement refine them. The Plan page went from
+8 SVG elements to 22. The same gate was on `Bar` and on the battery fill.
+
+**Pressing "Add it" on an empty field added "OS assignment".** The placeholder is
+a worked example, but the submit read `text || PLACEHOLDER`, so an empty field
+committed the example — once per press. That is where the repeating phantom tasks
+came from. The button now refuses an empty field and says so, and `addItem`
+rejects an exact repeat of the same title on the same day at the same hour while
+still allowing the same title at a *different* time, which is a real second thing.
+
+**The headline battery did not look like a summary of anything.** It is a blend
+of five areas and was drawn as one solid fill. It is now five cells, one per
+area, each filled to its own level — mental flat, physical nearly full — with the
+five numbers underneath and a line saying what the blend is. The picture is the
+composition.
+
+**Everything that adds now asks when.** Recovery could only ever be booked into
+today; it takes any of the next five days, with the gaps recomputed per day and
+the preview and timeline following the day you pick. Errands take a day and an
+hour too — given one they become a real block on that day rather than an
+anonymous lump of load, and they are then counted there instead of twice.
+
+### One model correction this exposed
+
+The study's fourth band is *"Recovery — load you get back"*, but recovery items
+were **adding** load: booking a swim made the battery worse. `loadOf` now returns
+a negative figure for anything marked `isRecovery`, so booking rest raises the
+battery, which is the only behaviour that makes the feature mean anything. Week
+11's physical bucket moved by four points as a result and the seed was retuned to
+keep the study's figures exact — `model:check` still passes all thirteen.
+
+---
+
 ## Nothing is a dead button
 
 An audit found nine controls that looked functional and were not, including two
@@ -167,9 +391,9 @@ quietly rot back.
 | `minimumViableWeek` — set by Calm mode, read by nothing | Hides all but the things that matter, with a banner saying how many and one tap to bring them back |
 | `dayReports` — recorded, read by nothing | Feeds `recalibrate`. Report *hard* twice below your line and the line comes down; the widget says so and Home shows where it sits |
 
-The three fake surfaces that remain are labelled as such: the microphone buttons
-on the physical and errands screens are affordances with no speech API behind
-them, and the sleep, step and cohort figures are seeded. Those are documented in
+The fake surfaces that remain are labelled as such: the microphone button on the
+physical screen is an affordance with no speech API behind it (the errands one
+was replaced by a real field), and the step and cohort figures are seeded. Those are documented in
 *What is real, what is seeded, what is cut* rather than dressed up.
 
 ---
@@ -190,8 +414,9 @@ The things most likely to break later, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 166 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 26 actions |
+| A component hard-codes a number | `render:check` asserts 228 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 118 actions |
+| A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
 | A screen becomes a dead end | `render:check` asserts all 14 non-tab routes carry an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
 | Typed routes go stale after adding a screen | `expo start` regenerates `.expo/types`; typecheck fails loudly until it does |
@@ -585,9 +810,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 166 strings against
-the rendered HTML of all seventeen screens, and `npm run behaviour:check` asserts
-26 state changes behind the buttons.
+figures against the model, and `npm run render:check` asserts 228 strings against
+the rendered HTML of all eighteen screens, and `npm run behaviour:check` asserts
+118 state changes behind the buttons.
 
 ---
 
@@ -600,9 +825,13 @@ two scripts below check the things that would actually be wrong.
   Node's native TypeScript stripping and asserts the study's numbers. It catches
   a seed edit that silently moves Amira off 87%.
 - `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 26 checks covering
+  actions the buttons call and asserts the state moved: 118 checks covering
   booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
-  capture and the area logs. This is the one that catches a button going dead.
+  capture with and without a time, the area logs, the time layer, scheduling,
+  errands and inviting people. Several assert that a slot is never offered
+  unless the gap genuinely fits — offering a time that does not exist is worse
+  than offering none — and a block of them presses the same button three times
+  to prove nothing accumulates.
 - `scripts/check-render.mjs` — statically renders every route, strips the HTML
   (keeping `aria-label` values, since a spoken chart is rendered content too) and
   asserts the figures reach the screen. It catches a component that hard-codes a

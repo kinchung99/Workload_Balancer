@@ -5,6 +5,7 @@ import { BUCKETS, BUCKET_LABEL, bandFor, speakBuckets } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
 import { useStore, weekReading } from '@/state/store';
+import { useReading } from '@/state/selectors';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -24,7 +25,7 @@ const WHAT: Record<BucketKey, string> = {
 export default function Areas() {
   const router = useRouter();
   const { items, ceilings, today, reset } = useStore();
-  const { percents } = weekReading(items, today, ceilings);
+  const { percents } = useReading();
 
   const sorted = [...BUCKETS].sort((a, b) => percents[b] - percents[a]);
 

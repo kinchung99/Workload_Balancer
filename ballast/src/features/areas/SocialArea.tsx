@@ -5,8 +5,9 @@ import * as Clipboard from 'expo-clipboard';
 import { successFeedback } from '@/lib/haptics';
 import { Bar, Button, Card, Chip, Divider, Stack, Text } from '@/components';
 import { BAND_LABEL } from '@/lib/load';
-import { circle, cohort, freeEveningWindow } from '@/data/seed';
+import { circle, cohort } from '@/data/seed';
 import { useStore } from '@/state/store';
+import { SocialPlanner } from './SocialPlanner';
 
 const RING = {
   steady: 'border-steady-fill', busy: 'border-busy-fill',
@@ -24,7 +25,7 @@ const STATE_TONE = { none: 'plain', talked: 'steady', saw: 'recovery' } as const
  */
 export function SocialArea() {
   const router = useRouter();
-  const { contacts, cycleContact, markContacted, windowSuggested, suggestWindow } = useStore();
+  const { contacts, cycleContact, markContacted } = useStore();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const sorted = [...contacts].sort((a, b) => b.lastSpokeDays - a.lastSpokeDays);
   const dropped = sorted[0];
@@ -105,29 +106,12 @@ export function SocialArea() {
         </Card>
       </Stack>
 
-      <Card tone="steady" gap={4}>
-        <Text variant="micro" tone="steady">A WINDOW</Text>
-        <Text variant="heading">
-          {freeEveningWindow.people.slice(0, -1).join(', ')} and {freeEveningWindow.people.at(-1)} are free {freeEveningWindow.day}.
-        </Text>
-        {windowSuggested ? (
-          <Stack gap={2} accessibilityLiveRegion="polite">
-            <Text variant="callout" weight="semibold" tone="steady">Suggested.</Text>
-            <Text variant="footnote" tone="muted">
-              {freeEveningWindow.people.slice(1).join(' and ')} have it. Nobody had to do the asking.
-            </Text>
-          </Stack>
-        ) : (
-          <Button
-            label="Suggest it to them"
-            kind="steady"
-            onPress={() => {
-              suggestWindow();
-              successFeedback();
-            }}
-          />
-        )}
-      </Card>
+      <Stack gap={3}>
+        <Text variant="micro" tone="subtle">PLAN SOMETHING</Text>
+        <Card gap={5}>
+          <SocialPlanner />
+        </Card>
+      </Stack>
 
       <Card gap={4}>
         <Text variant="micro" tone="subtle">{cohort.label.toUpperCase()}</Text>

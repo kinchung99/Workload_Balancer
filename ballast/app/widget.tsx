@@ -5,6 +5,7 @@ import { formatLong } from '@/lib/dates';
 import { bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { itemsOnDay, liveCeiling, useStore, weekReading } from '@/state/store';
+import { useReading } from '@/state/selectors';
 import { WEEK_NUMBER } from '@/data/seed';
 import { addDays } from '@/lib/dates';
 
@@ -23,7 +24,7 @@ const FELT = ['Fine', 'Meh', 'Hard'] as const;
  */
 export default function Widget() {
   const { items, ceilings, today, reportDay, dayReports, overallCeiling } = useStore();
-  const { overall } = weekReading(items, today, ceilings);
+  const { overall } = useReading();
   const [answered, setAnswered] = useState<(typeof FELT)[number] | null>(null);
   const band = bandFor(overall);
   const tomorrow = addDays(today, 1);

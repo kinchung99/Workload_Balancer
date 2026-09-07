@@ -26,9 +26,20 @@ export const COMMITMENT_LABEL: Record<Item['commitment'], string> = {
   self: 'Self-imposed',
 };
 
-/** The whole model, in one line. */
-export const loadOf = (item: Pick<Item, 'hours' | 'dread'>): number =>
-  Math.round(item.hours * item.dread * 10) / 10;
+/**
+ * The whole model, in one line.
+ *
+ * Two exceptions, both signed. A log states its own figure because a short night
+ * has no "hours" to multiply. And recovery is negative: the study's fourth band
+ * is "Recovery - load you get back", so an hour of swimming returns capacity
+ * rather than spending it. Booking rest raises the battery, which is the only
+ * behaviour that makes the feature mean anything.
+ */
+export const loadOf = (item: Pick<Item, 'hours' | 'dread' | 'loadOverride' | 'isRecovery'>): number => {
+  if (item.loadOverride !== undefined) return Math.round(item.loadOverride * 10) / 10;
+  const raw = Math.round(item.hours * item.dread * 10) / 10;
+  return item.isRecovery ? -raw : raw;
+};
 
 /**
  * Amira's ceilings, in load units per week.

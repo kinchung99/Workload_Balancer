@@ -2,14 +2,31 @@ import { useState } from 'react';
 import { Card, Chip, Divider, MoodGrid, Stack, Text, Button, quadrantLabel, quadrantTone } from '@/components';
 import type { ContributionTag, MoodQuadrant } from '@/lib/types';
 import { useStore } from '@/state/store';
+import { readingFrom, useReading } from '@/state/selectors';
+import { logItems } from '@/lib/logs';
+import { successFeedback } from '@/lib/haptics';
 
 const TAGS: ContributionTag[] = ['Academics', 'Social', 'Finances', 'Health', 'Personal'];
 
 /** Mental — a check-in that takes two taps and says more than a five-point scale. */
 export function MentalArea() {
-  const { moods, logMood } = useStore();
+  const { items, ceilings, today, meals, moods, sleepHours, logMood } = useStore();
+  const reading = useReading();
   const [quadrant, setQuadrant] = useState<MoodQuadrant | null>(null);
   const [tags, setTags] = useState<ContributionTag[]>([]);
+
+  /** The battery this check-in would produce, shown before it is logged. */
+  const preview = (next: MoodQuadrant) =>
+    readingFrom(
+      [...items, ...logItems({
+        today,
+        sleepHours,
+        meals,
+        moods: [{ id: 'preview', date: today, at: 'now', quadrant: next, tags: [] }, ...moods.filter((m) => m.date !== today)],
+      })],
+      today,
+      ceilings,
+    ).charge;
 
   const toggle = (tag: ContributionTag) =>
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
@@ -20,9 +37,14 @@ export function MentalArea() {
         <Text variant="micro" tone="subtle">LOG YOUR MOOD</Text>
         <MoodGrid value={quadrant} onChange={setQuadrant} />
         {quadrant ? (
-          <Stack gap={1} align="center">
+          <Stack gap={1} align="center" accessibilityLiveRegion="polite">
             <Text variant="heading" tone={quadrantTone(quadrant)}>{quadrantLabel(quadrant)}</Text>
-            <Text variant="micro" tone="subtle">CURRENT STATE</Text>
+            {/* What logging this would do, before you commit to it. */}
+            <Text variant="micro" tone={preview(quadrant) >= reading.charge ? 'steady' : 'heavy'}>
+              {preview(quadrant) === reading.charge
+                ? 'No change to your battery'
+                : `Battery would read ${preview(quadrant)}%`}
+            </Text>
           </Stack>
         ) : null}
       </Card>
@@ -44,6 +66,7 @@ export function MentalArea() {
           onPress={() => {
             if (!quadrant) return;
             logMood(quadrant, tags);
+            successFeedback();
             setQuadrant(null);
             setTags([]);
           }}

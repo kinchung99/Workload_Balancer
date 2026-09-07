@@ -46,7 +46,20 @@ export function buildForecast(
  * it would flag every week and the warning would stop meaning anything.
  */
 const CLUSTER_MIN_LOAD = 9;
-const CLUSTER_MIN_ITEMS = 4;
+export const CLUSTER_MIN_ITEMS = 4;
+
+/**
+ * How many collision-worthy things sit inside one window.
+ *
+ * Needed because "is the wall gone" and "is there any wall anywhere" are
+ * different questions. Clearing next week's pile-up can leave a smaller one
+ * somewhere else, and telling someone their wall is still there when in fact a
+ * different one surfaced is worse than useless.
+ */
+export const clusterCount = (items: Item[], from: string, to: string): number =>
+  items.filter(
+    (item) => !item.repeats && loadOf(item) >= CLUSTER_MIN_LOAD && item.date >= from && item.date <= to,
+  ).length;
 
 export interface Collision {
   /** First day of the window. */

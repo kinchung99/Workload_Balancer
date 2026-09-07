@@ -18,6 +18,7 @@ import type { BucketKey, SimAction } from './types';
 export const ACTIONS: SimAction[] = [
   {
     id: 'sleep',
+    logOnly: true,
     label: 'Sleep tonight',
     bucket: 'physical',
     min: 4, max: 10, step: 0.5, baseline: 6, unit: 'h',
@@ -27,6 +28,7 @@ export const ACTIONS: SimAction[] = [
   },
   {
     id: 'walk',
+    preferred: [12, 19],
     label: 'Take a walk',
     bucket: 'physical',
     min: 0, max: 60, step: 10, baseline: 0, unit: 'min',
@@ -36,6 +38,7 @@ export const ACTIONS: SimAction[] = [
   },
   {
     id: 'text',
+    preferred: [17, 21],
     label: 'Text a friend',
     bucket: 'social',
     min: 0, max: 2, step: 1, baseline: 0, unit: 'h',
@@ -46,6 +49,7 @@ export const ACTIONS: SimAction[] = [
   },
   {
     id: 'study',
+    preferred: [9, 18],
     label: 'Study session',
     bucket: 'mental',
     min: 0, max: 5, step: 0.5, baseline: 0, unit: 'h',
@@ -55,6 +59,7 @@ export const ACTIONS: SimAction[] = [
   },
   {
     id: 'screen',
+    preferred: [20, 23],
     label: 'Late-night screen',
     bucket: 'mental',
     min: 0, max: 4, step: 0.5, baseline: 0, unit: 'h',

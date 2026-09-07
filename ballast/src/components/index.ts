@@ -22,5 +22,8 @@ export { Bar } from './charts/Bar';
 export { ForecastStrip, type ForecastDay } from './charts/ForecastStrip';
 export { Battery, BatteryMini } from './charts/Battery';
 export { WeekGrid } from './charts/WeekGrid';
+export { DayTimeline } from './charts/DayTimeline';
+export { WeekStrip } from './charts/WeekStrip';
+export { CollisionWindow } from './charts/CollisionWindow';
 
 export { Screen, ScreenHeader } from './layout/Screen';

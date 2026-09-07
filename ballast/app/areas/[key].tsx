@@ -4,6 +4,7 @@ import { BUCKET_LABEL, BUCKETS, bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
 import { useStore, weekReading } from '@/state/store';
+import { useReading } from '@/state/selectors';
 import { MentalArea } from '@/features/areas/MentalArea';
 import { TimeArea } from '@/features/areas/TimeArea';
 import { PhysicalArea } from '@/features/areas/PhysicalArea';
@@ -30,7 +31,7 @@ export default function Area() {
   const { key } = useLocalSearchParams<{ key: BucketKey }>();
   const router = useRouter();
   const { items, ceilings, today } = useStore();
-  const { percents } = weekReading(items, today, ceilings);
+  const { percents } = useReading();
 
   const bucket = (BUCKETS.includes(key) ? key : 'mental') as BucketKey;
   const percent = percents[bucket];

@@ -11,8 +11,9 @@ import { threshold } from '@design/tokens';
 import type { BandName, BucketKey } from './types';
 import { BUCKETS, bandFor } from './load';
 
-/** Over its ceiling means flat, not negative. */
-export const chargeOf = (loadPercent: number): number => Math.max(0, Math.round(100 - loadPercent));
+/** Over its ceiling means flat, not negative; a good day cannot exceed full. */
+export const chargeOf = (loadPercent: number): number =>
+  Math.max(0, Math.min(100, Math.round(100 - loadPercent)));
 
 export const CHARGE_LABEL: Record<Exclude<BandName, 'recovery'>, string> = {
   steady: 'Charged',

@@ -24,8 +24,17 @@ export interface Item {
   commitment: CommitmentKind;
   /** ISO yyyy-mm-dd. */
   date: string;
-  /** Human time, e.g. "5pm to 11pm". Display only. */
+  /** Human time, e.g. "5pm to 11pm". Display only, and derived where possible. */
   when?: string;
+  /**
+   * Hour the thing starts, 24h, decimals allowed (9.5 = 9:30am).
+   *
+   * Undefined means it has no slot yet - coursework you can do whenever. That
+   * distinction matters: a fixed block and a floating one need different
+   * treatment, and pretending everything is scheduled is what makes other
+   * planners useless.
+   */
+  startHour?: number;
   /** Set once in onboarding and counted forever: shifts, commute, chores, caring. */
   repeats?: boolean;
   /**
@@ -38,6 +47,16 @@ export interface Item {
   isRecovery?: boolean;
   /** Where a batched saving comes from, e.g. "in town". */
   place?: string;
+  /**
+   * Load stated directly instead of derived from hours x dread, and signed.
+   *
+   * Only today's logs use this. A night of five hours' sleep is strain you are
+   * already carrying with no "hours" to multiply, and a good night removes some,
+   * which needs to go negative. Everything else keeps the honest multiplication.
+   */
+  loadOverride?: number;
+  /** Derived from a log rather than entered as a task. Never shown in a list. */
+  isLog?: boolean;
 }
 
 /** One row of the recovery ledger. Positive is credit, negative is debt. */
@@ -59,6 +78,8 @@ export interface Prescription {
   credit: number;
   /** When it goes in the calendar. An unscheduled suggestion is one you ignore. */
   slot: string;
+  /** The window this belongs in. A nap at 7am is not a nap. */
+  preferred?: readonly [number, number];
   tags?: string[];
   best?: boolean;
 }
@@ -87,6 +108,20 @@ export interface CircleMember {
   isYou?: boolean;
   /** Days stuck heavy. Surfaced quietly, with no script and no prompt to act. */
   heavyForDays?: number;
+  /** Their battery. A band and a number is all anyone shares - never a task. */
+  charge?: number;
+  /** Evenings they are free, by date. The raw material for finding an overlap. */
+  free?: Array<{ date: string; start: number; end: number }>;
+}
+
+/** A gathering you proposed. Local until someone accepts, which is the honest state. */
+export interface Invite {
+  id: string;
+  title: string;
+  date: string;
+  startHour: number;
+  hours: number;
+  people: string[];
 }
 
 /** What the parser pulled out of one sentence. Every field is one tap from being fixed. */
@@ -145,6 +180,17 @@ export interface Errand {
   title: string;
   category: ErrandCategory;
   done: boolean;
+  /** Rough size, hours. Used to price it against the errands ceiling. */
+  hours?: number;
+  /**
+   * Added by the student rather than seeded. Only these count towards load, for
+   * the same reason logs do: the seeded week has to keep reading as the
+   * interface study states until someone puts something into it themselves.
+   */
+  addedByUser?: boolean;
+  /** Optional slot. An errand with a time becomes a block like anything else. */
+  date?: string;
+  startHour?: number;
 }
 
 /** Time: a block on the week grid. */
@@ -176,4 +222,11 @@ export interface SimAction {
   badNote: string;
   /** Discrete sliders read as words, not numbers: Skip / Quick hi / Properly. */
   labels?: string[];
+  /** The hours of the day this belongs in, so a walk is not booked at dawn. */
+  preferred?: readonly [number, number];
+  /**
+   * Never becomes a block in a day. Sleep is the night, not an appointment, and
+   * placing it on a timeline is how it ended up scheduled for the morning.
+   */
+  logOnly?: boolean;
 }

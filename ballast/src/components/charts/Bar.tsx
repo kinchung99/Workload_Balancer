@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { View } from 'react-native';
-import { bar as barToken, color } from '@design/tokens';
+import { bar as barToken, color, frame, space } from '@design/tokens';
 import type { BandName } from '@/lib/types';
 import { PatternFill } from './BandPattern';
 
@@ -20,8 +20,11 @@ export interface BarProps {
   greyscale?: string;
 }
 
+/** Same reason as the forecast strip: draw at the artboard width, then refine. */
+const FALLBACK_WIDTH = frame.width - space[5] * 2 - space[6] * 2;
+
 export function Bar({ band, percent, height = barToken.bucket, greyscale }: BarProps) {
-  const [width, setWidth] = useState(0);
+  const [width, setWidth] = useState(FALLBACK_WIDTH);
   const filled = Math.max(0, Math.min(percent, 100)) / 100;
 
   return (

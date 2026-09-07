@@ -9,9 +9,9 @@
  * calendar could draw this strip, but every bar would be the same height.
  */
 import { useState } from 'react';
-import { View } from 'react-native';
-import { bar as barToken } from '@design/tokens';
-import { DAY_LETTER, dayIndex } from '@/lib/dates';
+import { Pressable, View } from 'react-native';
+import { bar as barToken, frame, space } from '@design/tokens';
+import { DAY_LETTER, dayIndex, parseISO } from '@/lib/dates';
 import { bandFor } from '@/lib/load';
 import { Stack } from '../primitives/Stack';
 import { Text } from '../primitives/Text';
@@ -26,8 +26,30 @@ export interface ForecastDay {
   inCluster?: boolean;
 }
 
-export function ForecastStrip({ days, spoken }: { days: ForecastDay[]; spoken: string }) {
-  const [columnWidth, setColumnWidth] = useState(0);
+/**
+ * Width to draw at before the first layout pass.
+ *
+ * SVG needs a number, and `onLayout` reports nothing during prerender - so
+ * gating on a measured width meant the chart was simply absent from the served
+ * HTML and only appeared once JavaScript had run. Starting from the artboard
+ * width draws it immediately and the real measurement refines it.
+ */
+const fallbackColumn = (count: number) =>
+  Math.max(6, (frame.width - space[5] * 2 - space[6] * 2 - space[1] * count) / count);
+
+export function ForecastStrip({
+  days,
+  spoken,
+  selected,
+  onSelect,
+}: {
+  days: ForecastDay[];
+  spoken: string;
+  /** The day whose detail is shown below. Makes the strip a control, not a picture. */
+  selected?: string;
+  onSelect?: (date: string) => void;
+}) {
+  const [columnWidth, setColumnWidth] = useState(() => fallbackColumn(days.length));
   const tallest = Math.max(...days.map((d) => d.percent), 100);
 
   return (
@@ -57,17 +79,40 @@ export function ForecastStrip({ days, spoken }: { days: ForecastDay[]; spoken: s
         </Stack>
 
         <Stack direction="row" gap={1} className="w-full">
-          {days.map((day) => (
-            <View key={day.date} className="flex-1 items-center">
-              <Text
-                variant="micro"
-                tone={day.inCluster ? 'heavy' : 'subtle'}
-                weight={day.inCluster ? 'bold' : 'semibold'}
-              >
-                {DAY_LETTER[dayIndex(day.date)]}
-              </Text>
-            </View>
-          ))}
+          {days.map((day) => {
+            const isSelected = day.date === selected;
+            const label = (
+              <Stack gap={1} align="center" className={`w-full rounded-sm py-1 ${isSelected ? 'bg-inverse' : ''}`}>
+                <Text
+                  variant="micro"
+                  tone={isSelected ? 'inverse' : day.inCluster ? 'heavy' : 'subtle'}
+                  weight={day.inCluster || isSelected ? 'bold' : 'semibold'}
+                >
+                  {DAY_LETTER[dayIndex(day.date)]}
+                </Text>
+                <Text variant="micro" tone={isSelected ? 'inverse' : 'subtle'}>
+                  {parseISO(day.date).getUTCDate()}
+                </Text>
+              </Stack>
+            );
+            return (
+              <View key={day.date} className="flex-1 items-center">
+                {onSelect ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`${DAY_LETTER[dayIndex(day.date)]} ${parseISO(day.date).getUTCDate()}, ${day.percent} percent of a normal day`}
+                    onPress={() => onSelect(day.date)}
+                    className="min-h-min w-full items-center justify-end active:opacity-60"
+                  >
+                    {label}
+                  </Pressable>
+                ) : (
+                  label
+                )}
+              </View>
+            );
+          })}
         </Stack>
       </Stack>
     </View>

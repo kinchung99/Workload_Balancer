@@ -34,16 +34,23 @@ const EXPECTATIONS = [
     '13%',                                    // the battery: 100 - 87
     'Running on empty',
     'Something has to come off this week.',
-    '13 percent charge. Running on empty.',   // spoken
+    '13 percent overall. Running on empty. Made of Mental 0%',  // spoken, with its parts
+    'Your five areas, blended',               // the headline number, explained
     'YOUR AREAS', 'Mental', 'Time', 'Errands', 'Social', 'Physical',
     '0% left',                                // mental is over its ceiling
     '69% left',                               // physical has room
     'of your week left',                      // the unit "13%" was missing
+    'THIS WEEK', 'TAP A DAY',                 // the other six days, visible from home
     "WHAT'S PULLING YOU DOWN",
     'over its limit by 4%',                   // mental, stated plainly
     '82% of its limit used',
+    'TODAY \u00b7 MON 10 NOV',                    // the day now has a clock, not just a count
+    '1pm', '5pm', '11pm',                     // the timeline, in order
+    'ANYTIME TODAY',                          // unscheduled work kept separate
+    'Give it a time',                         // and it can be dropped into a slot
+    'h free',                                 // the gaps are shown as usable space
     'SUGGESTED FOR YOU', 'Walk the river loop',
-    'Put it in today at 5pm',                 // books for real; no longer a dead 'Start now'
+    'Put it in today at 5pm',                 // books for real
     'your line sits at 85%',                  // the ceiling the daily tap moves
     'Operating systems, part 2', 'Caf\u00e9 shift', 'Return the library books',
     '11h of rest owed',
@@ -69,7 +76,9 @@ const EXPECTATIONS = [
     'What if I', 'NOW', 'PROJECTED', 'YOUR ACTIONS',
     'Sleep tonight', '6 hrs', 'Take a walk', 'Text a friend', 'Study session', 'Late-night screen',
     'Drag the sliders to see how tonight changes your level.',
-    'Nothing to book yet',                    // becomes a real count once a slider moves
+    'Move a slider first',                    // becomes a real count once a slider moves
+    'WHAT THIS PUTS IN YOUR WEEK',            // the effect, stated before you tap
+    'what it would book appears here, with a time on it',
   ]],
   ['areas/mental.html', 'Mental area', [
     'LOG YOUR MOOD', 'HIGH ENERGY', 'LOW ENERGY',
@@ -77,26 +86,39 @@ const EXPECTATIONS = [
     'RECENT CHECK-INS', 'High Energy \u00b7 Unpleasant',
   ]],
   ['areas/time.html', 'Time area', [
-    'HRS COMMITTED', 'HRS RECOVERY', 'Classes and work', 'Protected recovery',
+    'HRS COMMITTED', 'HRS RECOVERY', 'Committed', 'Protected recovery',
+    'unscheduled that day',                   // the grid is drawn from real items now
     'Recovery blocks are protected time.',
   ]],
   ['areas/physical.html', 'Physical area', [
     'Tap and describe what you ate', "TODAY'S MEALS",
     'Breakfast', 'Ate \u00b7 Filling', 'Lunch', 'Light snack', 'Dinner', 'Not yet',
     'ACTIVITY TODAY', '4,200', '32 active min',
+    'HOW DID YOU SLEEP?', '8h',               // logged on waking
+    'Nothing is assumed until you tap',       // each option previews its own effect
   ]],
   ['areas/social.html', 'Social area', [
     'LOW-EFFORT RECONNECTION', 'Sam K.', '9 days since you spoke',
     'CLOSE FRIENDS', 'Last spoke 5 days ago', 'Talked today',
-    'YOUR CIRCLE', 'A WINDOW', 'Wednesday evening', '84%', 'heavy for 11 days',
+    'YOUR CIRCLE', '84%', 'heavy for 11 days',
+    'PLAN SOMETHING', 'WHO', 'WHAT', 'WHEN EVERYONE IS FREE',
+    'Day trip', '71%',                        // Ravi's battery, shown before you invite him
   ]],
   ['areas/errands.html', 'Errands area', [
-    'Tap and say what you need to do',
-    'GROCERIES', 'Pick up oat milk', 'ADMIN', 'Pay the phone bill', 'ACADEMIC', 'Email Prof. Chen',
+    'ADD AN ERRAND', 'Pick up oat milk',      // a real field, not a dead microphone
+    'Type it as you would say it',
+    'Type something first',                   // empty submits are refused
+    'GROCERIES', 'ADMIN', 'Pay the phone bill', 'ACADEMIC', 'Email Prof. Chen',
     'Batched by where they are.',
   ]],
   ['plan.html', 'Plan', [
     'Next week, 4%',           // 100 - 96, the same number the other way up
+    'Tap any day to see it hour by hour.',
+    'THE COLLISION', '72 hours', '4 things',  // the pile-up as a shape, not a list
+    'Hard — never suggested for moving',
+    'Movable — the rebalance list works on these',
+    '+ Add here',                             // gaps are where things get added
+    'h booked', 'h free',
     'Tuesday to Thursday next week is a wall',
     'Four things inside seventy-two hours',
     'In 8 days',
@@ -107,6 +129,8 @@ const EXPECTATIONS = [
   ['rebalance.html', 'Rebalance', [
     '4%', '16%',              // charge before and after the four trades
     '4 changes selected, saving 34 load',
+    'NEXT WEEK, IF YOU APPLY',                // which days get lighter, before you commit
+    'WHAT YOU COULD PUT DOWN',
     'Hard deadline. Never suggested for moving',
     'Self-imposed, push to Sunday, saves 6',
     'Ask Jo to take it, saves 14',
@@ -117,12 +141,22 @@ const EXPECTATIONS = [
   ]],
   ['add.html', 'Add', [
     'Ballast read that as', 'Mental', '8 hours', 'Thu 13 Nov', 'Hard deadline', 'Dread 4', 'Load 32',
+    'No time yet',                            // a slot is asked for, and "none" is a real answer
     'How much are you dreading it?', 'Already counted, set once', 'Repeats',
   ]],
-  ['recover.html', 'Recover', ['Balance, last 14 days', '11h', 'deficit for 9 days straight', 'Last full day off', '23 days ago']],
+  ['recover.html', 'Recover', [
+    'BALANCE, LAST 14 DAYS', '11h', 'In deficit for 9 days straight',
+    "WHAT YOU'RE DOWN", "WHAT YOU'VE BANKED",   // debts and credits, no longer one pile
+    'owed', 'banked',
+    'Sleep', 'Movement', 'Downtime',
+    'LAST FULL DAY OFF', '23 days ago',
+  ]],
   ['prescription.html', 'Prescription', [
     'Walk the river loop', 'Costs nothing', 'Under an hour', 'Alone',
-    'Put it in today at 5pm',               // writes a protected block and credits the ledger
+    'WHICH DAY', 'Today', 'Tomorrow',         // recovery is no longer today-only
+    'HOW LONG', 'WHAT TIME \u00b7 1 GAP ON TODAY',
+    'IF YOU BOOK IT', 'WHERE IT LANDS',       // battery and timeline before committing
+    'Book Today at 12pm',                          // defaults into the window a walk belongs in
     'Show me something else',
   ]],
   ['decline/w11-birthday.html', 'Drafter', ["Aisyah's birthday dinner", 'Warm', 'Brief', 'Fully honest', "Actually, I'm going", 'Open in WhatsApp']],

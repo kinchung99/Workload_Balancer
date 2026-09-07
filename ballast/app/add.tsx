@@ -1,22 +1,24 @@
 import { useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Button, Card, Chip, Divider, DreadPicker, Screen, Stack, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { parse, titleFrom } from '@/lib/parser';
 import { BUCKETS, BUCKET_LABEL, COMMITMENT_LABEL, loadOf } from '@/lib/load';
-import { addDays, formatShort } from '@/lib/dates';
+import { addDays, dayName, formatShort } from '@/lib/dates';
+import { formatHour, startOptions } from '@/lib/schedule';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import type { BucketKey, CommitmentKind, Dread } from '@/lib/types';
 import { useStore } from '@/state/store';
+import { useItemsWithLogs } from '@/state/selectors';
 
 const PLACEHOLDER = 'OS assignment due thurs, about 8 hours, really not looking forward to it';
 const HOUR_OPTIONS = [0.5, 1, 2, 4, 8];
 const RANGES: Array<[string, number]> = [['Under an hour', 0.5], ['An hour or two', 1.5], ['Half a day', 4], ['A full day', 8]];
 
-type Field = 'bucket' | 'hours' | 'date' | 'commitment';
+type Field = 'bucket' | 'hours' | 'date' | 'commitment' | 'time';
 
 /**
  * Screen 2 — if adding a task feels like a task, nobody adds the task.
@@ -27,10 +29,18 @@ type Field = 'bucket' | 'hours' | 'date' | 'commitment';
  */
 export default function Add() {
   const router = useRouter();
+  // Prefilled when you arrive from a gap in a day: "add something here" should
+  // mean here, not "somewhere on Tuesday".
+  const params = useLocalSearchParams<{ date?: string; start?: string }>();
   const { today, items, addItem } = useStore();
+  const scheduleItems = useItemsWithLogs();
+
   const [text, setText] = useState('');
   const [editing, setEditing] = useState<Field | null>(null);
-  const [override, setOverride] = useState<Partial<Record<Field | 'dread', unknown>>>({});
+  const [override, setOverride] = useState<Partial<Record<Field | 'dread' | 'time', unknown>>>(() => ({
+    ...(params.date ? { date: params.date } : {}),
+    ...(params.start ? { time: Number(params.start) } : {}),
+  }));
 
   const parsed = useMemo(() => parse(text || PLACEHOLDER, today), [text, today]);
 
@@ -41,8 +51,12 @@ export default function Add() {
   const commitment = (override.commitment as CommitmentKind) ?? parsed.commitment;
   const dread = (override.dread as Dread) ?? parsed.dread;
   const load = loadOf({ hours, dread });
+  // `null` is a real answer here: some work genuinely has no slot yet, and
+  // pretending otherwise is what makes a calendar lie.
+  const time = (override.time as number | null | undefined) ?? null;
+  const timeOptions = startOptions(scheduleItems, date, hours);
 
-  const correct = (field: Field | 'dread', value: unknown) => {
+  const correct = (field: Field | 'dread' | 'time', value: unknown) => {
     tapFeedback();
     setOverride((prev) => ({ ...prev, [field]: value }));
     if (field !== 'dread') setEditing(null);
@@ -54,6 +68,10 @@ export default function Add() {
   };
 
   const repeating = items.filter((item) => item.repeats).slice(0, 3);
+  // The placeholder is a worked example, not a default. Submitting an empty
+  // field used to add "OS assignment" - once per press - which is where the
+  // repeating phantom tasks came from.
+  const ready = text.trim().length > 0;
   const hoursUnknown = parsed.unknown.includes('hours') && text.length > 0 && override.hours === undefined;
 
   return (
@@ -62,9 +80,16 @@ export default function Add() {
       backLabel="Home"
       footer={
         <Button
-          label="Add it"
+          label={ready ? `Add it${time === null ? '' : ` at ${formatHour(time)}`}` : 'Type something first'}
+          kind={ready ? 'primary' : 'secondary'}
+          accessibilityState={{ disabled: !ready }}
           onPress={() => {
-            addItem({ title: titleFrom(text || PLACEHOLDER), bucket, hours, dread, commitment, date });
+            if (!ready) return;
+            addItem({
+              title: titleFrom(text),
+              bucket, hours, dread, commitment, date,
+              ...(time === null ? {} : { startHour: time }),
+            });
             successFeedback();
             router.back();
           }}
@@ -113,7 +138,13 @@ export default function Add() {
               label={formatShort(date)}
               tone={editing === 'date' ? 'selected' : 'plain'}
               onPress={() => toggle('date')}
-              accessibilityHint="Change the date"
+              accessibilityHint="Change the day"
+            />
+            <Chip
+              label={time === null ? 'No time yet' : `${formatHour(time)}–${formatHour(time + hours)}`}
+              tone={editing === 'time' ? 'selected' : time === null ? 'plain' : 'steady'}
+              onPress={() => toggle('time')}
+              accessibilityHint="Give it a time"
             />
             <Chip
               label={COMMITMENT_LABEL[commitment]}
@@ -129,7 +160,15 @@ export default function Add() {
           {editing ? (
             <Card tone="sunken" gap={3}>
               <Text variant="micro" tone="subtle">
-                {editing === 'bucket' ? 'WHICH AREA' : editing === 'hours' ? 'HOW LONG' : editing === 'date' ? 'WHEN' : 'WHAT KIND'}
+                {editing === 'bucket'
+                  ? 'WHICH AREA'
+                  : editing === 'hours'
+                    ? 'HOW LONG'
+                    : editing === 'date'
+                      ? 'WHICH DAY'
+                      : editing === 'time'
+                        ? `WHAT TIME ON ${dayName(date).toUpperCase()} · ${timeOptions.length} FREE`
+                        : 'WHAT KIND'}
               </Text>
               <Stack direction="row" gap={3} wrap>
                 {editing === 'bucket'
@@ -144,8 +183,25 @@ export default function Add() {
                   : null}
                 {editing === 'date'
                   ? Array.from({ length: 7 }, (_, offset) => addDays(today, offset)).map((option) => (
-                      <Chip key={option} label={formatShort(option)} tone={option === date ? 'selected' : 'plain'} onPress={() => correct('date', option)} />
+                      <Chip
+                        key={option}
+                        label={offset0(option, today)}
+                        tone={option === date ? 'selected' : 'plain'}
+                        onPress={() => {
+                          // A new day means the old time may not be free on it.
+                          setOverride((prev) => ({ ...prev, date: option, time: null }));
+                          setEditing('time');
+                        }}
+                      />
                     ))
+                  : null}
+                {editing === 'time'
+                  ? [
+                      <Chip key="none" label="No time yet" tone={time === null ? 'selected' : 'plain'} onPress={() => correct('time', null)} />,
+                      ...timeOptions.map((option) => (
+                        <Chip key={option} label={formatHour(option)} tone={option === time ? 'selected' : 'plain'} onPress={() => correct('time', option)} />
+                      )),
+                    ]
                   : null}
                 {editing === 'commitment'
                   ? (['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
@@ -202,4 +258,11 @@ export default function Add() {
       </Stack>
     </Screen>
   );
+}
+
+/** "Today" and "Tomorrow" read better than a date on the two days people mean. */
+function offset0(date: string, today: string): string {
+  if (date === today) return 'Today';
+  if (date === addDays(today, 1)) return 'Tomorrow';
+  return formatShort(date);
 }

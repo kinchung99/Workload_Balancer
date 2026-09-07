@@ -1,69 +1,118 @@
 /**
  * Data / Week grid.
  *
- * Committed time in amber, protected recovery in green, written into the same
- * calendar rather than left as whatever is spare. Recovery that is not on the
- * grid is recovery that gets eaten.
+ * Drawn from the same `items` as everything else — it used to render a separate
+ * seeded block list, which meant the timetable on screen was not your week.
+ *
+ * Committed time carries its band colour so a heavy Wednesday looks heavy;
+ * protected recovery is green and outlined. Anything without a slot is counted
+ * under the day rather than invented onto the grid.
  */
-import { View } from 'react-native';
-import { DAY_LETTER } from '@/lib/dates';
-import type { Block } from '@/lib/types';
+import { Pressable, View } from 'react-native';
+import { DAY_LETTER, dayIndex } from '@/lib/dates';
+import { DAY_END, DAY_START, daySchedule, endHour, formatHour } from '@/lib/schedule';
+import { bandFor, loadOf } from '@/lib/load';
+import type { Item } from '@/lib/types';
 import { Stack } from '../primitives/Stack';
 import { Text } from '../primitives/Text';
 
-const START = 12;
-const END = 21;
-const ROW = 26;
+const ROW = 15;
 
-const KIND = {
-  committed: 'bg-busy-wash border-busy-fill',
-  recovery: 'bg-steady-wash border-steady-fill',
+const FILL = {
+  steady: 'bg-steady-wash border-l-steady-fill',
+  busy: 'bg-busy-wash border-l-busy-fill',
+  heavy: 'bg-heavy-wash border-l-heavy-fill',
 } as const;
 
-const TONE = { committed: 'busy', recovery: 'steady' } as const;
+const intensity = (item: Item) => bandFor((loadOf(item) / Math.max(item.hours, 0.5)) * 22);
 
-export function WeekGrid({ blocks, todayIndex }: { blocks: Block[]; todayIndex: number }) {
-  const hours = Array.from({ length: END - START }, (_, i) => START + i);
-  const spoken = `Week grid. ${blocks.filter((b) => b.kind === 'committed').length} committed blocks and ${
-    blocks.filter((b) => b.kind === 'recovery').length
-  } protected recovery blocks.`;
+export function WeekGrid({
+  items,
+  days,
+  todayDate,
+  onSelectDay,
+}: {
+  items: Item[];
+  days: string[];
+  todayDate: string;
+  onSelectDay?: (date: string) => void;
+}) {
+  const hours = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i);
+  const scheduled = days.reduce((total, date) => total + daySchedule(items, date).timed.length, 0);
+  const floating = days.reduce((total, date) => total + daySchedule(items, date).anytime.length, 0);
 
   return (
-    <View accessible accessibilityRole="image" accessibilityLabel={spoken}>
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`Week grid. ${scheduled} scheduled blocks and ${floating} unscheduled tasks across seven days.`}
+    >
       <Stack gap={3}>
         <Stack direction="row" gap={1}>
-          <View className="w-8" />
-          {DAY_LETTER.map((letter, index) => (
-            <View key={index} className="flex-1 items-center">
-              <Text variant="micro" tone={index === todayIndex ? 'default' : 'subtle'} weight={index === todayIndex ? 'bold' : 'semibold'}>
-                {letter}
-              </Text>
-            </View>
-          ))}
+          <View className="w-9" />
+          {days.map((date) => {
+            const isToday = date === todayDate;
+            const spare = daySchedule(items, date).anytime.length;
+            const header = (
+              <Stack gap={1} align="center">
+                <Text variant="micro" tone={isToday ? 'default' : 'subtle'} weight={isToday ? 'bold' : 'semibold'}>
+                  {DAY_LETTER[dayIndex(date)]}
+                </Text>
+                {spare > 0 ? <Text variant="micro" tone="subtle">+{spare}</Text> : <Text variant="micro" tone="subtle"> </Text>}
+              </Stack>
+            );
+            return (
+              <View key={date} className="flex-1">
+                {onSelectDay ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${date}`}
+                    onPress={() => onSelectDay(date)}
+                    className="min-h-min items-center justify-center active:opacity-60"
+                  >
+                    {header}
+                  </Pressable>
+                ) : (
+                  <View className="items-center">{header}</View>
+                )}
+              </View>
+            );
+          })}
         </Stack>
 
         <Stack direction="row" gap={1}>
-          <Stack className="w-8">
+          <Stack className="w-9">
             {hours.map((hour) => (
-              <View key={hour} style={{ height: ROW }} className="justify-start">
-                <Text variant="micro" tone="subtle">{hour > 12 ? `${hour - 12}pm` : '12pm'}</Text>
+              <View key={hour} style={{ height: ROW }}>
+                {hour % 3 === DAY_START % 3 ? (
+                  <Text variant="micro" tone="subtle">{formatHour(hour)}</Text>
+                ) : null}
               </View>
             ))}
           </Stack>
 
-          {DAY_LETTER.map((_, day) => (
-            <View key={day} className="flex-1 rounded-sm bg-sunken" style={{ height: (END - START) * ROW }}>
-              {blocks
-                .filter((block) => block.day === day)
-                .map((block) => (
-                  <View
-                    key={block.id}
-                    className={`absolute left-0 right-0 overflow-hidden rounded-sm border-l-2 ${KIND[block.kind]}`}
-                    style={{ top: (block.startHour - START) * ROW, height: block.hours * ROW - 2 }}
-                  >
-                    <Text variant="micro" tone={TONE[block.kind]} className="px-1 pt-1">{block.label}</Text>
-                  </View>
-                ))}
+          {days.map((date) => (
+            <View
+              key={date}
+              className={`flex-1 rounded-sm ${date === todayDate ? 'bg-sunken' : 'bg-page border border-line-hairline'}`}
+              style={{ height: (DAY_END - DAY_START) * ROW }}
+            >
+              {daySchedule(items, date).timed.map((item) => (
+                <View
+                  key={item.id}
+                  className={`absolute left-0 right-0 overflow-hidden rounded-sm border-l-2 ${
+                    item.isRecovery ? 'bg-recovery-wash border-l-recovery-fill' : FILL[intensity(item)]
+                  }`}
+                  style={{
+                    top: (item.startHour - DAY_START) * ROW,
+                    height: Math.max(ROW, (Math.min(endHour(item), DAY_END) - item.startHour) * ROW - 1),
+                  }}
+                >
+                  <Text variant="micro" tone="muted" numberOfLines={1} className="px-1">
+                    {item.title.split(',')[0].split(' ').slice(0, 2).join(' ')}
+                  </Text>
+                </View>
+              ))}
             </View>
           ))}
         </Stack>

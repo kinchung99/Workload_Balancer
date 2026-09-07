@@ -3,12 +3,16 @@ import { successFeedback } from '@/lib/haptics';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, Divider, Screen, Slider, Stack, Text,
+  Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Slider, Stack, Text,
 } from '@/components';
 import { ACTIONS, initialSim, note, pointsOf, project, readout, totalPoints } from '@/lib/simulate';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
-import { useStore, weekReading } from '@/state/store';
+import { useStore } from '@/state/store';
+import { useItemsWithLogs } from '@/state/selectors';
+import { formatHour, placeIn } from '@/lib/schedule';
+import type { Item } from '@/lib/types';
+import { useReading } from '@/state/selectors';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -21,8 +25,9 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export default function Actions() {
   const router = useRouter();
-  const { items, ceilings, today, applyPlan } = useStore();
-  const { overall } = weekReading(items, today, ceilings);
+  const { today, applyPlan } = useStore();
+  const items = useItemsWithLogs();
+  const { overall } = useReading();
 
   const now = chargeOf(overall);
   const [sim, setSim] = useState(initialSim);
@@ -33,13 +38,40 @@ export default function Actions() {
 
   // Only the actions that give charge back become blocks. A study session and
   // late-night scrolling are things you do, not things worth protecting time for.
-  const gains = ACTIONS.filter((action) => pointsOf(action, sim[action.id]) > 0).map((action) => ({
-    id: action.id,
-    label: action.label,
-    bucket: action.bucket,
-    hours: action.unit === 'min' ? sim[action.id] / 60 : Math.max(0.5, sim[action.id] - action.baseline),
-    credit: pointsOf(action, sim[action.id]),
-  }));
+  // Sleep is the night, not a block, so it is committed as a log instead.
+  const gains = ACTIONS.filter((action) => !action.logOnly && pointsOf(action, sim[action.id]) > 0).map((action) => {
+    const hours = action.unit === 'min' ? sim[action.id] / 60 : Math.max(0.5, sim[action.id] - action.baseline);
+    return {
+      id: action.id,
+      label: action.label,
+      bucket: action.bucket,
+      hours: Math.round(hours * 100) / 100,
+      credit: pointsOf(action, sim[action.id]),
+      preferred: action.preferred,
+    };
+  });
+
+  // Blocks this plan would replace must not be treated as occupied, or pressing
+  // apply twice makes the walk hop to a different hour each time.
+  const ownIds = new Set(ACTIONS.map((action) => `plan-${action.id}-${today}`));
+  const otherItems = items.filter((item) => !ownIds.has(item.id));
+
+  // Give each one a real slot in today, first gap that fits, none reused.
+  const placed = gains.reduce<Array<(typeof gains)[number] & { startHour?: number }>>((acc, block) => {
+    const taken: Item[] = acc
+      .filter((b) => b.startHour !== undefined)
+      .map((b) => ({
+        id: b.id, title: b.label, bucket: b.bucket, hours: b.hours,
+        dread: 1, commitment: 'self', date: today, startHour: b.startHour, isRecovery: true,
+      }));
+    // Placed in the window the activity belongs in, and never on top of one
+    // already placed by this same plan.
+    return [...acc, { ...block, startHour: placeIn([...otherItems, ...taken], today, block.hours, block.preferred) }];
+  }, []);
+
+  const sleepAction = ACTIONS.find((a) => a.logOnly)!;
+  const sleepChanged = sim[sleepAction.id] !== sleepAction.baseline;
+  const toBook = placed.filter((b) => b.startHour !== undefined);
 
   if (committed) {
     return (
@@ -65,10 +97,17 @@ export default function Actions() {
           </Text>
           <Card tone="steady" gap={3}>
             <Text variant="callout">
-              They are protected time now. Rebalancing moves work around them, never through them.
+              Protected time now. Rebalancing moves work around them, never through them.
             </Text>
-            <Text variant="footnote" tone="muted">+{committed.points} charge points credited to the ledger.</Text>
+            <Text variant="footnote" tone="muted">+{committed.points} charge points, and your battery already moved.</Text>
           </Card>
+
+          <Stack gap={3}>
+            <Text variant="micro" tone="subtle">TODAY, UPDATED</Text>
+            <Card gap={4}>
+              <DayTimeline items={items} date={today} showGaps={false} />
+            </Card>
+          </Stack>
         </Stack>
       </Screen>
     );
@@ -79,12 +118,16 @@ export default function Actions() {
       footer={
         <>
           <Button
-            label={gains.length ? `Put ${gains.length} block${gains.length === 1 ? '' : 's'} in my week` : 'Nothing to book yet'}
+            label={
+              toBook.length || sleepChanged
+                ? `Put ${toBook.length + (sleepChanged ? 1 : 0)} thing${toBook.length + (sleepChanged ? 1 : 0) === 1 ? '' : 's'} in my week`
+                : 'Move a slider first'
+            }
             onPress={() => {
-              if (!gains.length) return;
-              applyPlan(gains);
+              if (!toBook.length && !sleepChanged) return;
+              applyPlan(toBook, sleepChanged ? sim[sleepAction.id] : undefined);
               successFeedback();
-              setCommitted({ blocks: gains.length, points: delta });
+              setCommitted({ blocks: toBook.length + (sleepChanged ? 1 : 0), points: delta });
             }}
           />
           <Button label="Reset" kind="quiet" onPress={() => setSim(initialSim())} />
@@ -171,6 +214,51 @@ export default function Actions() {
                 </Stack>
               );
             })}
+          </Card>
+        </Stack>
+
+        {/* The answer to "what happens if I press this". */}
+        <Stack gap={3}>
+          <Text variant="micro" tone="subtle">WHAT THIS PUTS IN YOUR WEEK</Text>
+          <Card pad={0} gap={0} className="px-5">
+            {sleepChanged ? (
+              <Stack direction="row" gap={4} align="center" justify="between" className="min-h-row py-4">
+                <Stack gap={1} grow>
+                  <Text variant="body" weight="semibold">Sleep {sim[sleepAction.id]}h tonight</Text>
+                  <Text variant="footnote" tone="subtle">Logged for tonight — never placed on the timeline</Text>
+                </Stack>
+                <Chip
+                  label={`${pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? '+' : ''}${pointsOf(sleepAction, sim[sleepAction.id])}`}
+                  tone={pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? 'steady' : 'heavy'}
+                  readOnly
+                />
+              </Stack>
+            ) : null}
+
+            {placed.map((block, index) => (
+              <Stack key={block.id}>
+                {(index > 0 || sleepChanged) ? <Divider /> : null}
+                <Stack direction="row" gap={4} align="center" justify="between" className="min-h-row py-4">
+                  <Stack gap={1} grow>
+                    <Text variant="body" weight="semibold">{block.label}</Text>
+                    <Text variant="footnote" tone={block.startHour === undefined ? 'heavy' : 'subtle'}>
+                      {block.startHour === undefined
+                        ? 'No gap long enough today'
+                        : `${formatHour(block.startHour)}–${formatHour(block.startHour + block.hours)} · protected`}
+                    </Text>
+                  </Stack>
+                  <Chip label={`+${block.credit}`} tone="steady" readOnly />
+                </Stack>
+              </Stack>
+            ))}
+
+            {!sleepChanged && placed.length === 0 ? (
+              <View className="py-5">
+                <Text variant="footnote" tone="subtle">
+                  Nothing yet. Move a slider above and what it would book appears here, with a time on it.
+                </Text>
+              </View>
+            ) : null}
           </Card>
         </Stack>
 
