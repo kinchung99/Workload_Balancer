@@ -71,6 +71,35 @@ export const ACTIONS: SimAction[] = [
 
 export type SimState = Record<string, number>;
 
+/**
+ * Three shapes an evening takes.
+ *
+ * Sliders are precise and abstract; most people do not want to dial in a night,
+ * they want to know what kind of night they are choosing. These set every slider
+ * at once, and the screen shows what each one would cost or return before you
+ * pick it.
+ */
+export const PRESETS: Array<{ id: string; label: string; note: string; state: SimState }> = [
+  {
+    id: 'recover',
+    label: 'A recovery night',
+    note: 'Early night, a walk, one message sent',
+    state: { sleep: 9, walk: 30, text: 1, study: 0, screen: 0 },
+  },
+  {
+    id: 'balanced',
+    label: 'A balanced night',
+    note: 'Some work, some rest, phone down by eleven',
+    state: { sleep: 8, walk: 20, text: 1, study: 1.5, screen: 0 },
+  },
+  {
+    id: 'push',
+    label: 'Push through',
+    note: 'Four hours of work and a short night',
+    state: { sleep: 5, walk: 0, text: 0, study: 4, screen: 1 },
+  },
+];
+
 export const initialSim = (): SimState =>
   Object.fromEntries(ACTIONS.map((action) => [action.id, action.baseline]));
 

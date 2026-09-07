@@ -362,6 +362,173 @@ the preview and timeline following the day you pick. Errands take a day and an
 hour too — given one they become a real block on that day rather than an
 anonymous lump of load, and they are then counted there instead of twice.
 
+### A deadline is not a task
+
+The list showed things on the day they were due, which is the reason a to-do list
+can look empty right up until the night it ruins. An assignment due Thursday is
+not a Thursday task; it is nine hours spread across the days before Thursday.
+
+Anything with preparation now carries a deadline, an estimate, a difficulty and
+an importance, and it sits on **every** day's list from now until it is due —
+showing how much is left rather than a tick box that is false until the end. It
+disappears the moment the work is done.
+
+```
+ANYTIME · 1 loose + what is owing
+Emails I have been avoiding   Mental · 4h left of 4h · 2 days left   100% undone
+  [Schedule it]  [Plan 3 sessions for me]  [Push to tomorrow]
+Algorithms problem set        Mental · 3h left of 4h · 3 days left    75% undone
+```
+
+Four things you can do to a row: put a sitting on this day at a time that is
+actually free, have the sittings planned across the days before the deadline,
+push it to another day, or log the hours you already did — which is what makes
+the percentage fall.
+
+**"Plan it for me" is a scheduler, not a model call.** It runs offline, it is
+explainable, and every session can be justified: at most two hours a sitting,
+never more than one sitting per day per pass so the work is spread rather than
+crammed, and it leaves the day it is due clear if it possibly can, because
+handing in is not the same as finishing. It also says what it *cannot* fit —
+`2h will not fit before the deadline` — rather than quietly dropping it. The
+same honesty as the parser: rule-based, and labelled as such.
+
+One thing it can tell you that no list does: whether there is genuinely enough
+free time left before the deadline. If not, the row turns red and says so.
+
+### A battery you can actually move
+
+Amira starts at 13% because that is the week the interface study describes, but
+a number that only ever sits near empty stops meaning anything — it just reads as
+a verdict. The seeded baseline is unchanged; what changed is how far the good
+things move it.
+
+- **Good moments are worth roughly twice what they were**, and there are eight of
+  them now — *helped someone* and *actually rested* joined the list.
+- **The hard cap is gone.** It made the number feel rigged: past twelve, nothing
+  you did counted. In its place, each *repeat of the same kind* is worth less
+  than the last — the fifth laugh is not the first. A genuinely varied day counts
+  fully, and tapping one button twenty times tails off to nothing. Both are
+  asserted.
+- **You say why.** Picking a moment opens a field in your own words, with
+  prompts under it — *"Something my flatmate said"*, *"Asked for help"*,
+  *"An evening with nothing in it"* — and the reasons are listed back under
+  *Today's good bits*, which is the part worth reading in a bad week.
+
+A recovery night now reads **32% `+19`** against a balanced night's **23% `+9.5`**,
+so the choice between them is visible rather than nominal.
+
+### One evening, and only one
+
+*Tonight* silently spanned whatever day you were on and accumulated. Booking a
+walk-and-message plan and then a walk-only plan left the message behind, because
+applying cleared only the blocks in the current press. Repeat that a few times
+and the day fills with protected recovery.
+
+A day now owns exactly one plan: applying **replaces** it, the screen names the
+evening it is working on (*Tonight*, *Tomorrow*, or a date), lists what is already
+booked there, and offers *Clear this evening*. The button says which it is doing —
+`Book tonight — 2 things` or `Replace tonight — 2 things`.
+
+### Buttons that go where they say
+
+`Screen`'s back control popped history whenever there was any, so a button
+reading **Home** took you to whatever you last looked at instead. It now goes to
+the destination it names. Fourteen routes were affected.
+
+### Nothing outlives a reload
+
+Every launch starts from the seeded semester. Only whether the intro has run is
+saved. A week you can accidentally wreck and cannot get back is worse than one
+that forgets — the demo is repeatable, nothing half-finished carries over, and a
+bug fixed in code can no longer be kept alive by data written before it.
+
+### Planned is not the same as done
+
+The bar tracked only what was finished, so booking three sittings changed nothing
+about how alarming a piece of work looked. But a plan genuinely *is* different
+from an intention, and the screen should say so.
+
+It now tracks three states at once — done, booked into a day, and neither — as
+one bar with the numbers under it. Booking takes work out of the unplanned part
+even though none of it is finished; giving the sitting back puts it straight in
+again.
+
+```
+Algorithms problem set   Mental · due Thu 13 Nov · 3 days left   75% unplanned
+1h done   0h booked   3h with no plan
+```
+
+**Progress is a percentage now**, not `+30m done` — because "about half way" is
+how people actually hold it in their heads, and hours are a translation step
+nobody wants to do. The hours are still shown underneath.
+
+**Every sitting takes a note.** *Finish section 2* is the difference between a
+block of time and a plan, and it is the thing that makes a booked hour usable
+when you get to it.
+
+**Preparation hours are no longer capped at twelve.** Presets up to thirty with a
+stepper past that, and above twelve it says what that means in sittings: *"20h is
+10 sittings at two hours each. Worth checking the deadline gives you that many
+days."*
+
+**The two kinds of "not at a time" are now separate blocks.** *Owing before a
+deadline* — which sits there every day until it is done — is nothing like
+*Today's list*, which is loose things for that day only. Stacking them together
+is exactly how a deadline hides among the errands.
+
+### The battery can go up
+
+Everything else here measures what a week takes out of you, and a battery that
+only ever falls is both bleak and inaccurate. Days do go well.
+
+The mental area now has one-tap good moments — *properly laughed*, *finished
+something*, *proud of myself*, *got outside* — each worth a small credit in the
+area it belongs to, showing on the battery immediately. Reconnecting with someone
+on the social screen logs one too, because reaching a person you had dropped is
+social recovery whatever else it is.
+
+They are deliberately small, and capped at +12 a day. Without a cap, tapping
+"laughed" twenty times would read as a well-rested week, which is exactly the
+self-deception this app exists to prevent.
+
+### Adding to a day that is not today
+
+Capture could already reach any day, but only by tapping a date chip to reveal a
+picker — so it read as a today-only screen with an option hidden inside it.
+Adding to Thursday is the normal case, not an advanced one. **Which day?** is now
+a permanent section with seven days in view and the free times for whichever is
+selected, and *Anytime that day* stays a real answer.
+
+When a day has no gap long enough it now says which of the two problems that is,
+rather than showing a bare `0 FREE`: *"No gap on Thursday is 8 hours long. Leave
+it anytime, shorten it, or mark it as needing preparation and have the sittings
+planned across several days."*
+
+### What the Tonight tab is for
+
+It was called **Actions** and opened on *"What if I…"* over five sliders, which
+says nothing about why you would use it. The tab is now **Tonight** and the
+screen states its own purpose in a line:
+
+> Every other screen tells you what already happened. This one is the rest of
+> today: choose how you spend it, see what it costs or gives back, and book it
+> only if you want to. Nothing is saved until you press the button.
+
+Sliders are precise and abstract, and most people are not dialling in a night —
+they are choosing a *kind* of night. So three presets sit above them, each
+showing where it would leave you before you pick it:
+
+| | |
+|---|---|
+| **A recovery night** — early night, a walk, one message sent | **26%** `+13` |
+| **A balanced night** — some work, some rest, phone down by eleven | **17%** `+4` |
+| **Push through** — four hours of work and a short night | **1%** `−15` |
+
+Picking one sets every slider; the sliders are still there to adjust from. And
+the screen now shows *where the blocks would land* on today's timeline, so
+"book it" is a visible change to a real evening rather than an abstraction.
+
 ### One model correction this exposed
 
 The study's fourth band is *"Recovery — load you get back"*, but recovery items
@@ -414,8 +581,8 @@ The things most likely to break later, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 228 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 118 actions |
+| A component hard-codes a number | `render:check` asserts 262 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 169 actions |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
 | A screen becomes a dead end | `render:check` asserts all 14 non-tab routes carry an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
@@ -810,9 +977,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 228 strings against
+figures against the model, and `npm run render:check` asserts 262 strings against
 the rendered HTML of all eighteen screens, and `npm run behaviour:check` asserts
-118 state changes behind the buttons.
+169 state changes behind the buttons.
 
 ---
 
@@ -825,7 +992,7 @@ two scripts below check the things that would actually be wrong.
   Node's native TypeScript stripping and asserts the study's numbers. It catches
   a seed edit that silently moves Amira off 87%.
 - `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 118 checks covering
+  actions the buttons call and asserts the state moved: 169 checks covering
   booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
   capture with and without a time, the area logs, the time layer, scheduling,
   errands and inviting people. Several assert that a slot is never offered

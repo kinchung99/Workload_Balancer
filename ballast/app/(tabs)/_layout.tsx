@@ -11,7 +11,7 @@ const TABS: Array<{ name: string; title: string; icon: TabName }> = [
   { name: 'index',   title: 'Home',    icon: 'home' },
   { name: 'areas',   title: 'Areas',   icon: 'areas' },
   { name: 'plan',    title: 'Plan',    icon: 'plan' },
-  { name: 'actions', title: 'Actions', icon: 'actions' },
+  { name: 'actions', title: 'Tonight', icon: 'actions' },
 ];
 
 export default function TabsLayout() {

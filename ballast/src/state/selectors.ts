@@ -30,10 +30,10 @@ export function readingFrom(items: Item[], anchor: string, ceilings: Record<Buck
 }
 
 export function useReading(anchor?: string): Reading {
-  const { items, ceilings, today, sleepHours, meals, moods, errands } = useStore();
+  const { items, ceilings, today, sleepHours, meals, moods, errands, moments } = useStore();
   const withLogs = useMemo(
-    () => [...items, ...logItems({ today, sleepHours, meals, moods, errands })],
-    [items, today, sleepHours, meals, moods, errands],
+    () => [...items, ...logItems({ today, sleepHours, meals, moods, errands, moments })],
+    [items, today, sleepHours, meals, moods, errands, moments],
   );
   return useMemo(
     () => readingFrom(withLogs, anchor ?? today, ceilings),
@@ -43,9 +43,9 @@ export function useReading(anchor?: string): Reading {
 
 /** The same list the reading used, for timelines and grids. */
 export function useItemsWithLogs(): Item[] {
-  const { items, today, sleepHours, meals, moods, errands } = useStore();
+  const { items, today, sleepHours, meals, moods, errands, moments } = useStore();
   return useMemo(
-    () => [...items, ...logItems({ today, sleepHours, meals, moods, errands })],
-    [items, today, sleepHours, meals, moods, errands],
+    () => [...items, ...logItems({ today, sleepHours, meals, moods, errands, moments })],
+    [items, today, sleepHours, meals, moods, errands, moments],
   );
 }

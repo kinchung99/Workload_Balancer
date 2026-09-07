@@ -9,7 +9,7 @@
  * the fixed from the floating. Coursework with no slot is not "late", it is
  * unscheduled, and treating those the same is why a packed week reads as noise.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { DAY_END, endHour, formatHour, freeSlots, slotHours, daySchedule, startOptions } from '@/lib/schedule';
 import { BUCKET_LABEL, bandFor, loadOf } from '@/lib/load';
@@ -38,6 +38,7 @@ export function DayTimeline({
   onSelect,
   onSchedule,
   onAddAt,
+  todo,
   showGaps = true,
 }: {
   items: Item[];
@@ -47,6 +48,8 @@ export function DayTimeline({
   onSchedule?: (item: Item, startHour: number | undefined) => void;
   /** Tapping an empty stretch. This is how something gets added *at a time*. */
   onAddAt?: (date: string, startHour: number) => void;
+  /** Work owing before a deadline, rendered above the plain unscheduled items. */
+  todo?: ReactNode;
   showGaps?: boolean;
 }) {
   const { timed, anytime } = daySchedule(items, date);
@@ -149,9 +152,25 @@ export function DayTimeline({
         ),
       )}
 
+      {/* Two different kinds of "not at a time". Work owing before a deadline
+          behaves nothing like a loose task for today, and stacking them into one
+          list is why a deadline can hide among the errands. */}
+      {todo ? (
+        <Stack gap={3} className="pt-2">
+          <Stack gap={1}>
+            <Text variant="micro" tone="heavy">OWING BEFORE A DEADLINE</Text>
+            <Text variant="micro" tone="subtle">Sits here every day until it is done</Text>
+          </Stack>
+          {todo}
+        </Stack>
+      ) : null}
+
       {anytime.length > 0 ? (
         <Stack gap={3} className="pt-2">
-          <Text variant="micro" tone="subtle">ANYTIME TODAY · {anytime.length}</Text>
+          <Stack gap={1}>
+            <Text variant="micro" tone="subtle">TODAY'S LIST · {anytime.length}</Text>
+            <Text variant="micro" tone="subtle">Just this day, no time set</Text>
+          </Stack>
           {anytime.map((item) => (
             <Stack key={item.id} direction="row" gap={4} align="start">
               <View className="w-14 pt-3">
@@ -201,7 +220,7 @@ export function DayTimeline({
         </Stack>
       ) : null}
 
-      {rows.length === 0 && anytime.length === 0 ? (
+      {rows.length === 0 && anytime.length === 0 && !todo ? (
         <View className="rounded-md border border-dashed border-line-hairline px-5 py-8">
           <Text variant="callout" tone="subtle" className="text-center">Nothing scheduled. Genuinely.</Text>
         </View>

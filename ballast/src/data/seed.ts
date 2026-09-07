@@ -51,9 +51,9 @@ export const seedItems: Item[] = [
   { id: 'seminar',   title: 'Seminar prep, distributed systems', bucket: 'mental', hours: 3, dread: 3, commitment: 'soft', date: d(W10, 2), startHour: 11 },
   { id: 'tutorial',  title: 'Tutorial exercises',         bucket: 'mental',  hours: 2,    dread: 3, commitment: 'soft', date: d(W10, 3), startHour: 10 },
   { id: 'ch9',       title: 'Chapter 9 reading',          bucket: 'mental',  hours: 3,    dread: 2, commitment: 'self', date: d(W10, 5) },
-  { id: 'algo-set',  title: 'Algorithms problem set',     bucket: 'mental',  hours: 4,    dread: 3, commitment: 'soft', date: d(W10, 3), startHour: 14 },
+  { id: 'algo-set',  title: 'Algorithms problem set',     bucket: 'mental',  hours: 4,    dread: 3, commitment: 'soft', date: d(W10, 3), deadline: d(W10, 3), prepHours: 4, prepDone: 1, importance: 3 },
   { id: 'revision',  title: 'Week 10 catch-up revision',  bucket: 'mental',  hours: 5,    dread: 3, commitment: 'self', date: d(W10, 5), startHour: 10 },
-  { id: 'emails',    title: 'Emails I have been avoiding',bucket: 'mental',  hours: 4,    dread: 3, commitment: 'self', date: d(W10, 2), startHour: 14 },
+  { id: 'emails',    title: 'Emails I have been avoiding',bucket: 'mental',  hours: 4,    dread: 3, commitment: 'self', date: d(W10, 2), deadline: d(W10, 2), prepHours: 4, prepDone: 0, importance: 1 },
   { id: 'good-read', title: 'Reading you actually enjoy', bucket: 'mental',  hours: 6,    dread: 1, commitment: 'self', date: d(W10, 6) },
 
   // Time. The invisible half of the week, entered once in September.
@@ -85,7 +85,7 @@ export const seedItems: Item[] = [
   // ---------------------------------------------------------------- week 11
   // The wall: four things inside seventy-two hours, Tuesday to Thursday.
   { id: 'w11-net-lab',  title: 'Networks lab report',     bucket: 'mental',  hours: 5,    dread: 2, commitment: 'hard', date: d(W11, 1), when: 'Tue', startHour: 10 },
-  { id: 'w11-pres',     title: 'Group presentation',      bucket: 'mental',  hours: 6,    dread: 4, commitment: 'hard', date: d(W11, 2), when: 'Wed', startHour: 9 },
+  { id: 'w11-pres',     title: 'Group presentation',      bucket: 'mental',  hours: 6,    dread: 4, commitment: 'hard', date: d(W11, 2), when: 'Wed', startHour: 9, deadline: d(W11, 2), prepHours: 6, prepDone: 0, importance: 3 },
   { id: 'w11-amin',     title: 'Café shift, covering Amin', bucket: 'time',  hours: 7,    dread: 2, commitment: 'soft', date: d(W11, 2), when: 'Wed evening', startHour: 16 },
   { id: 'w11-birthday', title: "Aisyah's birthday dinner", bucket: 'social', hours: 3,    dread: 3, commitment: 'soft', date: d(W11, 3), when: 'Thu', startHour: 19 },
 

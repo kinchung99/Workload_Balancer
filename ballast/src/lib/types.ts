@@ -57,6 +57,44 @@ export interface Item {
   loadOverride?: number;
   /** Derived from a log rather than entered as a task. Never shown in a list. */
   isLog?: boolean;
+
+  // --- work that takes more than one sitting -------------------------------
+  /**
+   * When it is due, which is not the same as when you do it.
+   *
+   * An assignment due Thursday is not a Thursday task; it is up to nine hours
+   * spread across the days before Thursday. Conflating the two is why a to-do
+   * list can look empty right up until the night it ruins.
+   */
+  deadline?: string;
+  /** Total hours of preparation it needs. Absent for things you just attend. */
+  prepHours?: number;
+  /** Hours done so far. It stays on every day's list until this reaches prepHours. */
+  prepDone?: number;
+  /** 1 low, 2 normal, 3 high. Used to order what gets scheduled first. */
+  importance?: 1 | 2 | 3;
+  /** A booked sitting of a larger piece of work. */
+  parentId?: string;
+  /** What you mean to get through in this sitting. Yours, in your words. */
+  note?: string;
+}
+
+/**
+ * A good moment.
+ *
+ * The battery only ever went down, which is a miserable thing to hand someone
+ * and also wrong: a day can genuinely go well. These are the small things that
+ * give a little back, logged in one tap.
+ */
+export interface Moment {
+  id: string;
+  date: string;
+  kind: string;
+  bucket: BucketKey;
+  /** Load returned, before diminishing returns are applied. */
+  credit: number;
+  /** Why, in the student's own words. The part worth reading back later. */
+  note?: string;
 }
 
 /** One row of the recovery ledger. Positive is credit, negative is debt. */

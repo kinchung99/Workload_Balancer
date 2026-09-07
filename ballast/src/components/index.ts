@@ -25,5 +25,6 @@ export { WeekGrid } from './charts/WeekGrid';
 export { DayTimeline } from './charts/DayTimeline';
 export { WeekStrip } from './charts/WeekStrip';
 export { CollisionWindow } from './charts/CollisionWindow';
+export { TodoList } from './charts/TodoList';
 
 export { Screen, ScreenHeader } from './layout/Screen';

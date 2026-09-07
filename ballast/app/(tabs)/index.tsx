@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import {
-  AreaTile, Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Stack, Text, WeekStrip,
+  AreaTile, Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Stack, Text, TodoList, WeekStrip,
 } from '@/components';
 import { CalmMode } from '@/features/home/CalmMode';
 import { CHARGE_LABEL, CHARGE_NOTE, chargeOf, drains } from '@/lib/battery';
@@ -14,6 +14,7 @@ import { findCollision, leadLabel } from '@/lib/forecast';
 import { successFeedback } from '@/lib/haptics';
 import { formatShort } from '@/lib/dates';
 import { WEEK_NUMBER, prescriptions } from '@/data/seed';
+import { openPrep, remaining } from '@/lib/prep';
 import { useHydrated } from '@/hooks/useHydrated';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
@@ -36,7 +37,8 @@ export default function Home() {
   const router = useRouter();
   const { items, ceilings, today, onboarded, recovery, booked, dayReports, overallCeiling,
     minimumViableWeek, showEverythingAnyway, setShowEverything, setMinimumViableWeek,
-    scheduleItem } = useStore();
+    scheduleItem, scheduleSessions, moveItem, setProgressPercent, unscheduleSession,
+    setSessionNote } = useStore();
 
   // First run goes to the intro. Deliberately an effect rather than a <Redirect>:
   // every route is prerendered in Node with `onboarded` still false, and a
@@ -235,6 +237,35 @@ export default function Home() {
                 successFeedback();
               }}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
+              todo={
+                <TodoList
+                  todo={openPrep(items, today)}
+                  items={items}
+                  today={today}
+                  date={today}
+                  onSchedule={(item, startHour, hours, note) => {
+                    scheduleSessions(item.id, [{ date: today, startHour, hours, note }]);
+                    successFeedback();
+                  }}
+                  onPlan={(item, sessions) => {
+                    scheduleSessions(item.id, sessions, { replace: true });
+                    successFeedback();
+                  }}
+                  onDefer={(item, to) => {
+                    moveItem(item.id, to);
+                    successFeedback();
+                  }}
+                  onSetPercent={(item, percent) => {
+                    setProgressPercent(item.id, percent);
+                    successFeedback();
+                  }}
+                  onUnschedule={(sessionId) => {
+                    unscheduleSession(sessionId);
+                    successFeedback();
+                  }}
+                  onNote={(sessionId, note) => setSessionNote(sessionId, note)}
+                />
+              }
             />
           </Card>
         </Stack>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View } from 'react-native';
 import {
-  Button, Card, Chip, CollisionWindow, DayTimeline, Divider, ForecastStrip, Screen, Stack, Text,
+  Button, Card, Chip, CollisionWindow, DayTimeline, Divider, ForecastStrip, Screen, Stack, Text, TodoList,
 } from '@/components';
 import { threshold } from '@design/tokens';
 import { buildForecast, findCollision, leadLabel, speakForecast } from '@/lib/forecast';
@@ -11,6 +11,7 @@ import { chargeOf } from '@/lib/battery';
 import { dayHours, endHour, formatHour, freeSlots, slotHours } from '@/lib/schedule';
 import { addDays, formatLong, formatShort, daysBetween } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
+import { openPrep, remaining } from '@/lib/prep';
 import { nextWeek, useStore, weekReading } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { WEEK_NUMBER } from '@/data/seed';
@@ -26,7 +27,8 @@ import { WEEK_NUMBER } from '@/data/seed';
  */
 export default function Plan() {
   const router = useRouter();
-  const { ceilings, today, scheduleItem } = useStore();
+  const { ceilings, today, scheduleItem, scheduleSessions, moveItem, setProgressPercent, unscheduleSession,
+    setSessionNote } = useStore();
   const items = useItemsWithLogs();
 
   // Arriving from Home's week strip opens straight onto that day.
@@ -119,6 +121,35 @@ export default function Plan() {
                 successFeedback();
               }}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
+              todo={
+                <TodoList
+                  todo={openPrep(items, selected)}
+                  items={items}
+                  today={today}
+                  date={selected}
+                  onSchedule={(item, startHour, hours, note) => {
+                    scheduleSessions(item.id, [{ date: selected, startHour, hours, note }]);
+                    successFeedback();
+                  }}
+                  onPlan={(item, sessions) => {
+                    scheduleSessions(item.id, sessions, { replace: true });
+                    successFeedback();
+                  }}
+                  onDefer={(item, to) => {
+                    moveItem(item.id, to);
+                    successFeedback();
+                  }}
+                  onSetPercent={(item, percent) => {
+                    setProgressPercent(item.id, percent);
+                    successFeedback();
+                  }}
+                  onUnschedule={(sessionId) => {
+                    unscheduleSession(sessionId);
+                    successFeedback();
+                  }}
+                  onNote={(sessionId, note) => setSessionNote(sessionId, note)}
+                />
+              }
             />
           </Card>
         </Stack>

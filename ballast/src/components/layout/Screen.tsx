@@ -57,10 +57,10 @@ export function Screen({ children, footer, surface = 'page', scroll = true, back
               accessibilityRole="button"
               accessibilityLabel={backLabel ?? 'Back'}
               onPress={() => {
-                // Popping history is right in-app; the fallback is what rescues
-                // anyone who arrived here from a shared link with no history.
-                if (router.canGoBack()) router.back();
-                else router.replace(back);
+                // Go where the label says. This used to pop history whenever
+                // there was any, so a button reading "Home" took you to whatever
+                // you happened to look at last - which is not what it promised.
+                router.navigate(back);
               }}
               className="min-h-min flex-row items-center gap-2 self-start pr-4 active:opacity-60"
             >

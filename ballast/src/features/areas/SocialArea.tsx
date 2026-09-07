@@ -25,7 +25,7 @@ const STATE_TONE = { none: 'plain', talked: 'steady', saw: 'recovery' } as const
  */
 export function SocialArea() {
   const router = useRouter();
-  const { contacts, cycleContact, markContacted } = useStore();
+  const { contacts, cycleContact, markContacted, logMoment } = useStore();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const sorted = [...contacts].sort((a, b) => b.lastSpokeDays - a.lastSpokeDays);
   const dropped = sorted[0];
@@ -51,6 +51,8 @@ export function SocialArea() {
                 // Drafts and copies. Ballast never sends anything itself.
                 await Clipboard.setStringAsync(`Hey ${dropped.name.split(' ')[0]}, thinking of you. How have you been?`);
                 markContacted(dropped.id);
+                // Reaching someone is social recovery; the battery should say so.
+                logMoment('good-chat', 'social', 3);
                 successFeedback();
                 setSentTo(dropped.id);
               }}

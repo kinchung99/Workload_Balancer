@@ -10,7 +10,8 @@
  * is why the seeded week reads exactly as the interface study says it does.
  */
 import { errandLoad, outstandingLoad, scheduledErrands } from './errands';
-import type { Errand, Item, Meal, MealStatus, MoodCheckIn, MoodQuadrant } from './types';
+import { momentCredits } from './moments';
+import type { BucketKey, Errand, Item, Meal, MealStatus, Moment, MoodCheckIn, MoodQuadrant } from './types';
 
 /** Hours below which a night starts costing you, and what each hour costs. */
 export const SLEEP_TARGET = 7.5;
@@ -43,6 +44,7 @@ export interface LogState {
   meals: Meal[];
   moods: MoodCheckIn[];
   errands?: Errand[];
+  moments?: Moment[];
 }
 
 const entry = (id: string, title: string, bucket: Item['bucket'], load: number): Item => ({
@@ -62,7 +64,7 @@ const entry = (id: string, title: string, bucket: Item['bucket'], load: number):
  * Signed load from what has been logged today. Appended to the week before any
  * reading is taken, so the battery moves the moment something is recorded.
  */
-export function logItems({ today, sleepHours, meals, moods, errands = [] }: LogState): Item[] {
+export function logItems({ today, sleepHours, meals, moods, errands = [], moments = [] }: LogState): Item[] {
   const out: Item[] = [];
 
   if (sleepHours !== null) {
@@ -108,6 +110,12 @@ export function logItems({ today, sleepHours, meals, moods, errands = [] }: LogS
       startHour: errand.startHour,
       spread: false,
     });
+  }
+
+  // Good moments. No ceiling - diminishing returns per kind does the work.
+  for (const [bucket, load] of Object.entries(momentCredits(moments, today))) {
+    if (load === 0) continue;
+    out.push({ ...entry(`moment-${bucket}`, 'Good moments', bucket as BucketKey, load), date: today });
   }
 
   return out;

@@ -38,8 +38,11 @@ export const STORAGE_KEY = 'ballast/v1';
  *   1  first persisted build
  *   2  de-duplicated plan blocks, and sleep stopped being a placeable block
  *   3  empty submits no longer create phantom "OS assignment" tasks
+ *   4  multi-sitting work, progress, and good moments
+ *   5  sittings carry notes; the bar tracks planned as well as done
+ *   6  only the intro flag persists; a week never outlives a reload
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 6;
 
 /**
  * What survives an upgrade.

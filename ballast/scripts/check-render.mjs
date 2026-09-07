@@ -46,8 +46,13 @@ const EXPECTATIONS = [
     '82% of its limit used',
     'TODAY \u00b7 MON 10 NOV',                    // the day now has a clock, not just a count
     '1pm', '5pm', '11pm',                     // the timeline, in order
-    'ANYTIME TODAY',                          // unscheduled work kept separate
-    'Give it a time',                         // and it can be dropped into a slot
+    'OWING BEFORE A DEADLINE',                // deadline work and loose tasks, split apart
+    'Sits here every day until it is done',
+    "TODAY'S LIST", 'Just this day, no time set',
+    'Give it a time',                         // a loose task can be dropped into a slot
+    'Algorithms problem set', '75%', 'unplanned',
+    '1h done', '0h booked', '3h with no plan', // done / booked / neither
+    'Book', 'sitting', 'Push to tomorrow',
     'h free',                                 // the gaps are shown as usable space
     'SUGGESTED FOR YOU', 'Walk the river loop',
     'Put it in today at 5pm',                 // books for real
@@ -73,9 +78,14 @@ const EXPECTATIONS = [
     'ABOUT THIS BUILD', 'Replay the intro', 'Reset to the seeded week',
   ]],
   ['actions.html', 'Simulator', [
-    'What if I', 'NOW', 'PROJECTED', 'YOUR ACTIONS',
+    'TONIGHT', 'Try tonight before you live it.',   // the purpose, stated
+    'Nothing is saved until you press the button.',
+    'WHICH EVENING', 'Tonight', 'Tomorrow',         // one evening, chosen
+    'OR START FROM ONE OF THESE',                   // a kind of night, not a dial
+    'A recovery night', 'A balanced night', 'Push through',
+    'NOW', 'PROJECTED', 'YOUR ACTIONS',
     'Sleep tonight', '6 hrs', 'Take a walk', 'Text a friend', 'Study session', 'Late-night screen',
-    'Drag the sliders to see how tonight changes your level.',
+    'Drag a slider, or pick a night above, to see the difference.',
     'Move a slider first',                    // becomes a real count once a slider moves
     'WHAT THIS PUTS IN YOUR WEEK',            // the effect, stated before you tap
     'what it would book appears here, with a time on it',
@@ -83,6 +93,10 @@ const EXPECTATIONS = [
   ['areas/mental.html', 'Mental area', [
     'LOG YOUR MOOD', 'HIGH ENERGY', 'LOW ENERGY',
     "WHAT'S CONTRIBUTING?", 'Academics', 'Finances', 'Log check-in',
+    'SOMETHING GOOD HAPPENED?',               // the one input that adds charge
+    'Properly laughed', 'Finished something', 'Proud of myself',
+    'Helped someone', 'Actually rested',
+    'Pick one and say why',                   // a reason, not just a category
     'RECENT CHECK-INS', 'High Energy \u00b7 Unpleasant',
   ]],
   ['areas/time.html', 'Time area', [
@@ -141,7 +155,10 @@ const EXPECTATIONS = [
   ]],
   ['add.html', 'Add', [
     'Ballast read that as', 'Mental', '8 hours', 'Thu 13 Nov', 'Hard deadline', 'Dread 4', 'Load 32',
-    'No time yet',                            // a slot is asked for, and "none" is a real answer
+    'Which day?', 'Today', 'Tomorrow',        // any day, in view, not behind a chip
+    'Anytime that day',                       // "no time" stays a real answer
+    'Does it need work beforehand?',          // an interview and an assignment are different shapes
+    'Just turn up', 'Needs preparation',
     'How much are you dreading it?', 'Already counted, set once', 'Repeats',
   ]],
   ['recover.html', 'Recover', [

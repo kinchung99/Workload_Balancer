@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { successFeedback } from '@/lib/haptics';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Slider, Stack, Text,
 } from '@/components';
-import { ACTIONS, initialSim, note, pointsOf, project, readout, totalPoints } from '@/lib/simulate';
+import { ACTIONS, PRESETS, initialSim, note, pointsOf, project, readout, totalPoints } from '@/lib/simulate';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
 import { formatHour, placeIn } from '@/lib/schedule';
+import { addDays, formatShort } from '@/lib/dates';
 import type { Item } from '@/lib/types';
 import { useReading } from '@/state/selectors';
 
@@ -25,12 +26,15 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export default function Actions() {
   const router = useRouter();
-  const { today, applyPlan } = useStore();
+  const { today, applyPlan, clearPlan } = useStore();
   const items = useItemsWithLogs();
   const { overall } = useReading();
 
   const now = chargeOf(overall);
   const [sim, setSim] = useState(initialSim);
+  // One evening at a time. A plan that spans days is a rebalance, not a night.
+  const [day, setDay] = useState(today);
+  const dayName = day === today ? 'Tonight' : day === addDays(today, 1) ? 'Tomorrow night' : formatShort(day);
   const [committed, setCommitted] = useState<{ blocks: number; points: number } | null>(null);
   const projected = project(now, sim);
   const delta = totalPoints(sim);
@@ -53,8 +57,11 @@ export default function Actions() {
 
   // Blocks this plan would replace must not be treated as occupied, or pressing
   // apply twice makes the walk hop to a different hour each time.
-  const ownIds = new Set(ACTIONS.map((action) => `plan-${action.id}-${today}`));
-  const otherItems = items.filter((item) => !ownIds.has(item.id));
+  // Blocks belonging to this day's plan are not "occupied" - applying replaces
+  // them - so placement stays stable however many times the button is pressed.
+  const isPlanBlock = (id: string) => id.startsWith('plan-') && id.endsWith(`-${day}`);
+  const otherItems = items.filter((item) => !isPlanBlock(item.id));
+  const alreadyBooked = items.filter((item) => isPlanBlock(item.id));
 
   // Give each one a real slot in today, first gap that fits, none reused.
   const placed = gains.reduce<Array<(typeof gains)[number] & { startHour?: number }>>((acc, block) => {
@@ -66,7 +73,7 @@ export default function Actions() {
       }));
     // Placed in the window the activity belongs in, and never on top of one
     // already placed by this same plan.
-    return [...acc, { ...block, startHour: placeIn([...otherItems, ...taken], today, block.hours, block.preferred) }];
+    return [...acc, { ...block, startHour: placeIn([...otherItems, ...taken], day, block.hours, block.preferred) }];
   }, []);
 
   const sleepAction = ACTIONS.find((a) => a.logOnly)!;
@@ -105,7 +112,7 @@ export default function Actions() {
           <Stack gap={3}>
             <Text variant="micro" tone="subtle">TODAY, UPDATED</Text>
             <Card gap={4}>
-              <DayTimeline items={items} date={today} showGaps={false} />
+              <DayTimeline items={items} date={day} showGaps={false} />
             </Card>
           </Stack>
         </Stack>
@@ -120,12 +127,12 @@ export default function Actions() {
           <Button
             label={
               toBook.length || sleepChanged
-                ? `Put ${toBook.length + (sleepChanged ? 1 : 0)} thing${toBook.length + (sleepChanged ? 1 : 0) === 1 ? '' : 's'} in my week`
+                ? `${alreadyBooked.length ? 'Replace' : 'Book'} ${dayName.toLowerCase()} — ${toBook.length + (sleepChanged ? 1 : 0)} thing${toBook.length + (sleepChanged ? 1 : 0) === 1 ? '' : 's'}`
                 : 'Move a slider first'
             }
             onPress={() => {
               if (!toBook.length && !sleepChanged) return;
-              applyPlan(toBook, sleepChanged ? sim[sleepAction.id] : undefined);
+              applyPlan(toBook, sleepChanged ? sim[sleepAction.id] : undefined, day);
               successFeedback();
               setCommitted({ blocks: toBook.length + (sleepChanged ? 1 : 0), points: delta });
             }}
@@ -135,9 +142,96 @@ export default function Actions() {
       }
     >
       <Stack gap={6} className="pt-4">
-        <Stack gap={1}>
-          <Text variant="micro" tone="subtle">SIMULATOR</Text>
-          <Text variant="title" accessibilityRole="header">What if I…</Text>
+        <Stack gap={2}>
+          <Text variant="micro" tone="subtle">TONIGHT</Text>
+          <Text variant="title" accessibilityRole="header">Try tonight before you live it.</Text>
+          <Text variant="callout" tone="muted">
+            Every other screen tells you what already happened. This one is the rest of today: choose how you
+            spend it, see what it costs or gives back, and book it only if you want to. Nothing is saved until
+            you press the button.
+          </Text>
+        </Stack>
+
+        {/* One evening, chosen. */}
+        <Stack gap={3}>
+          <Text variant="micro" tone="subtle">WHICH EVENING</Text>
+          <Stack direction="row" gap={3} wrap>
+            {[today, addDays(today, 1), addDays(today, 2)].map((option) => (
+              <Chip
+                key={option}
+                label={option === today ? 'Tonight' : option === addDays(today, 1) ? 'Tomorrow' : formatShort(option)}
+                tone={option === day ? 'selected' : 'plain'}
+                onPress={() => setDay(option)}
+              />
+            ))}
+          </Stack>
+        </Stack>
+
+        {/* What is already booked for that evening, and a way to take it back. */}
+        {alreadyBooked.length ? (
+          <Card tone="recovery" gap={4}>
+            <Text variant="micro" tone="recovery">ALREADY BOOKED FOR {dayName.toUpperCase()}</Text>
+            <Stack gap={2}>
+              {alreadyBooked.map((block) => (
+                <Text key={block.id} variant="footnote" tone="muted">
+                  {block.title} · {formatHour(block.startHour ?? 0)}–{formatHour((block.startHour ?? 0) + block.hours)}
+                </Text>
+              ))}
+            </Stack>
+            <Text variant="footnote" tone="muted">
+              Booking again replaces these rather than adding to them.
+            </Text>
+            <Button
+              label="Clear this evening"
+              kind="secondary"
+              onPress={() => {
+                clearPlan(day);
+                successFeedback();
+              }}
+            />
+          </Card>
+        ) : null}
+
+        {/* Most people are choosing a kind of night, not dialling in sliders. */}
+        <Stack gap={3}>
+          <Text variant="micro" tone="subtle">OR START FROM ONE OF THESE</Text>
+          <Stack gap={3}>
+            {PRESETS.map((preset) => {
+              const points = totalPoints(preset.state);
+              const outcome = project(now, preset.state);
+              const active = ACTIONS.every((action) => sim[action.id] === preset.state[action.id]);
+              return (
+                <Pressable
+                  key={preset.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${preset.label}. ${preset.note}. Would leave you at ${outcome} percent.`}
+                  onPress={() => {
+                    successFeedback();
+                    setSim(preset.state);
+                  }}
+                  className={`min-h-row justify-center rounded-md border px-5 py-4 active:opacity-70 ${
+                    active ? 'border-inverse bg-sunken' : 'border-line-hairline'
+                  }`}
+                >
+                  <Stack direction="row" gap={4} align="center" justify="between">
+                    <Stack gap={1} grow>
+                      <Text variant="body" weight="semibold">{preset.label}</Text>
+                      <Text variant="footnote" tone="subtle">{preset.note}</Text>
+                    </Stack>
+                    <Stack gap={1} align="end">
+                      <Text variant="heading" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'muted'}>
+                        {outcome}%
+                      </Text>
+                      <Text variant="micro" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
+                        {points > 0 ? `+${points}` : points}
+                      </Text>
+                    </Stack>
+                  </Stack>
+                </Pressable>
+              );
+            })}
+          </Stack>
         </Stack>
 
         {/* Now, and what the plan on this screen would make of it. */}
@@ -179,7 +273,11 @@ export default function Actions() {
             accessibilityLiveRegion="polite"
             accessibilityLabel={`Projected ${projected} percent, ${delta > 0 ? 'up' : 'down'} ${Math.abs(delta)} points`}
           >
-            Drag the sliders to see how tonight changes your level.
+            {delta === 0
+              ? 'Drag a slider, or pick a night above, to see the difference.'
+              : delta > 0
+                ? `That night leaves you ${delta} points better off than you are now.`
+                : `That night costs you ${Math.abs(delta)} points.`}
           </Text>
         </Card>
 
@@ -261,6 +359,33 @@ export default function Actions() {
             ) : null}
           </Card>
         </Stack>
+
+        {/* Where the booked blocks would actually sit. */}
+        {toBook.length ? (
+          <Stack gap={3}>
+            <Text variant="micro" tone="subtle">WHERE THEY WOULD LAND</Text>
+            <Card gap={4}>
+              <DayTimeline
+                items={[
+                  ...otherItems,
+                  ...toBook.map((block) => ({
+                    id: `preview-${block.id}`,
+                    title: block.label,
+                    bucket: block.bucket,
+                    hours: block.hours,
+                    dread: 1 as const,
+                    commitment: 'self' as const,
+                    date: day,
+                    startHour: block.startHour,
+                    isRecovery: true,
+                  })),
+                ]}
+                date={day}
+                showGaps={false}
+              />
+            </Card>
+          </Stack>
+        ) : null}
 
         <Stack gap={3}>
           <Text variant="micro" tone="subtle">OR GO STRAIGHT TO</Text>

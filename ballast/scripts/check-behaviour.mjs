@@ -30,6 +30,8 @@ for (const [from, to] of [
   ['src/lib/errands.ts', 'errands.ts'],
   ['src/lib/rebalance.ts', 'rebalance.ts'],
   ['src/lib/forecast.ts', 'forecast.ts'],
+  ['src/lib/prep.ts', 'prep.ts'],
+  ['src/lib/moments.ts', 'moments.ts'],
   ['src/lib/battery.ts', 'battery.ts'],
   ['src/lib/simulate.ts', 'simulate.ts'],
   ['src/data/seed.ts', 'seed.ts'],
@@ -56,7 +58,7 @@ export const storage = createJSONStorage(() => ({
   removeItem: (n) => void mem.delete(n),
 }));
 export const STORAGE_KEY = 'ballast/test';
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 6;
 export function migrateSaved(persisted, from) {
   if (from >= SCHEMA_VERSION) return persisted ?? {};
   return { onboarded: persisted?.onboarded ?? false };
@@ -74,6 +76,8 @@ const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn } = awai
 const { categorise, errandLoad, outstandingLoad } = await import(join(tmp, 'errands.ts'));
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
+const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, remaining, planSessions, isAtRisk } = await import(join(tmp, 'prep.ts'));
+const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { percentByBucket, overallPercent } = await import(join(tmp, 'load.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
@@ -83,7 +87,7 @@ const charge = (extra = []) => {
   return chargeOf(overallPercent(percentByBucket(all.filter((i) => !i.date || i.date >= st.today.slice(0, 8)), st.ceilings)));
 };
 const { prescriptions } = await import(join(tmp, 'seed.ts'));
-const { ACTIONS, initialSim, pointsOf, project, totalPoints } = await import(join(tmp, 'simulate.ts'));
+const { ACTIONS, PRESETS, initialSim, pointsOf, project, totalPoints } = await import(join(tmp, 'simulate.ts'));
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -92,6 +96,11 @@ const check = (label, actual, expected) => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${label.padEnd(52)} ${ok ? '' : `got ${JSON.stringify(actual)}, want ${JSON.stringify(expected)}`}`);
 };
 const s = () => useStore.getState();
+const addDaysISO = (iso, days) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
 
 console.log('\nBooking recovery — "Put it in today at 5pm"');
 {
@@ -405,6 +414,17 @@ console.log('\nPressing apply twice does not move things');
   check('with still only one walk', daySchedule(s().items, s().today).timed.filter((i) => i.title === 'Take a walk').length, 1);
 }
 
+console.log('\nEvery launch starts from the seeded semester');
+{
+  // Only the intro flag is written, so nothing about a week can outlive a reload.
+  const saved = { onboarded: true, items: [{ id: 'junk' }], sleepHours: 4, moments: [{ id: 'm' }] };
+  const kept = ((({ onboarded }) => ({ onboarded }))(saved));
+  check('the week is not persisted', kept.items, undefined);
+  check('nor is anything logged', kept.sleepHours, undefined);
+  check('nor are good moments', kept.moments, undefined);
+  check('only whether the intro has run', kept.onboarded, true);
+}
+
 console.log('\nA stale save does not carry a fixed bug forward');
 {
   // What a phone written by the pre-fix build would be holding.
@@ -422,7 +442,7 @@ console.log('\nA stale save does not carry a fixed bug forward');
   check('including the stacked walks', JSON.stringify(migrated).includes('Take a walk'), false);
   check('and the sleep block that should never have existed', JSON.stringify(migrated).includes('Sleep tonight'), false);
   check('but the intro stays done', migrated.onboarded, true);
-  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 3).sleepHours, 8);
+  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 6).sleepHours, 8);
 }
 
 console.log('\nThings happen at a sensible hour');
@@ -448,6 +468,134 @@ console.log('\nThings happen at a sensible hour');
   s().applyPlan([], 9);
   check('committing sleep adds no block at all', daySchedule(s().items, s().today).timed.some((i) => /sleep/i.test(i.title)), false);
   check('it only moves the log', s().sleepHours, 9);
+}
+
+console.log('\nWork that takes more than one sitting');
+{
+  s().reset();
+  const owing = openPrep(s().items, s().today);
+  check('unfinished prep shows on today', owing.length > 0, true);
+  const algo = owing.find((i) => i.id === 'algo-set');
+  check('the problem set is on the list', !!algo, true);
+  check('it starts three quarters undone', percentUndone(algo), 75);
+  check('with three hours left', remaining(algo), 3);
+
+  // It stays on every day until its deadline, not just the day it is due.
+  const tomorrow = addDaysISO(s().today, 1);
+  check('and it is still there tomorrow', openPrep(s().items, tomorrow).some((i) => i.id === 'algo-set'), true);
+
+  s().logProgress('algo-set', 2);
+  check('logging two hours moves it to 25%', percentUndone(s().items.find((i) => i.id === 'algo-set')), 25);
+  s().logProgress('algo-set', 5);
+  check('progress cannot exceed the estimate', remaining(s().items.find((i) => i.id === 'algo-set')), 0);
+  check('and it leaves the list once done', openPrep(s().items, s().today).some((i) => i.id === 'algo-set'), false);
+}
+
+console.log('\nPlanning the sittings');
+{
+  s().reset();
+  const algo = s().items.find((i) => i.id === 'algo-set');
+  const plan = planSessions(algo, s().items, s().today);
+  check('it proposes sittings', plan.length > 0, true);
+  check('none longer than two hours', plan.every((p) => p.hours <= 2), true);
+  check('none after the deadline', plan.every((p) => p.date <= algo.deadline), true);
+  check('they add up to what is left', Math.min(remaining(algo), plan.reduce((t, p) => t + p.hours, 0)) > 0, true);
+  check('spread across days rather than crammed', new Set(plan.map((p) => p.date)).size, plan.length);
+
+  s().scheduleSessions('algo-set', plan, { replace: true });
+  const booked = s().items.filter((i) => i.parentId === 'algo-set');
+  check('booking creates one item per sitting', booked.length, plan.length);
+  check('each with a real time', booked.every((i) => i.startHour !== undefined), true);
+
+  // Re-planning replaces rather than stacking.
+  s().scheduleSessions('algo-set', plan, { replace: true });
+  check('re-planning does not double them', s().items.filter((i) => i.parentId === 'algo-set').length, plan.length);
+
+  s().moveItem('algo-set', addDaysISO(s().today, 2));
+  check('and it can be pushed to another day', s().items.find((i) => i.id === 'algo-set').date, addDaysISO(s().today, 2));
+}
+
+console.log('\nTonight, as three kinds of night');
+{
+  s().reset();
+  const now = chargeOf(weekReading(s().items, s().today, s().ceilings).overall);
+  const outcome = (id) => project(now, PRESETS.find((p) => p.id === id).state);
+
+  check('every preset sets every slider', PRESETS.every((p) => ACTIONS.every((a) => p.state[a.id] !== undefined)), true);
+  check('a recovery night leaves you better off', outcome('recover') > now, true);
+  check('pushing through costs you', outcome('push') < now, true);
+  check('balanced sits between the two', outcome('balanced') > outcome('push') && outcome('balanced') < outcome('recover'), true);
+  check('and none of them is just the baseline', PRESETS.every((p) => totalPoints(p.state) !== 0), true);
+
+  // A preset is a starting point, not a commitment: nothing is saved by picking one.
+  const before = s().items.length;
+  check('choosing one books nothing on its own', s().items.length, before);
+}
+
+console.log('\nBooking moves the bar, giving it back moves it straight in again');
+{
+  s().reset();
+  const algo = () => s().items.find((i) => i.id === 'algo-set');
+  check('three hours are unplanned to begin with', unplanned(algo(), s().items), 3);
+  check('so the bar reads 75%', percentUnplanned(algo(), s().items), 75);
+
+  s().scheduleSessions('algo-set', [{ date: s().today, startHour: 8, hours: 2, note: 'Finish section 2' }]);
+  check('booking two hours drops the bar', percentUnplanned(algo(), s().items), 25);
+  check('though none of it is actually done yet', percentUndone(algo()), 75);
+  check('and the note is kept', s().items.find((i) => i.parentId === 'algo-set').note, 'Finish section 2');
+
+  const session = s().items.find((i) => i.parentId === 'algo-set');
+  s().unscheduleSession(session.id);
+  check('giving the sitting back puts the bar straight up again', percentUnplanned(algo(), s().items), 75);
+  check('and the sitting is gone from the day', scheduledHours(algo(), s().items), 0);
+}
+
+console.log('\nProgress in percent, not hours');
+{
+  s().reset();
+  s().setProgressPercent('algo-set', 50);
+  check('half done on a four-hour job is two hours', s().items.find((i) => i.id === 'algo-set').prepDone, 2);
+  check('which reads as 50% undone', percentUndone(s().items.find((i) => i.id === 'algo-set')), 50);
+  s().setProgressPercent('algo-set', 100);
+  check('100% clears it from the list', openPrep(s().items, s().today).some((i) => i.id === 'algo-set'), false);
+  s().setProgressPercent('algo-set', 0);
+  check('and it can be put back to nothing', percentUndone(s().items.find((i) => i.id === 'algo-set')), 100);
+  s().setProgressPercent('algo-set', 500);
+  check('out-of-range input is clamped', s().items.find((i) => i.id === 'algo-set').prepDone, 4);
+}
+
+console.log('\nThe battery can go up, not only down');
+{
+  s().reset();
+  const base = chargeOf(weekReading(s().items, s().today, s().ceilings).overall);
+  const laughed = MOMENT_KINDS.find((k) => k.id === 'laughed');
+  s().logMoment(laughed.id, laughed.bucket, laughed.credit);
+  const withMoment = logItems({ today: s().today, sleepHours: null, meals: s().meals, moods: s().moods, errands: s().errands, moments: s().moments });
+  check('a good moment is recorded', s().moments.length, 1);
+  check('and it gives load back rather than taking it', withMoment.some((i) => i.loadOverride < 0), true);
+  check('in the area it belongs to', withMoment.find((i) => i.loadOverride < 0).bucket, 'mental');
+
+  check('and it can say why', s().moments[0].note, undefined);
+  s().logMoment('finished', 'mental', 8, 'Handed something in');
+  check('a reason is kept with it', s().moments[1].note, 'Handed something in');
+  check('every kind has prompts to pick from', MOMENT_KINDS.every((k) => (WHY_SUGGESTIONS[k.id] ?? []).length > 0), true);
+
+  // No ceiling, but the fifth laugh is not the first.
+  s().reset();
+  check('the first is worth full value', nextWorth(laughed, 0), laughed.credit);
+  check('the second is worth half', nextWorth(laughed, 1), laughed.credit / 2);
+  for (let i = 0; i < 20; i += 1) s().logMoment(laughed.id, laughed.bucket, laughed.credit);
+  const spam = Math.abs(momentCredits(s().moments, s().today).mental);
+  s().reset();
+  for (let i = 0; i < 4; i += 1) {
+    const k = MOMENT_KINDS.filter((m) => m.bucket === 'mental')[i % 2];
+    s().logMoment(k.id, k.bucket, k.credit);
+  }
+  const varied = Math.abs(momentCredits(s().moments, s().today).mental);
+  check('twenty taps of one thing tails off', spam < laughed.credit * 5, true);
+  check('a genuinely varied day is worth more per tap', varied / 4 > spam / 20, true);
+  check('but a good day is no longer capped', spam > 12, true);
+  check('base week unchanged by any of it', base, 13);
 }
 
 console.log('\nInviting people');

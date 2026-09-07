@@ -10,7 +10,7 @@ import { persist } from 'zustand/middleware';
 import { SCHEMA_VERSION, STORAGE_KEY, migrateSaved, storage } from './storage';
 import type {
   BucketKey, Contact, ContributionTag, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
-  MoodQuadrant, ErrandCategory, Invite, Prescription, RecoveryEntry, Trade,
+  MoodQuadrant, ErrandCategory, Invite, Moment, Prescription, RecoveryEntry, Trade,
 } from '@/lib/types';
 import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
@@ -48,6 +48,8 @@ interface State {
   sleepHours: number | null;
   /** Gatherings you proposed. Local until someone accepts - the honest state. */
   invites: Invite[];
+  /** One-tap records of things that went well. The only input that adds charge. */
+  moments: Moment[];
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
@@ -59,11 +61,24 @@ interface State {
   markContacted: (id: string) => void;
   logSleep: (hours: number) => void;
   sendInvite: (invite: Omit<Invite, 'id'>) => void;
+  logMoment: (kind: string, bucket: BucketKey, credit: number, note?: string) => void;
+  logProgress: (id: string, hours: number) => void;
+  moveItem: (id: string, date: string) => void;
+  scheduleSessions: (
+    parentId: string,
+    sessions: Array<{ date: string; startHour: number; hours: number; note?: string }>,
+    options?: { replace?: boolean },
+  ) => void;
+  unscheduleSession: (sessionId: string) => void;
+  setSessionNote: (sessionId: string, note: string) => void;
+  setProgressPercent: (id: string, percent: number) => void;
   keepItem: (id: string, pushId: string) => void;
   applyPlan: (
     blocks: Array<{ id: string; label: string; bucket: BucketKey; hours: number; credit: number; startHour?: number }>,
     sleepHours?: number,
+    date?: string,
   ) => void;
+  clearPlan: (date: string) => void;
   reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number) => void;
   logMood: (quadrant: MoodQuadrant, tags: ContributionTag[]) => void;
   setMealStatus: (id: string, status: MealStatus) => void;
@@ -93,6 +108,7 @@ export const useStore = create<State>()(
   booked: [],
   sleepHours: null,
   invites: [],
+  moments: [],
 
   addItem: (item) =>
     set((state) => {
@@ -183,18 +199,23 @@ export const useStore = create<State>()(
    * protected block in the week, so "what if I slept nine hours" turns into
    * something the forecast and the rebalancer can both see.
    */
-  applyPlan: (blocks, sleepHours) =>
+  applyPlan: (blocks, sleepHours, date) =>
     set((state) => {
-      // Ids are stable per activity per day, and anything matching is replaced
-      // rather than appended. Applying the same plan three times used to leave
-      // three walks stacked at 7am, 8am and 9am, which is not a plan.
-      const ids = blocks.map((block) => `plan-${block.id}-${state.today}`);
+      const day = date ?? state.today;
+      // A day has one plan, not a pile of them.
+      //
+      // Ids are stable per activity per day, but clearing only the ids in *this*
+      // call left blocks from previous presses behind: booking a walk-only plan
+      // after a walk-and-message one kept the message. The plan owns the whole
+      // `plan-*` namespace for its day, so applying replaces it outright.
+      const isPlanBlock = (id: string) => id.startsWith('plan-') && id.endsWith(`-${day}`);
+      const ids = blocks.map((block) => `plan-${block.id}-${day}`);
       return {
         // Sleep is the night, not a block. It lands as a log and moves the
         // battery that way; it is never placed on a timeline.
         ...(sleepHours === undefined ? {} : { sleepHours }),
         items: [
-          ...state.items.filter((item) => !ids.includes(item.id)),
+          ...state.items.filter((item) => !isPlanBlock(item.id)),
           ...blocks.map((block, index) => ({
             id: ids[index],
             title: block.label,
@@ -202,7 +223,7 @@ export const useStore = create<State>()(
             hours: block.hours,
             dread: 1 as const,
             commitment: 'self' as const,
-            date: state.today,
+            date: day,
             startHour: block.startHour,
             isRecovery: true,
           })),
@@ -214,8 +235,18 @@ export const useStore = create<State>()(
             detail: 'From tonight’s plan',
             hours: block.credit,
           })),
-          ...state.recovery.filter((row) => !ids.includes(row.id)),
+          ...state.recovery.filter((row) => !isPlanBlock(row.id)),
         ],
+      };
+    }),
+
+  /** Throw the whole plan for a day away. One plan per day, and it is undoable. */
+  clearPlan: (date) =>
+    set((state) => {
+      const isPlanBlock = (id: string) => id.startsWith('plan-') && id.endsWith(`-${date}`);
+      return {
+        items: state.items.filter((item) => !isPlanBlock(item.id)),
+        recovery: state.recovery.filter((row) => !isPlanBlock(row.id)),
       };
     }),
 
@@ -223,6 +254,87 @@ export const useStore = create<State>()(
   markContacted: (id) =>
     set((state) => ({
       contacts: state.contacts.map((c) => (c.id === id ? { ...c, lastSpokeDays: 0, state: 'talked' } : c)),
+    })),
+
+  /** The one input that gives charge back rather than taking it. */
+  logMoment: (kind, bucket, credit, note) =>
+    set((state) => ({
+      moments: [...state.moments, { id: `moment-${Date.now()}`, date: state.today, kind, bucket, credit, note }],
+    })),
+
+  /** Chipping away at a longer piece of work. Percent undone falls as this rises. */
+  logProgress: (id, hours) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id
+          ? { ...item, prepDone: Math.min(item.prepHours ?? 0, Math.round(((item.prepDone ?? 0) + hours) * 10) / 10) }
+          : item,
+      ),
+    })),
+
+  /** Push it to another day. Losing a day is a decision, not a failure. */
+  moveItem: (id, date) =>
+    set((state) => ({
+      items: state.items.map((item) => (item.id === id ? { ...item, date } : item)),
+    })),
+
+  /**
+   * Book the sittings a plan proposed. Replaces any previous plan for the same
+   * piece of work, so re-planning does not leave the old sessions behind.
+   */
+  /**
+   * Book sittings of a longer piece of work.
+   *
+   * `replace` is for the planner, which proposes a whole schedule; adding one
+   * sitting by hand keeps the ones already there.
+   */
+  scheduleSessions: (parentId, sessions, options) =>
+    set((state) => {
+      const parent = state.items.find((item) => item.id === parentId);
+      if (!parent) return {};
+      const kept = options?.replace
+        ? state.items.filter((item) => item.parentId !== parentId)
+        : state.items;
+      const existing = kept.filter((item) => item.parentId === parentId).length;
+      return {
+        items: [
+          ...kept,
+          ...sessions.map((session, index) => ({
+            id: `session-${parentId}-${Date.now()}-${existing + index}`,
+            title: parent.title,
+            bucket: parent.bucket,
+            hours: session.hours,
+            dread: parent.dread,
+            commitment: parent.commitment,
+            date: session.date,
+            startHour: session.startHour,
+            parentId,
+            note: session.note,
+          })),
+        ],
+      };
+    }),
+
+  /** Giving a sitting back. The unplanned part of the bar grows again. */
+  unscheduleSession: (sessionId) =>
+    set((state) => ({ items: state.items.filter((item) => item.id !== sessionId) })),
+
+  setSessionNote: (sessionId, note) =>
+    set((state) => ({
+      items: state.items.map((item) => (item.id === sessionId ? { ...item, note } : item)),
+    })),
+
+  /** How far through it you are, said as a percentage rather than in hours. */
+  setProgressPercent: (id, percent) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              prepDone: Math.round((item.prepHours ?? 0) * (Math.max(0, Math.min(100, percent)) / 100) * 10) / 10,
+            }
+          : item,
+      ),
     })),
 
   /** One tap on waking. The battery moves before you put the phone down. */
@@ -326,14 +438,23 @@ export const useStore = create<State>()(
       items: seedItems, showEverythingAnyway: false, minimumViableWeek: false,
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
-      sleepHours: null, invites: [],
+      sleepHours: null, invites: [], moments: [],
     }),
     }),
     {
       name: STORAGE_KEY,
       storage,
-      /** `today` is the demo anchor and must not be frozen into a saved state. */
-      partialize: ({ today, ...rest }) => rest,
+      /**
+       * Only whether the intro has run survives a reload.
+       *
+       * Every launch starts from the seeded semester on purpose. A week you can
+       * accidentally wreck and cannot get back is worse than one that forgets:
+       * the demo is repeatable, nothing half-finished carries over, and a bug
+       * fixed in code cannot be kept alive by data written before it. The intro
+       * flag is the exception because replaying a three-step tour on every
+       * refresh would be its own kind of punishment.
+       */
+      partialize: ({ onboarded }) => ({ onboarded }) as unknown as State,
       /**
        * Bump this whenever a fix changes what a *saved* week can contain.
        *
