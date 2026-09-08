@@ -8,7 +8,8 @@
  * So anything with preparation stays on *every* day's list from now until it is
  * due, carrying how much of it is left, and disappears the moment it is done.
  */
-import { DAY_END, freeSlots, slotHours, startOptions } from './schedule';
+import { DAY_END, dayHours, freeSlots, slotHours, startOptions } from './schedule';
+import { sumLoad } from './load';
 import { daysBetween } from './dates';
 import type { Item } from './types';
 
@@ -108,6 +109,12 @@ const MIN_SESSION = 0.5;
  * backwards from the deadline in the sense that it always leaves the last day
  * clear if it can, because handing in is not the same as finishing.
  */
+/** What a day already carries, for showing and for choosing where work goes. */
+export const loadOnDay = (items: Item[], date: string): number =>
+  Math.max(0, sumLoad(items.filter((i) => i.date === date)));
+
+export const committedOnDay = (items: Item[], date: string): number => dayHours(items, date).committed;
+
 export function planSessions(item: Item, items: Item[], today: string): Session[] {
   // Plan what has neither been done nor booked; anything already scheduled stays
   // where the student put it.
@@ -115,11 +122,24 @@ export function planSessions(item: Item, items: Item[], today: string): Session[
   if (left <= 0) return [];
 
   const days = daysLeft(item, today);
+  const targets = Array.from({ length: days + 1 }, (_, offset) => addDaysLocal(today, offset));
   // Aim to be finished the day before it is due, and only use the due day itself
   // if there is genuinely no other room.
-  const targets = Array.from({ length: days + 1 }, (_, offset) => addDaysLocal(today, offset));
   const preferred = targets.length > 1 ? targets.slice(0, -1) : targets;
-  const order = [...preferred, ...targets.slice(preferred.length)];
+  const lastResort = targets.slice(preferred.length);
+
+  /**
+   * Lightest days first.
+   *
+   * Working in date order piled sittings onto whatever came next, including days
+   * that were already the heaviest of the week. Putting work where there is room
+   * for it is the entire point of knowing how heavy each day is.
+   */
+  const byRoom = [...preferred].sort((a, b) => {
+    const diff = loadOnDay(items, a) - loadOnDay(items, b);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+  const order = [...byRoom, ...lastResort];
 
   const sessions: Session[] = [];
   const placedByDay = new Map<string, Session[]>();

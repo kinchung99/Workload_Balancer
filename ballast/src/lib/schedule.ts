@@ -109,8 +109,12 @@ export function placeIn(
   date: string,
   hours: number,
   preferred?: readonly [number, number],
+  /** Nothing is placed before this hour. Used for "my day ends at five". */
+  notBefore?: number,
 ): number | undefined {
-  const options = startOptions(items, date, hours, 24);
+  const all = startOptions(items, date, hours, 24);
+  const options = notBefore === undefined ? all : all.filter((h) => h >= notBefore);
+  if (options.length === 0 && notBefore !== undefined) return undefined;
   if (!preferred || options.length === 0) return options[0];
   const [from, to] = preferred;
   const inside = options.find((h) => h >= from && h + hours <= to);

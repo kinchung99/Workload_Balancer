@@ -71,6 +71,35 @@ export const ACTIONS: SimAction[] = [
 
 export type SimState = Record<string, number>;
 
+/** When the working day can end. Nothing on this screen is booked before it. */
+export const OFF_HOURS = [15, 16, 17, 18, 19, 20];
+
+/**
+ * Build an action from what a student says they actually do in an evening.
+ *
+ * The shipped five are a starting point, not a claim about anyone's life. If
+ * your evening is badminton and a night run, the model should hold badminton and
+ * a night run.
+ */
+export function customAction(id: string, label: string, hours: number, bucket: SimAction['bucket']): SimAction {
+  return {
+    id: `custom-${id}`,
+    label,
+    bucket,
+    min: 0,
+    max: Math.max(3, Math.ceil(hours * 2)),
+    step: 0.5,
+    baseline: 0,
+    unit: 'h',
+    // Worth its own weight back per hour: it is your recovery, not a chore.
+    ptsPerUnit: 4,
+    goodNote: 'Your own evening, counted',
+    badNote: 'Skipped tonight',
+    preferred: [18, 22],
+    custom: true,
+  };
+}
+
 /**
  * Three shapes an evening takes.
  *
@@ -107,14 +136,14 @@ export const initialSim = (): SimState =>
 export const pointsOf = (action: SimAction, value: number): number =>
   Math.round((value - action.baseline) * action.ptsPerUnit * 10) / 10;
 
-export const totalPoints = (state: SimState): number =>
+export const totalPoints = (state: SimState, actions: SimAction[] = ACTIONS): number =>
   Math.round(
-    ACTIONS.reduce((sum, action) => sum + pointsOf(action, state[action.id] ?? action.baseline), 0) * 10,
+    actions.reduce((sum, action) => sum + pointsOf(action, state[action.id] ?? action.baseline), 0) * 10,
   ) / 10;
 
 /** Projected charge, clamped to a real battery's range. */
-export const project = (charge: number, state: SimState): number =>
-  Math.max(0, Math.min(100, Math.round(charge + totalPoints(state))));
+export const project = (charge: number, state: SimState, actions: SimAction[] = ACTIONS): number =>
+  Math.max(0, Math.min(100, Math.round(charge + totalPoints(state, actions))));
 
 /** The value under the slider, as words where words read better than a number. */
 export function readout(action: SimAction, value: number): string {

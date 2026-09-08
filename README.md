@@ -396,6 +396,49 @@ same honesty as the parser: rule-based, and labelled as such.
 One thing it can tell you that no list does: whether there is genuinely enough
 free time left before the deadline. If not, the row turns red and says so.
 
+### Sharpening the deadline rows
+
+- **Progress is its own control.** It was buried at the bottom of the planning
+  sheet, which is a different job entirely. The row now carries
+  `Plan it` and `Progress · 25%` side by side, each opening only what it needs.
+- **Booking one by hand is folded away** behind *Or book one yourself*, so the
+  planning sheet is short by default.
+- **Sittings go on the lightest days.** The planner worked in date order, which
+  piled work onto whatever came next — including days that were already the
+  heaviest of the week. It now sorts the candidate days by what they already
+  carry, and the preview says so: `Wed 12 Nov · 2pm–4pm · 2h (4h already booked
+  that day)`.
+- **"Push to tomorrow" moves the work, not the deadline.** It used to move the
+  due date, which is the one thing a student cannot do. It now moves that day's
+  sittings onto tomorrow's list and leaves the deadline where the world put it.
+
+### Picking a date, not a chip
+
+*Due by* offered ten fixed days. Deadlines are months out as often as they are
+days, so it is a month grid you can page through, with a typed entry beside it —
+`14/3`, `14/3/26` or `2026-03-14` all work — and nothing before tomorrow is
+selectable.
+
+### Errands weigh what you say they weigh
+
+Twenty minutes at the bank is not twenty minutes of walking, so effort is yours
+to set — *Easy*, *Normal*, *Dreading it* — and the load is shown as you choose it.
+
+And **finishing one always moves the number**. Clearing your own errand stops it
+costing you, which already worked; a seeded one never cost anything, so ticking
+it off did nothing at all. Both now pay out the weight of the thing, because a
+list where completing something changes no number is a list nobody keeps.
+
+### Tonight, on your own schedule
+
+- **Nothing is booked before your day is yours.** *My day is my own from* takes
+  3pm to 8pm and every block on the screen respects it — a run at 11am is not a
+  plan for someone who finishes at five.
+- **Your evening, in the model.** The shipped five were a starting point, not a
+  claim about anyone's life. *Add your own* turns badminton, a night run or band
+  practice into a slider like the rest, booked after your off-hour, removable
+  again. Presets set the five they know about and leave yours alone.
+
 ### A battery you can actually move
 
 Amira starts at 13% because that is the week the interface study describes, but
@@ -581,8 +624,8 @@ The things most likely to break later, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 262 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 169 actions |
+| A component hard-codes a number | `render:check` asserts 267 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 177 actions |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
 | A screen becomes a dead end | `render:check` asserts all 14 non-tab routes carry an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
@@ -977,9 +1020,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 262 strings against
+figures against the model, and `npm run render:check` asserts 267 strings against
 the rendered HTML of all eighteen screens, and `npm run behaviour:check` asserts
-169 state changes behind the buttons.
+177 state changes behind the buttons.
 
 ---
 
@@ -992,7 +1035,7 @@ two scripts below check the things that would actually be wrong.
   Node's native TypeScript stripping and asserts the study's numbers. It catches
   a seed edit that silently moves Amira off 87%.
 - `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 169 checks covering
+  actions the buttons call and asserts the state moved: 177 checks covering
   booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
   capture with and without a time, the area logs, the time layer, scheduling,
   errands and inviting people. Several assert that a slot is never offered

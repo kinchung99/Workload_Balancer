@@ -10,10 +10,11 @@ import { persist } from 'zustand/middleware';
 import { SCHEMA_VERSION, STORAGE_KEY, migrateSaved, storage } from './storage';
 import type {
   BucketKey, Contact, ContributionTag, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
-  MoodQuadrant, ErrandCategory, Invite, Moment, Prescription, RecoveryEntry, Trade,
+  MoodQuadrant, ErrandCategory, Invite, Moment, Prescription, RecoveryEntry, SimAction, Trade,
 } from '@/lib/types';
 import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
+import { completionCredit } from '@/lib/errands';
 import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
@@ -50,6 +51,15 @@ interface State {
   invites: Invite[];
   /** One-tap records of things that went well. The only input that adds charge. */
   moments: Moment[];
+  /**
+   * When your day is your own.
+   *
+   * Booking a run at 11am is not a plan for someone with a 5pm finish, so nothing
+   * on the Tonight screen is placed before this hour.
+   */
+  offHour: number;
+  /** Activities the student added themselves - badminton, a night run. */
+  customActions: SimAction[];
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
@@ -79,11 +89,21 @@ interface State {
     date?: string,
   ) => void;
   clearPlan: (date: string) => void;
+  setOffHour: (hour: number) => void;
+  addCustomAction: (action: SimAction) => void;
+  removeCustomAction: (id: string) => void;
+  pushSittings: (parentId: string, from: string, to: string) => void;
   reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number) => void;
   logMood: (quadrant: MoodQuadrant, tags: ContributionTag[]) => void;
   setMealStatus: (id: string, status: MealStatus) => void;
   toggleErrand: (id: string) => void;
-  addErrand: (title: string, category: ErrandCategory, hours: number, when?: { date: string; startHour: number }) => void;
+  addErrand: (
+    title: string,
+    category: ErrandCategory,
+    hours: number,
+    effort: 1 | 2 | 3,
+    when?: { date: string; startHour: number },
+  ) => void;
   scheduleItem: (id: string, startHour: number | undefined) => void;
   cycleContact: (id: string) => void;
   reset: () => void;
@@ -109,6 +129,8 @@ export const useStore = create<State>()(
   sleepHours: null,
   invites: [],
   moments: [],
+  offHour: 17,
+  customActions: [],
 
   addItem: (item) =>
     set((state) => {
@@ -239,6 +261,30 @@ export const useStore = create<State>()(
         ],
       };
     }),
+
+  setOffHour: (hour) => set({ offHour: hour }),
+
+  addCustomAction: (action) =>
+    set((state) => ({
+      customActions: [...state.customActions.filter((a) => a.id !== action.id), action],
+    })),
+
+  removeCustomAction: (id) =>
+    set((state) => ({ customActions: state.customActions.filter((a) => a.id !== id) })),
+
+  /**
+   * Move a day's sittings of one piece of work onto another day.
+   *
+   * "Push to tomorrow" used to move the deadline itself, which is the one thing
+   * a student cannot do. It moves the work instead: the sittings go, the due
+   * date stays where the world put it.
+   */
+  pushSittings: (parentId, from, to) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.parentId === parentId && item.date === from ? { ...item, date: to, startHour: undefined } : item,
+      ),
+    })),
 
   /** Throw the whole plan for a day away. One plan per day, and it is undoable. */
   clearPlan: (date) =>
@@ -399,13 +445,30 @@ export const useStore = create<State>()(
   setMealStatus: (id, status) =>
     set((state) => ({ meals: state.meals.map((m) => (m.id === id ? { ...m, status } : m)) })),
 
+  /**
+   * Ticking one off. Yours stops costing you; a seeded one pays out its weight
+   * as a credit, so finishing something always moves the number.
+   */
   toggleErrand: (id) =>
-    set((state) => ({ errands: state.errands.map((e) => (e.id === id ? { ...e, done: !e.done } : e)) })),
+    set((state) => {
+      const errand = state.errands.find((e) => e.id === id);
+      if (!errand) return {};
+      const credit = completionCredit(errand);
+      const momentId = `errand-done-${id}`;
+      return {
+        errands: state.errands.map((e) => (e.id === id ? { ...e, done: !e.done } : e)),
+        moments: errand.done
+          ? state.moments.filter((m) => m.id !== momentId)
+          : credit > 0
+            ? [...state.moments, { id: momentId, date: state.today, kind: 'errand-done', bucket: 'errands' as const, credit, note: errand.title }]
+            : state.moments,
+      };
+    }),
 
-  addErrand: (title, category, hours, when) =>
+  addErrand: (title, category, hours, effort, when) =>
     set((state) => ({
       errands: [
-        { id: `errand-${Date.now()}`, title, category, done: false, hours, addedByUser: true, ...when },
+        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, ...when },
         ...state.errands,
       ],
     })),
@@ -438,7 +501,7 @@ export const useStore = create<State>()(
       items: seedItems, showEverythingAnyway: false, minimumViableWeek: false,
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
-      sleepHours: null, invites: [], moments: [],
+      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: [],
     }),
     }),
     {

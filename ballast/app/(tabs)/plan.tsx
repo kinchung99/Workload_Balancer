@@ -27,7 +27,7 @@ import { WEEK_NUMBER } from '@/data/seed';
  */
 export default function Plan() {
   const router = useRouter();
-  const { ceilings, today, scheduleItem, scheduleSessions, moveItem, setProgressPercent, unscheduleSession,
+  const { ceilings, today, scheduleItem, scheduleSessions, pushSittings, setProgressPercent, unscheduleSession,
     setSessionNote } = useStore();
   const items = useItemsWithLogs();
 
@@ -136,7 +136,8 @@ export default function Plan() {
                     successFeedback();
                   }}
                   onDefer={(item, to) => {
-                    moveItem(item.id, to);
+                    // The work moves; the deadline is not ours to move.
+                    pushSittings(item.id, selected, to);
                     successFeedback();
                   }}
                   onSetPercent={(item, percent) => {

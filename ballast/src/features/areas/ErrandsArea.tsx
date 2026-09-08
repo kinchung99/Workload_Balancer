@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { Button, Card, Checkbox, Chip, Divider, Stack, Text } from '@/components';
 import { color } from '@design/tokens';
-import { DEFAULT_ERRAND_HOURS, categorise, errandLoad } from '@/lib/errands';
+import { DEFAULT_ERRAND_HOURS, EFFORTS, categorise, completionCredit, errandLoad } from '@/lib/errands';
 import { formatHour, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
 import { logItems } from '@/lib/logs';
@@ -33,6 +33,7 @@ export function ErrandsArea() {
   const [override, setOverride] = useState<ErrandCategory | null>(null);
   const [day, setDay] = useState(today);
   const [startHour, setStartHour] = useState<number | null>(null);
+  const [effort, setEffort] = useState<1 | 2 | 3>(2);
 
   const dayOptions = Array.from({ length: 5 }, (_, offset) => addDays(today, offset));
   const timeOptions = useMemo(() => startOptions(scheduleItems, day, hours, 6), [scheduleItems, day, hours]);
@@ -44,7 +45,7 @@ export function ErrandsArea() {
   const preview = useMemo(() => {
     if (!title.trim()) return null;
     const candidate = {
-      id: 'preview', title, category, done: false, hours, addedByUser: true,
+      id: 'preview', title, category, done: false, hours, effort, addedByUser: true,
       ...(startHour === null ? {} : { date: day, startHour }),
     };
     return readingFrom(
@@ -52,7 +53,7 @@ export function ErrandsArea() {
       today,
       ceilings,
     ).charge;
-  }, [title, category, hours, day, startHour, items, errands, today, sleepHours, meals, moods, ceilings]);
+  }, [title, category, hours, effort, day, startHour, items, errands, today, sleepHours, meals, moods, ceilings]);
 
   const grouped = ORDER.map((name) => ({
     category: name,
@@ -63,11 +64,12 @@ export function ErrandsArea() {
 
   const submit = () => {
     if (!title.trim()) return;
-    addErrand(title.trim(), category, hours, startHour === null ? undefined : { date: day, startHour });
+    addErrand(title.trim(), category, hours, effort, startHour === null ? undefined : { date: day, startHour });
     successFeedback();
     setTitle('');
     setOverride(null);
     setHours(DEFAULT_ERRAND_HOURS);
+    setEffort(2);
     setStartHour(null);
   };
 
@@ -112,6 +114,23 @@ export function ErrandsArea() {
                       label={label}
                       tone={value === hours ? 'selected' : 'plain'}
                       onPress={() => { tapFeedback(); setHours(value); setStartHour(null); }}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+
+              {/* Twenty minutes at the bank is not twenty minutes of walking. */}
+              <Stack gap={2}>
+                <Text variant="micro" tone="subtle">
+                  HOW MUCH YOU MIND IT · {Math.round(hours * effort * 10) / 10} load
+                </Text>
+                <Stack direction="row" gap={2} wrap>
+                  {EFFORTS.map(([value, label]) => (
+                    <Chip
+                      key={value}
+                      label={label}
+                      tone={value === effort ? 'selected' : 'plain'}
+                      onPress={() => { tapFeedback(); setEffort(value); }}
                     />
                   ))}
                 </Stack>
@@ -194,6 +213,9 @@ export function ErrandsArea() {
           <Text variant="footnote" tone="muted">
             Worth {Math.round(mine.reduce((t, e) => t + errandLoad(e), 0) * 10) / 10} load. Tick one off to get it back.
           </Text>
+          <Text variant="micro" tone="subtle">
+            Everything on this list pays out when you finish it, seeded or not.
+          </Text>
         </Card>
       ) : null}
 
@@ -213,17 +235,19 @@ export function ErrandsArea() {
                     <View className="flex-1">
                       <Checkbox label={errand.title} checked={errand.done} onPress={() => toggleErrand(errand.id)} />
                     </View>
-                    {errand.addedByUser && !errand.done ? (
+                    {errand.done ? (
+                      <Chip label={`+${errandLoad(errand)}`} tone="steady" readOnly />
+                    ) : (
                       <Chip
                         label={
                           errand.startHour === undefined
                             ? `${errandLoad(errand)}`
-                            : `${formatHour(errand.startHour)}`
+                            : formatHour(errand.startHour)
                         }
                         tone={errand.startHour === undefined ? 'busy' : 'steady'}
                         readOnly
                       />
-                    ) : null}
+                    )}
                   </Stack>
                 </Stack>
               ))}

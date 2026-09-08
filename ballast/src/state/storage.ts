@@ -41,8 +41,9 @@ export const STORAGE_KEY = 'ballast/v1';
  *   4  multi-sitting work, progress, and good moments
  *   5  sittings carry notes; the bar tracks planned as well as done
  *   6  only the intro flag persists; a week never outlives a reload
+ *   7  off-hours, custom evening activities, errand effort
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /**
  * What survives an upgrade.

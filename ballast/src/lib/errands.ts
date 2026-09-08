@@ -30,10 +30,28 @@ export function categorise(title: string): ErrandCategory {
 
 /** A small thing still takes a slice of a small ceiling. Default twenty minutes. */
 export const DEFAULT_ERRAND_HOURS = 0.33;
-const ERRAND_DREAD = 2;
+const DEFAULT_EFFORT = 2;
 
+export const EFFORTS: Array<[1 | 2 | 3, string]> = [
+  [1, 'Easy'],
+  [2, 'Normal'],
+  [3, 'Dreading it'],
+];
+
+/** Same shape as everything else: hours multiplied by how much you mind it. */
 export const errandLoad = (errand: Errand): number =>
-  Math.round((errand.hours ?? DEFAULT_ERRAND_HOURS) * ERRAND_DREAD * 10) / 10;
+  Math.round((errand.hours ?? DEFAULT_ERRAND_HOURS) * (errand.effort ?? DEFAULT_EFFORT) * 10) / 10;
+
+/**
+ * What ticking one off gives back.
+ *
+ * Clearing your own errand simply stops it costing you. A seeded one never cost
+ * anything, so finishing it would otherwise do nothing at all - and a list where
+ * completing something changes no number is a list nobody keeps. Both pay out
+ * the same way: the weight of the thing, credited.
+ */
+export const completionCredit = (errand: Errand): number =>
+  errand.addedByUser ? 0 : errandLoad(errand);
 
 /** Still outstanding, added by the student, and not yet given a slot. */
 export const isFloating = (errand: Errand): boolean =>

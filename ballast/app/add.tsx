@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  Button, Card, Chip, Divider, DreadPicker, Screen, Stack, Text,
+  Button, Card, Chip, DatePicker, Divider, DreadPicker, Screen, Stack, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { parse, titleFrom } from '@/lib/parser';
@@ -303,17 +303,8 @@ export default function Add() {
               </Stack>
 
               <Stack gap={2}>
-                <Text variant="micro" tone="subtle">DUE BY</Text>
-                <Stack direction="row" gap={2} wrap>
-                  {Array.from({ length: 10 }, (_, offset) => addDays(today, offset + 1)).map((option) => (
-                    <Chip
-                      key={option}
-                      label={formatShort(option)}
-                      tone={option === due ? 'selected' : 'plain'}
-                      onPress={() => { tapFeedback(); setDeadline(option); }}
-                    />
-                  ))}
-                </Stack>
+                <Text variant="micro" tone="subtle">DUE BY · {formatShort(due)}</Text>
+                <DatePicker value={due} min={addDays(today, 1)} onChange={setDeadline} />
               </Stack>
 
               <Stack gap={2}>

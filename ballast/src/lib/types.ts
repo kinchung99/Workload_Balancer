@@ -220,6 +220,8 @@ export interface Errand {
   done: boolean;
   /** Rough size, hours. Used to price it against the errands ceiling. */
   hours?: number;
+  /** How much it takes out of you, 1 to 3. Yours to set - a bank call is not a walk. */
+  effort?: 1 | 2 | 3;
   /**
    * Added by the student rather than seeded. Only these count towards load, for
    * the same reason logs do: the seeded week has to keep reading as the
@@ -260,6 +262,8 @@ export interface SimAction {
   badNote: string;
   /** Discrete sliders read as words, not numbers: Skip / Quick hi / Properly. */
   labels?: string[];
+  /** Added by the student rather than shipped. Their own evening, in the model. */
+  custom?: boolean;
   /** The hours of the day this belongs in, so a walk is not booked at dawn. */
   preferred?: readonly [number, number];
   /**

@@ -52,7 +52,8 @@ const EXPECTATIONS = [
     'Give it a time',                         // a loose task can be dropped into a slot
     'Algorithms problem set', '75%', 'unplanned',
     '1h done', '0h booked', '3h with no plan', // done / booked / neither
-    'Book', 'sitting', 'Push to tomorrow',
+    'Book', 'sitting',
+    'Progress \u00b7 25%',                      // progress is its own control now
     'h free',                                 // the gaps are shown as usable space
     'SUGGESTED FOR YOU', 'Walk the river loop',
     'Put it in today at 5pm',                 // books for real
@@ -80,7 +81,10 @@ const EXPECTATIONS = [
   ['actions.html', 'Simulator', [
     'TONIGHT', 'Try tonight before you live it.',   // the purpose, stated
     'Nothing is saved until you press the button.',
+    'MY DAY IS MY OWN FROM', '5pm',                 // nothing booked before you finish
     'WHICH EVENING', 'Tonight', 'Tomorrow',         // one evening, chosen
+    'WHAT YOU ACTUALLY DO', 'Add your own',         // your evening, in the model
+    'Badminton, a night run, band practice',
     'OR START FROM ONE OF THESE',                   // a kind of night, not a dial
     'A recovery night', 'A balanced night', 'Push through',
     'NOW', 'PROJECTED', 'YOUR ACTIONS',

@@ -12,7 +12,7 @@
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import {
-  composition, daysLeft, isAtRisk, percentUndone, percentUnplanned, planSessions,
+  committedOnDay, composition, daysLeft, isAtRisk, percentUndone, percentUnplanned, planSessions,
   remaining, scheduledHours, unplanned, unplaced,
 } from '@/lib/prep';
 import { formatHour, startOptions } from '@/lib/schedule';
@@ -34,6 +34,7 @@ export interface TodoListProps {
   date: string;
   onSchedule: (item: Item, startHour: number, hours: number, note?: string) => void;
   onPlan: (item: Item, sessions: Array<{ date: string; startHour: number; hours: number }>) => void;
+  /** Move this day's sittings to another day. The deadline itself never moves. */
   onDefer: (item: Item, date: string) => void;
   onSetPercent: (item: Item, percent: number) => void;
   onUnschedule: (sessionId: string) => void;
@@ -43,7 +44,10 @@ export interface TodoListProps {
 export function TodoList({
   todo, items, today, date, onSchedule, onPlan, onDefer, onSetPercent, onUnschedule, onNote,
 }: TodoListProps) {
-  const [open, setOpen] = useState<string | null>(null);
+  // Two panels, opened separately: planning is a different job from recording
+  // progress, and stacking them made one very long sheet nobody scrolled.
+  const [open, setOpen] = useState<{ id: string; panel: 'plan' | 'progress' } | null>(null);
+  const [manual, setManual] = useState(false);
   const [draftNote, setDraftNote] = useState('');
   const [draftHours, setDraftHours] = useState(2);
 
@@ -58,7 +62,9 @@ export function TodoList({
         const parts = composition(item, items);
         const due = daysLeft(item, date);
         const risk = isAtRisk(item, items, date);
-        const expanded = open === item.id;
+        const planning = open?.id === item.id && open.panel === 'plan';
+        const tracking = open?.id === item.id && open.panel === 'progress';
+        const sittingsToday = items.filter((i) => i.parentId === item.id && i.date === date);
         const sessions = items
           .filter((i) => i.parentId === item.id)
           .sort((a, b) => a.date.localeCompare(b.date) || (a.startHour ?? 0) - (b.startHour ?? 0));
@@ -108,18 +114,34 @@ export function TodoList({
 
             <Stack direction="row" gap={2} wrap>
               <Chip
-                label={expanded ? 'Close' : 'Plan it'}
-                tone={expanded ? 'selected' : 'steady'}
-                onPress={() => { tapFeedback(); setOpen(expanded ? null : item.id); setDraftNote(''); }}
+                label={planning ? 'Close' : 'Plan it'}
+                tone={planning ? 'selected' : 'steady'}
+                onPress={() => {
+                  tapFeedback();
+                  setOpen(planning ? null : { id: item.id, panel: 'plan' });
+                  setManual(false);
+                  setDraftNote('');
+                }}
+              />
+              {/* Progress is its own control, not buried inside planning. */}
+              <Chip
+                label={tracking ? 'Close' : `Progress · ${100 - percentUndone(item)}%`}
+                tone={tracking ? 'selected' : 'plain'}
+                onPress={() => { tapFeedback(); setOpen(tracking ? null : { id: item.id, panel: 'progress' }); }}
               />
               {plan.length ? (
                 <Chip
                   label={`Book ${plan.length} sitting${plan.length === 1 ? '' : 's'} for me`}
                   onPress={() => onPlan(item, plan)}
-                  accessibilityHint={`Spreads ${loose} unplanned hours across the days before it is due`}
+                  accessibilityHint={`Spreads ${loose} unplanned hours across the lightest days before it is due`}
                 />
               ) : null}
-              <Chip label="Push to tomorrow" onPress={() => onDefer(item, addDays(date, 1))} />
+              {sittingsToday.length ? (
+                <Chip
+                  label={`Push ${sittingsToday.length === 1 ? "today's sitting" : `${sittingsToday.length} sittings`} to tomorrow`}
+                  onPress={() => onDefer(item, addDays(date, 1))}
+                />
+              ) : null}
             </Stack>
 
             {/* Sittings already booked, each with what it is for. */}
@@ -148,7 +170,26 @@ export function TodoList({
               </Stack>
             ) : null}
 
-            {expanded ? (
+            {tracking ? (
+              <Stack gap={3} className="rounded-sm bg-sunken px-4 py-4">
+                <Text variant="micro" tone="subtle">HOW FAR THROUGH ARE YOU?</Text>
+                <Stack direction="row" gap={2} wrap>
+                  {PERCENTS.map((percent) => (
+                    <Chip
+                      key={percent}
+                      label={`${percent}%`}
+                      tone={100 - percentUndone(item) === percent ? 'selected' : 'plain'}
+                      onPress={() => onSetPercent(item, percent)}
+                    />
+                  ))}
+                </Stack>
+                <Text variant="micro" tone="subtle">
+                  {100 - percentUndone(item)}% done — {left}h of {item.prepHours}h still to do.
+                </Text>
+              </Stack>
+            ) : null}
+
+            {planning ? (
               <Stack gap={4} className="rounded-sm bg-sunken px-4 py-4">
                 {plan.length ? (
                   <Stack gap={2}>
@@ -157,16 +198,28 @@ export function TodoList({
                       <Text key={`${session.date}-${session.startHour}`} variant="footnote" tone="muted">
                         {formatShort(session.date)} · {formatHour(session.startHour)}–
                         {formatHour(session.startHour + session.hours)} · {session.hours}h
+                        {'  '}
+                        <Text variant="micro" tone="subtle">
+                          ({committedOnDay(items, session.date)}h already booked that day)
+                        </Text>
                       </Text>
                     ))}
+                    <Text variant="micro" tone="subtle">Placed on the lightest days it could use.</Text>
                     {short > 0 ? (
                       <Text variant="footnote" tone="heavy">{short}h will not fit before the deadline.</Text>
                     ) : null}
                   </Stack>
                 ) : null}
 
+                <Chip
+                  label={manual ? 'Close' : 'Or book one yourself'}
+                  tone={manual ? 'selected' : 'plain'}
+                  onPress={() => { tapFeedback(); setManual(!manual); }}
+                />
+
+                {manual ? (
                 <Stack gap={2}>
-                  <Text variant="micro" tone="subtle">OR BOOK ONE YOURSELF · HOW LONG</Text>
+                  <Text variant="micro" tone="subtle">HOW LONG</Text>
                   <Stack direction="row" gap={2} wrap>
                     {[1, 2, 3].filter((h) => h <= Math.max(loose, 1)).map((option) => (
                       <Chip
@@ -204,37 +257,7 @@ export function TodoList({
                     )}
                   </Stack>
                 </Stack>
-
-                {/* Progress as a percentage, which is how people think about it. */}
-                <Stack gap={2}>
-                  <Text variant="micro" tone="subtle">HOW FAR THROUGH ARE YOU?</Text>
-                  <Stack direction="row" gap={2} wrap>
-                    {PERCENTS.map((percent) => (
-                      <Chip
-                        key={percent}
-                        label={`${percent}%`}
-                        tone={100 - percentUndone(item) === percent ? 'selected' : 'plain'}
-                        onPress={() => onSetPercent(item, percent)}
-                      />
-                    ))}
-                  </Stack>
-                  <Text variant="micro" tone="subtle">
-                    {100 - percentUndone(item)}% done — {left}h of {item.prepHours}h still to do.
-                  </Text>
-                </Stack>
-
-                <Stack gap={2}>
-                  <Text variant="micro" tone="subtle">OR DO IT ANOTHER DAY</Text>
-                  <Stack direction="row" gap={2} wrap>
-                    {[1, 2, 3].map((offset) => (
-                      <Chip
-                        key={offset}
-                        label={formatShort(addDays(date, offset))}
-                        onPress={() => { onDefer(item, addDays(date, offset)); setOpen(null); }}
-                      />
-                    ))}
-                  </Stack>
-                </Stack>
+                ) : null}
               </Stack>
             ) : null}
           </Stack>

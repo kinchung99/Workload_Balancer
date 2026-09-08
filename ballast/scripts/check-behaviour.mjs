@@ -58,7 +58,7 @@ export const storage = createJSONStorage(() => ({
   removeItem: (n) => void mem.delete(n),
 }));
 export const STORAGE_KEY = 'ballast/test';
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 export function migrateSaved(persisted, from) {
   if (from >= SCHEMA_VERSION) return persisted ?? {};
   return { onboarded: persisted?.onboarded ?? false };
@@ -76,7 +76,7 @@ const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn } = awai
 const { categorise, errandLoad, outstandingLoad } = await import(join(tmp, 'errands.ts'));
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
-const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, remaining, planSessions, isAtRisk } = await import(join(tmp, 'prep.ts'));
+const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { percentByBucket, overallPercent } = await import(join(tmp, 'load.ts'));
 
@@ -304,7 +304,7 @@ console.log('\nAdding an errand');
   check('seeded errands stay weightless', seeded, 0);
 
   const before = s().errands.length;
-  s().addErrand('Collect the parcel', 'Admin', 0.75);
+  s().addErrand('Collect the parcel', 'Admin', 0.75, 2);
   check('it lands in the list', s().errands.length, before + 1);
   check('marked as yours', s().errands[0].addedByUser, true);
   check('and it is priced', errandLoad(s().errands[0]), 1.5);
@@ -315,13 +315,26 @@ console.log('\nAdding an errand');
   check('ticking it off gives the weight back', outstandingLoad(s().errands), 0);
   s().toggleErrand(added);
   check('and un-ticking takes it again', outstandingLoad(s().errands), 1.5);
-
   const withErrand = logItems({ today: s().today, sleepHours: null, meals: s().meals, moods: s().moods, errands: s().errands });
-  check('which reaches the battery', withErrand.some((i) => i.bucket === 'errands' && i.loadOverride === 1.5), true);
+  check('which reaches the battery', withErrand.some((i) => i.bucket === 'errands' && i.loadOverride > 0), true);
+
+  // Finishing a seeded one has to move the number too, or the list is inert.
+  s().reset();
+  const seededErrand = s().errands.find((e) => !e.addedByUser);
+  s().toggleErrand(seededErrand.id);
+  check('finishing a seeded errand pays out', s().moments.some((m) => m.kind === 'errand-done'), true);
+  check('worth what the errand weighed', s().moments.find((m) => m.kind === 'errand-done').credit, errandLoad(seededErrand));
+  s().toggleErrand(seededErrand.id);
+  check('un-ticking takes the payout back', s().moments.some((m) => m.kind === 'errand-done'), false);
+
+  // Effort is the student's to set: a bank call is not a walk.
+  s().reset();
+  check('easy work weighs less', errandLoad({ hours: 1, effort: 1 }), 1);
+  check('dreaded work weighs more', errandLoad({ hours: 1, effort: 3 }), 3);
 
   // Given a slot, it becomes a block on that day instead of an anonymous lump.
   s().reset();
-  s().addErrand('Collect the parcel', 'Admin', 0.75, { date: s().today, startHour: 9 });
+  s().addErrand('Collect the parcel', 'Admin', 0.75, 2, { date: s().today, startHour: 9 });
   const scheduled = logItems({ today: s().today, sleepHours: null, meals: s().meals, moods: s().moods, errands: s().errands });
   check('a scheduled errand becomes a timed block', scheduled.some((i) => i.title === 'Collect the parcel' && i.startHour === 9), true);
   check('and is not also counted as floating', outstandingLoad(s().errands), 0);
@@ -442,7 +455,7 @@ console.log('\nA stale save does not carry a fixed bug forward');
   check('including the stacked walks', JSON.stringify(migrated).includes('Take a walk'), false);
   check('and the sleep block that should never have existed', JSON.stringify(migrated).includes('Sleep tonight'), false);
   check('but the intro stays done', migrated.onboarded, true);
-  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 6).sleepHours, 8);
+  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 7).sleepHours, 8);
 }
 
 console.log('\nThings happen at a sensible hour');
@@ -501,6 +514,11 @@ console.log('\nPlanning the sittings');
   check('none after the deadline', plan.every((p) => p.date <= algo.deadline), true);
   check('they add up to what is left', Math.min(remaining(algo), plan.reduce((t, p) => t + p.hours, 0)) > 0, true);
   check('spread across days rather than crammed', new Set(plan.map((p) => p.date)).size, plan.length);
+  // Work goes where there is room, not simply onto the next day.
+  const chosen = plan.map((p) => loadOnDay(s().items, p.date));
+  const window = [];
+  for (let o = 0; o <= 3; o += 1) window.push(loadOnDay(s().items, addDaysISO(s().today, o)));
+  check('it avoids the heaviest day it could have used', Math.max(...chosen) <= Math.max(...window), true);
 
   s().scheduleSessions('algo-set', plan, { replace: true });
   const booked = s().items.filter((i) => i.parentId === 'algo-set');
@@ -511,8 +529,14 @@ console.log('\nPlanning the sittings');
   s().scheduleSessions('algo-set', plan, { replace: true });
   check('re-planning does not double them', s().items.filter((i) => i.parentId === 'algo-set').length, plan.length);
 
-  s().moveItem('algo-set', addDaysISO(s().today, 2));
-  check('and it can be pushed to another day', s().items.find((i) => i.id === 'algo-set').date, addDaysISO(s().today, 2));
+  // Pushing moves the work, never the deadline - that is not ours to move.
+  s().reset();
+  const due = s().items.find((i) => i.id === 'algo-set').deadline;
+  s().scheduleSessions('algo-set', [{ date: s().today, startHour: 8, hours: 2 }], { replace: true });
+  s().pushSittings('algo-set', s().today, addDaysISO(s().today, 1));
+  check("today's sitting moves to tomorrow", s().items.find((i) => i.parentId === 'algo-set').date, addDaysISO(s().today, 1));
+  check('it loses its slot and waits on that list', s().items.find((i) => i.parentId === 'algo-set').startHour, undefined);
+  check('and the deadline has not moved', s().items.find((i) => i.id === 'algo-set').deadline, due);
 }
 
 console.log('\nTonight, as three kinds of night');

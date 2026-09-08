@@ -16,6 +16,7 @@ export { Slider } from './primitives/Slider';
 export { Checkbox } from './primitives/Checkbox';
 export { MoodGrid, QUADRANTS, quadrantLabel, quadrantTone } from './primitives/MoodGrid';
 export { AreaTile } from './primitives/AreaTile';
+export { DatePicker } from './primitives/DatePicker';
 
 export { BandSwatch, PatternFill, BAND_FILL } from './charts/BandPattern';
 export { Bar } from './charts/Bar';

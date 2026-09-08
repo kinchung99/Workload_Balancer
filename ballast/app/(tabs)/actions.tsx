@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { successFeedback } from '@/lib/haptics';
-import { Pressable, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Slider, Stack, Text,
 } from '@/components';
-import { ACTIONS, PRESETS, initialSim, note, pointsOf, project, readout, totalPoints } from '@/lib/simulate';
+import {
+  ACTIONS, OFF_HOURS, PRESETS, customAction, initialSim, note, pointsOf, project, readout, totalPoints,
+} from '@/lib/simulate';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
 import { useStore } from '@/state/store';
@@ -13,6 +15,7 @@ import { useItemsWithLogs } from '@/state/selectors';
 import { formatHour, placeIn } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
 import type { Item } from '@/lib/types';
+import { color } from '@design/tokens';
 import { useReading } from '@/state/selectors';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
@@ -26,31 +29,39 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export default function Actions() {
   const router = useRouter();
-  const { today, applyPlan, clearPlan } = useStore();
+  const { today, applyPlan, clearPlan, offHour, setOffHour, customActions, addCustomAction, removeCustomAction } = useStore();
   const items = useItemsWithLogs();
   const { overall } = useReading();
 
   const now = chargeOf(overall);
-  const [sim, setSim] = useState(initialSim);
+  // The shipped five plus whatever the student added for their own evening.
+  const allActions = [...ACTIONS, ...customActions];
+  const [sim, setSim] = useState<Record<string, number>>(initialSim);
+  const [newLabel, setNewLabel] = useState('');
+  const [newHours, setNewHours] = useState(1);
+  const [addingActivity, setAddingActivity] = useState(false);
   // One evening at a time. A plan that spans days is a rebalance, not a night.
   const [day, setDay] = useState(today);
   const dayName = day === today ? 'Tonight' : day === addDays(today, 1) ? 'Tomorrow night' : formatShort(day);
   const [committed, setCommitted] = useState<{ blocks: number; points: number } | null>(null);
-  const projected = project(now, sim);
-  const delta = totalPoints(sim);
+  const value = (id: string) => sim[id] ?? 0;
+  const isPlanBlock = (id: string) => id.startsWith('plan-') && id.endsWith(`-${day}`);
+
+  const projected = project(now, sim, allActions);
+  const delta = totalPoints(sim, allActions);
   const projectedLoad = 100 - projected;
 
   // Only the actions that give charge back become blocks. A study session and
   // late-night scrolling are things you do, not things worth protecting time for.
   // Sleep is the night, not a block, so it is committed as a log instead.
-  const gains = ACTIONS.filter((action) => !action.logOnly && pointsOf(action, sim[action.id]) > 0).map((action) => {
-    const hours = action.unit === 'min' ? sim[action.id] / 60 : Math.max(0.5, sim[action.id] - action.baseline);
+  const gains = allActions.filter((action) => !action.logOnly && pointsOf(action, value(action.id)) > 0).map((action) => {
+    const hours = action.unit === 'min' ? value(action.id) / 60 : Math.max(0.5, value(action.id) - action.baseline);
     return {
       id: action.id,
       label: action.label,
       bucket: action.bucket,
       hours: Math.round(hours * 100) / 100,
-      credit: pointsOf(action, sim[action.id]),
+      credit: pointsOf(action, value(action.id)),
       preferred: action.preferred,
     };
   });
@@ -59,7 +70,6 @@ export default function Actions() {
   // apply twice makes the walk hop to a different hour each time.
   // Blocks belonging to this day's plan are not "occupied" - applying replaces
   // them - so placement stays stable however many times the button is pressed.
-  const isPlanBlock = (id: string) => id.startsWith('plan-') && id.endsWith(`-${day}`);
   const otherItems = items.filter((item) => !isPlanBlock(item.id));
   const alreadyBooked = items.filter((item) => isPlanBlock(item.id));
 
@@ -73,10 +83,11 @@ export default function Actions() {
       }));
     // Placed in the window the activity belongs in, and never on top of one
     // already placed by this same plan.
-    return [...acc, { ...block, startHour: placeIn([...otherItems, ...taken], day, block.hours, block.preferred) }];
+    // Nothing before the hour the student says their day is their own.
+    return [...acc, { ...block, startHour: placeIn([...otherItems, ...taken], day, block.hours, block.preferred, offHour) }];
   }, []);
 
-  const sleepAction = ACTIONS.find((a) => a.logOnly)!;
+  const sleepAction = allActions.find((a) => a.logOnly)!;
   const sleepChanged = sim[sleepAction.id] !== sleepAction.baseline;
   const toBook = placed.filter((b) => b.startHour !== undefined);
 
@@ -152,6 +163,25 @@ export default function Actions() {
           </Text>
         </Stack>
 
+        {/* When the evening starts. Nothing is booked before it. */}
+        <Stack gap={3}>
+          <Text variant="micro" tone="subtle">MY DAY IS MY OWN FROM</Text>
+          <Stack direction="row" gap={2} wrap>
+            {OFF_HOURS.map((hour) => (
+              <Chip
+                key={hour}
+                label={formatHour(hour)}
+                tone={hour === offHour ? 'selected' : 'plain'}
+                onPress={() => setOffHour(hour)}
+              />
+            ))}
+          </Stack>
+          <Text variant="footnote" tone="subtle">
+            Nothing here is booked before {formatHour(offHour)} — a run at 11am is not a plan for someone who
+            finishes at five.
+          </Text>
+        </Stack>
+
         {/* One evening, chosen. */}
         <Stack gap={3}>
           <Text variant="micro" tone="subtle">WHICH EVENING</Text>
@@ -197,8 +227,8 @@ export default function Actions() {
           <Text variant="micro" tone="subtle">OR START FROM ONE OF THESE</Text>
           <Stack gap={3}>
             {PRESETS.map((preset) => {
-              const points = totalPoints(preset.state);
-              const outcome = project(now, preset.state);
+              const points = totalPoints(preset.state, allActions);
+              const outcome = project(now, preset.state, allActions);
               const active = ACTIONS.every((action) => sim[action.id] === preset.state[action.id]);
               return (
                 <Pressable
@@ -208,7 +238,8 @@ export default function Actions() {
                   accessibilityLabel={`${preset.label}. ${preset.note}. Would leave you at ${outcome} percent.`}
                   onPress={() => {
                     successFeedback();
-                    setSim(preset.state);
+                    // Keep whatever the student added; a preset only sets the five.
+                    setSim((current) => ({ ...current, ...preset.state }));
                   }}
                   className={`min-h-row justify-center rounded-md border px-5 py-4 active:opacity-70 ${
                     active ? 'border-inverse bg-sunken' : 'border-line-hairline'
@@ -284,25 +315,30 @@ export default function Actions() {
         <Stack gap={3}>
           <Text variant="micro" tone="subtle">YOUR ACTIONS</Text>
           <Card pad={0} gap={0} className="px-5">
-            {ACTIONS.map((action, index) => {
-              const value = sim[action.id];
-              const { text, points } = note(action, value);
+            {allActions.map((action, index) => {
+              const current = value(action.id);
+              const { text, points } = note(action, current);
               return (
                 <Stack key={action.id}>
                   {index > 0 ? <Divider /> : null}
                   <Stack gap={2} className="py-4">
                     <Stack direction="row" justify="between" align="center" gap={3}>
                       <Text variant="body" weight="semibold">{action.label}</Text>
-                      <Text variant="body" tone="muted">{readout(action, value)}</Text>
+                      <Stack direction="row" gap={3} align="center">
+                        <Text variant="body" tone="muted">{readout(action, current)}</Text>
+                        {action.custom ? (
+                          <Chip label="Remove" onPress={() => removeCustomAction(action.id)} />
+                        ) : null}
+                      </Stack>
                     </Stack>
                     <Slider
-                      value={value}
+                      value={current}
                       min={action.min}
                       max={action.max}
                       step={action.step}
                       tone={action.ptsPerUnit > 0 ? 'steady' : 'heavy'}
                       label={action.label}
-                      readout={readout(action, value)}
+                      readout={readout(action, current)}
                       onChange={(next) => setSim((prev) => ({ ...prev, [action.id]: next }))}
                     />
                     <Text variant="footnote" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
@@ -386,6 +422,66 @@ export default function Actions() {
             </Card>
           </Stack>
         ) : null}
+
+        {/* The shipped five are a starting point, not a claim about your life. */}
+        <Stack gap={3}>
+          <Stack direction="row" justify="between" align="center">
+            <Text variant="micro" tone="subtle">WHAT YOU ACTUALLY DO</Text>
+            <Chip
+              label={addingActivity ? 'Close' : 'Add your own'}
+              tone={addingActivity ? 'selected' : 'steady'}
+              onPress={() => setAddingActivity(!addingActivity)}
+            />
+          </Stack>
+          {addingActivity ? (
+            <Card gap={4}>
+              <TextInput
+                value={newLabel}
+                onChangeText={setNewLabel}
+                placeholder="Badminton, a night run, choir…"
+                placeholderTextColor={color.ink.subtle}
+                accessibilityLabel="What do you usually do in an evening"
+                className="min-h-min rounded-sm border border-line-strong bg-page px-4 py-3 text-body text-ink-default"
+              />
+              <Stack gap={2}>
+                <Text variant="micro" tone="subtle">HOW LONG, USUALLY</Text>
+                <Stack direction="row" gap={2} wrap>
+                  {[0.5, 1, 1.5, 2, 3].map((option) => (
+                    <Chip
+                      key={option}
+                      label={option < 1 ? `${option * 60}m` : `${option}h`}
+                      tone={option === newHours ? 'selected' : 'plain'}
+                      onPress={() => setNewHours(option)}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+              <Button
+                label={newLabel.trim() ? `Add ${newLabel.trim()} as a slider` : 'Name it first'}
+                kind={newLabel.trim() ? 'primary' : 'secondary'}
+                onPress={() => {
+                  if (!newLabel.trim()) return;
+                  const id = newLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  const action = customAction(id, newLabel.trim(), newHours, 'physical');
+                  addCustomAction(action);
+                  setSim((current) => ({ ...current, [action.id]: newHours }));
+                  successFeedback();
+                  setNewLabel('');
+                  setAddingActivity(false);
+                }}
+              />
+              <Text variant="footnote" tone="subtle">
+                It becomes a slider like the rest, and gets booked after {formatHour(offHour)}.
+              </Text>
+            </Card>
+          ) : (
+            <Text variant="footnote" tone="subtle">
+              {customActions.length
+                ? `${customActions.length} of your own in the list above.`
+                : 'Badminton, a night run, band practice — add what your evenings actually contain.'}
+            </Text>
+          )}
+        </Stack>
 
         <Stack gap={3}>
           <Text variant="micro" tone="subtle">OR GO STRAIGHT TO</Text>

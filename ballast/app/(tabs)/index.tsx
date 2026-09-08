@@ -37,7 +37,7 @@ export default function Home() {
   const router = useRouter();
   const { items, ceilings, today, onboarded, recovery, booked, dayReports, overallCeiling,
     minimumViableWeek, showEverythingAnyway, setShowEverything, setMinimumViableWeek,
-    scheduleItem, scheduleSessions, moveItem, setProgressPercent, unscheduleSession,
+    scheduleItem, scheduleSessions, pushSittings, setProgressPercent, unscheduleSession,
     setSessionNote } = useStore();
 
   // First run goes to the intro. Deliberately an effect rather than a <Redirect>:
@@ -252,7 +252,8 @@ export default function Home() {
                     successFeedback();
                   }}
                   onDefer={(item, to) => {
-                    moveItem(item.id, to);
+                    // The work moves; the deadline is not ours to move.
+                    pushSittings(item.id, today, to);
                     successFeedback();
                   }}
                   onSetPercent={(item, percent) => {
