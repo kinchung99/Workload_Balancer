@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" font-family="-apple-system, Segoe UI, Roboto, sans-serif">
+  <rect width="900" height="560" fill="#FFFFFF"/>
+  <text x="24" y="34" font-size="15" font-weight="700" fill="#14161A">Problem tree — why students burn out</text>
+  <text x="24" y="54" font-size="12" fill="#6B7079">Roots are causes. The trunk is the problem. Branches are what it costs.</text>
+
+  <!-- effects -->
+  <text x="24" y="98" font-size="11" font-weight="700" fill="#A31C38" letter-spacing="1">EFFECTS</text>
+  <g fill="#FBE9EC" stroke="#B32540" stroke-width="1.5">
+    <rect x="24" y="110" width="196" height="52" rx="10"/>
+    <rect x="240" y="110" width="196" height="52" rx="10"/>
+    <rect x="456" y="110" width="196" height="52" rx="10"/>
+    <rect x="672" y="110" width="204" height="52" rx="10"/>
+  </g>
+  <g font-size="12" fill="#14161A">
+    <text x="38" y="132">Missed deadlines and</text><text x="38" y="149">all-nighters</text>
+    <text x="254" y="132">Rest feels like</text><text x="254" y="149">something to feel guilty for</text>
+    <text x="470" y="132">Withdrawal from</text><text x="470" y="149">friends and exercise</text>
+    <text x="686" y="132">Dropping out, or a</text><text x="686" y="149">term repeated</text>
+  </g>
+
+  <!-- trunk -->
+  <path d="M122 162 V196 M338 162 V196 M554 162 V196 M774 162 V196" stroke="#C9C6BE" stroke-width="1.5"/>
+  <rect x="238" y="196" width="424" height="62" rx="12" fill="#16261F"/>
+  <text x="450" y="222" font-size="15" font-weight="700" fill="#F7F6F2" text-anchor="middle">A student cannot see which part of their life</text>
+  <text x="450" y="243" font-size="15" font-weight="700" fill="#F7F6F2" text-anchor="middle">is overflowing — until it already has</text>
+  <path d="M450 258 V292" stroke="#C9C6BE" stroke-width="1.5"/>
+
+  <!-- causes -->
+  <text x="24" y="312" font-size="11" font-weight="700" fill="#1B5C46" letter-spacing="1">ROOT CAUSES</text>
+  <g fill="#E8F2ED" stroke="#2F8265" stroke-width="1.5">
+    <rect x="24" y="324" width="270" height="72" rx="10"/>
+    <rect x="314" y="324" width="270" height="72" rx="10"/>
+    <rect x="604" y="324" width="272" height="72" rx="10"/>
+    <rect x="24" y="412" width="270" height="72" rx="10"/>
+    <rect x="314" y="412" width="270" height="72" rx="10"/>
+    <rect x="604" y="412" width="272" height="72" rx="10"/>
+  </g>
+  <g font-size="12.5" fill="#14161A">
+    <text x="38" y="348" font-weight="700">Hours are not the cost</text>
+    <text x="38" y="367">An hour of laundry and an hour of a</text>
+    <text x="38" y="384">group presentation are not the same hour.</text>
+
+    <text x="328" y="348" font-weight="700">Half the week is uncounted</text>
+    <text x="328" y="367">Shifts, commuting, chores, caring —</text>
+    <text x="328" y="384">no planner ever asked about them.</text>
+
+    <text x="618" y="348" font-weight="700">Clustering, not volume</text>
+    <text x="618" y="367">Three deadlines over ten days is fine.</text>
+    <text x="618" y="384">The same three in 72 hours is not.</text>
+
+    <text x="38" y="436" font-weight="700">Saying no is expensive</text>
+    <text x="38" y="455">The hard part is not knowing what to cut.</text>
+    <text x="38" y="472">It is composing the message.</text>
+
+    <text x="328" y="436" font-weight="700">Logging is itself work</text>
+    <text x="328" y="455">The student who most needs a tracker</text>
+    <text x="328" y="472">has the least capacity to keep one.</text>
+
+    <text x="618" y="436" font-weight="700">Warnings arrive too late</text>
+    <text x="618" y="455">A notification the night before is not</text>
+    <text x="618" y="472">a warning. It is a commiseration.</text>
+  </g>
+  <path d="M159 324 V300 H450 M449 324 V300 M740 324 V300 M159 412 V300 M449 412 V300 M740 412 V300"
+        stroke="#C9C6BE" stroke-width="1.5" fill="none"/>
+
+  <text x="24" y="524" font-size="11.5" fill="#6B7079">Stakeholders: the student · flatmates and friends who absorb the cancellations ·</text>
+  <text x="24" y="542" font-size="11.5" fill="#6B7079">tutors and shift managers who receive the late request · university wellbeing services, downstream of all of it.</text>
+</svg>

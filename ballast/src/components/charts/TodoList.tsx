@@ -82,8 +82,7 @@ export function TodoList({
               <Stack gap={1} grow>
                 <Text variant="body" weight="semibold">{item.title}</Text>
                 <Text variant="micro" tone="subtle">
-                  {BUCKET_LABEL[item.bucket]} · due {formatShort(item.deadline ?? item.date)} ·{' '}
-                  {due === 0 ? 'today' : due === 1 ? 'tomorrow' : `${due} days left`}
+                  {due === 0 ? 'Due today' : due === 1 ? 'Due tomorrow' : `${due} days left`} · {left}h to go
                 </Text>
               </Stack>
               <Stack gap={1} align="end">
@@ -100,16 +99,14 @@ export function TodoList({
               <View style={{ flexGrow: parts.scheduled || 0.0001, backgroundColor: color.band.recovery.fill }} />
               <View style={{ flexGrow: parts.unplanned || 0.0001, backgroundColor: color.surface.track }} />
             </View>
-            <Stack direction="row" gap={4} wrap>
+            <Stack direction="row" gap={3} wrap>
               <Text variant="micro" tone="steady">{item.prepDone ?? 0}h done</Text>
               <Text variant="micro" tone="recovery">{booked}h booked</Text>
-              <Text variant="micro" tone="subtle">{loose}h with no plan</Text>
+              <Text variant="micro" tone="subtle">{loose}h loose</Text>
             </Stack>
 
             {risk ? (
-              <Text variant="micro" tone="heavy">
-                There is not enough free time left before it is due. Something has to move.
-              </Text>
+              <Text variant="micro" tone="heavy">Not enough free time left. Something has to move.</Text>
             ) : null}
 
             <Stack direction="row" gap={2} wrap>
@@ -204,7 +201,7 @@ export function TodoList({
                         </Text>
                       </Text>
                     ))}
-                    <Text variant="micro" tone="subtle">Placed on the lightest days it could use.</Text>
+                    <Text variant="micro" tone="subtle">Lightest days first.</Text>
                     {short > 0 ? (
                       <Text variant="footnote" tone="heavy">{short}h will not fit before the deadline.</Text>
                     ) : null}

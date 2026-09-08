@@ -57,6 +57,10 @@ export const completionCredit = (errand: Errand): number =>
 export const isFloating = (errand: Errand): boolean =>
   !!errand.addedByUser && !errand.done && errand.startHour === undefined;
 
+/** Everything the student added that is still outstanding, slot or not. */
+export const openErrands = (errands: Errand[]): Errand[] =>
+  errands.filter((errand) => errand.addedByUser && !errand.done);
+
 /**
  * The weight of what you added and have not done.
  *

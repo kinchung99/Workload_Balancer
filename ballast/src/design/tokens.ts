@@ -22,6 +22,20 @@ export const color = {
     heavy:    { fill: '#B32540', ink: '#A31C38', wash: '#FBE9EC', onDark: '#E4607D' },
     recovery: { fill: '#6B95C9', ink: '#2C5C8F', wash: '#EAF1F9', onDark: '#9EC1E8' },
   },
+  /**
+   * Identity colours for the five areas.
+   *
+   * Used only on icons and tile washes, never on a reading. Colour on a bar, a
+   * number or the battery still means which band it is in; these are a
+   * deliberately different family so the two channels never compete.
+   */
+  area: {
+    mental:   { ink: '#6B3FC0', wash: '#F0EAFC' },
+    time:     { ink: '#0C6E8F', wash: '#E2F1F7' },
+    physical: { ink: '#4F7A1E', wash: '#EEF5E2' },
+    social:   { ink: '#A63A8C', wash: '#FAE9F5' },
+    errands:  { ink: '#5A5560', wash: '#F1F0F3' },
+  },
   surface: {
     page:    '#FFFFFF',
     raised:  '#FFFFFF',

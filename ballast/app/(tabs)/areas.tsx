@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import { Battery, Button, Card, Screen, Stack, Text } from '@/components';
+import { AreaIcon, Battery, Button, Card, Screen, Stack, Text } from '@/components';
+import { color } from '@design/tokens';
 import { BUCKETS, BUCKET_LABEL, bandFor, speakBuckets } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
@@ -52,15 +53,21 @@ export default function Areas() {
                 className="active:opacity-70"
               >
                 <Card tone={band} gap={4}>
-                  <Stack direction="row" gap={5} align="center">
-                    <Battery charge={charge} loadPercent={percent} width={96} height={46} label="" />
+                  <Stack direction="row" gap={4} align="center">
+                    <View
+                      className="h-12 w-12 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: color.area[bucket].wash }}
+                    >
+                      <AreaIcon area={bucket} size={24} />
+                    </View>
                     <Stack gap={1} grow>
                       <Stack direction="row" gap={3} align="center">
                         <Text variant="heading">{BUCKET_LABEL[bucket]}</Text>
                         <Text variant="heading" tone={TONE[band]}>{charge}%</Text>
                       </Stack>
-                      <Text variant="footnote" tone="muted">{WHAT[bucket]}</Text>
+                      <Text variant="micro" tone="subtle">{WHAT[bucket]}</Text>
                     </Stack>
+                    <Battery charge={charge} loadPercent={percent} width={64} height={32} label="" />
                   </Stack>
                 </Card>
               </Pressable>

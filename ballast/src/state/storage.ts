@@ -42,8 +42,9 @@ export const STORAGE_KEY = 'ballast/v1';
  *   5  sittings carry notes; the bar tracks planned as well as done
  *   6  only the intro flag persists; a week never outlives a reload
  *   7  off-hours, custom evening activities, errand effort
+ *   8  one list for tasks and errands; each lands on its own day
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * What survives an upgrade.

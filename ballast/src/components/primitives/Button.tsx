@@ -27,7 +27,7 @@ export function Button({ label, kind = 'primary', className = '', ...rest }: But
   return (
     <Pressable
       accessibilityRole="button"
-      className={`min-h-button items-center justify-center rounded-lg border px-5 py-4 active:opacity-80 ${box} ${className}`}
+      className={`min-h-button items-center justify-center rounded-pill border-2 px-6 py-4 active:opacity-80 ${box} ${className}`}
       {...rest}
     >
       <Text variant="body" weight="semibold" tone={tone as never} className="text-center">

@@ -2,75 +2,71 @@ import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import {
-  AreaTile, Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Stack, Text, TodoList, WeekStrip,
+  AreaIcon, Button, Card, Chip, DayTimeline, MOOD_WORD, Mascot, Reveal, Screen, Spot, Stack, Text,
+  TodoList, WeekStrip, moodFor,
 } from '@/components';
 import { CalmMode } from '@/features/home/CalmMode';
-import { CHARGE_LABEL, CHARGE_NOTE, chargeOf, drains } from '@/lib/battery';
+import { CHARGE_NOTE, chargeOf, drains } from '@/lib/battery';
+import { color } from '@design/tokens';
 import { BUCKETS, BUCKET_LABEL, bandFor, isCalm } from '@/lib/load';
-import { itemsOnDay, liveCeiling, restOwedFrom, useStore, weekReading } from '@/state/store';
+import { itemsOnDay, liveCeiling, restOwedFrom, useStore } from '@/state/store';
 import { useReading } from '@/state/selectors';
 import { dayHours, freeSlots, slotHours, weekDays } from '@/lib/schedule';
 import { findCollision, leadLabel } from '@/lib/forecast';
 import { successFeedback } from '@/lib/haptics';
 import { formatShort } from '@/lib/dates';
-import { WEEK_NUMBER, prescriptions } from '@/data/seed';
 import { openPrep, remaining } from '@/lib/prep';
+import { WEEK_NUMBER, prescriptions } from '@/data/seed';
 import { useHydrated } from '@/hooks/useHydrated';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
 const greeting = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 };
 
 /**
  * Home — one battery, then the part of you that is empty.
  *
- * Answers "am I fine?" in under two seconds, and "which part of me isn't?"
- * immediately below. No streak, no score out of ten, no badge: a heavy week is
- * information, not a failure.
+ * Rebuilt to lead with the picture. Everything that explains the app rather than
+ * reporting your week now sits behind a tap, because it is worth reading once
+ * and then never again.
  */
 export default function Home() {
   const router = useRouter();
-  const { items, ceilings, today, onboarded, recovery, booked, dayReports, overallCeiling,
-    minimumViableWeek, showEverythingAnyway, setShowEverything, setMinimumViableWeek,
-    scheduleItem, scheduleSessions, pushSittings, setProgressPercent, unscheduleSession,
-    setSessionNote } = useStore();
+  const {
+    items, today, onboarded, recovery, booked, dayReports, overallCeiling, minimumViableWeek,
+    showEverythingAnyway, setShowEverything, setMinimumViableWeek,
+    scheduleItem, scheduleSessions, pushSittings, setProgressPercent, unscheduleSession, setSessionNote,
+  } = useStore();
 
-  // First run goes to the intro. Deliberately an effect rather than a <Redirect>:
-  // every route is prerendered in Node with `onboarded` still false, and a
-  // redirect at render time would bake one into the static HTML for everyone.
+  const { items: withLogs, percents, overall } = useReading();
+  const charge = chargeOf(overall);
+  const band = bandFor(overall);
+
   const hydrated = useHydrated();
   useEffect(() => {
     if (hydrated && !onboarded) router.replace('/welcome');
   }, [hydrated, onboarded, router]);
 
-  const { percents, overall } = useReading();
-  const charge = chargeOf(overall);
-  const band = bandFor(overall);
-  const allToday = itemsOnDay(items, today);
-  // Minimum viable week: everything but the things that genuinely matter is out
-  // of sight until Sunday. Nothing is deleted, and one tap brings it all back.
+  const allToday = itemsOnDay(withLogs, today);
   const todayItems = minimumViableWeek
     ? [...allToday].sort((a, b) => (b.commitment === 'hard' ? 1 : 0) - (a.commitment === 'hard' ? 1 : 0)).slice(0, 2)
     : allToday;
   const hidden = allToday.length - todayItems.length;
-  // Your ceiling moves: two hard days below your line and the line comes down.
-  const ceiling = liveCeiling(overallCeiling, dayReports);
+
   const days = weekDays(today);
-  const collision = findCollision(items, today);
-  const cluster = new Set(
-    collision ? days.filter((d) => d >= collision.from && d <= collision.to) : [],
-  );
-  const hoursToday = dayHours(items, today);
-  const freeToday = Math.round(freeSlots(items, today, 1).reduce((t, slot) => t + slotHours(slot), 0) * 10) / 10;
-  const pulling = drains(percents).slice(0, 3);
+  const collision = findCollision(withLogs, today);
+  const cluster = new Set(collision ? days.filter((d) => d >= collision.from && d <= collision.to) : []);
+  const hoursToday = dayHours(withLogs, today);
+  const freeToday = Math.round(freeSlots(withLogs, today, 1).reduce((t, s) => t + slotHours(s), 0) * 10) / 10;
+
+  const pulling = drains(percents).slice(0, 2);
   const unbooked = prescriptions.filter((entry) => !booked.includes(entry.id));
   const suggestion = unbooked.find((entry) => entry.best) ?? unbooked[0];
   const restOwed = restOwedFrom(recovery);
+  const ceiling = liveCeiling(overallCeiling, dayReports);
 
   if (isCalm(overall) && !showEverythingAnyway) {
     return (
@@ -87,183 +83,121 @@ export default function Home() {
   return (
     <Screen footer={<Button label="Add anything" onPress={() => router.push('/add')} />}>
       <Stack gap={6} className="pt-4">
-        <Stack gap={1}>
-          <Text variant="micro" tone="subtle">{greeting().toUpperCase()}, AMIRA</Text>
-          <Text variant="title" accessibilityRole="header">Week {WEEK_NUMBER}</Text>
-        </Stack>
+        <Text variant="micro" tone="subtle">{greeting().toUpperCase()} · WEEK {WEEK_NUMBER}</Text>
 
-        {/* The battery. Same number as the load model, friendlier end of it. */}
-        <Card tone={band} gap={5}>
-          <Stack direction="row" gap={5} align="center">
-            <Battery
-              charge={charge}
-              loadPercent={overall}
-              width={150}
-              height={74}
-              segments={BUCKETS.map((bucket) => ({
-                key: bucket,
-                charge: chargeOf(percents[bucket]),
-                loadPercent: percents[bucket],
-              }))}
-              label={`${charge} percent overall. ${CHARGE_LABEL[band]}. Made of ${BUCKETS.map((b) => `${BUCKET_LABEL[b]} ${chargeOf(percents[b])}%`).join(', ')}.`}
-            />
-            <Stack gap={1} grow>
-              <Text variant="display" tone={TONE[band]}>{charge}%</Text>
-              <Text variant="footnote" weight="semibold">{CHARGE_LABEL[band]}</Text>
-              <Text variant="micro" tone="subtle">of your week left</Text>
-              <Text variant="micro" tone="subtle">your line sits at {ceiling}%</Text>
-            </Stack>
+        {/* The character. You can read how the week is going before you read
+            anything at all, which is the point. */}
+        <Card tone={band} gap={4} align="center">
+          <Mascot charge={charge} loadPercent={overall} size={128} />
+          <Stack gap={1} align="center">
+            <Text
+              variant="hero"
+              tone={TONE[band]}
+              // The drawing is decorative; this line is what a screen reader gets,
+              // and it still carries the shape the picture is made of.
+              accessibilityLabel={`${charge} percent left. ${MOOD_WORD[moodFor(charge)]}. Made of ${BUCKETS.map((b) => `${BUCKET_LABEL[b]} ${chargeOf(percents[b])}%`).join(', ')}.`}
+            >
+              {charge}%
+            </Text>
+            <Text variant="heading">{MOOD_WORD[moodFor(charge)]}</Text>
           </Stack>
-          <Text variant="callout" tone="muted">{CHARGE_NOTE[band]}</Text>
-          {/* Say what the number is, since the cells above are now visibly parts. */}
-          <Stack direction="row" gap={2} justify="between">
-            {BUCKETS.map((bucket) => (
-              <Stack key={bucket} gap={1} align="center" className="flex-1">
-                <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].slice(0, 3)}</Text>
-                <Text variant="micro" weight="semibold" tone={TONE[bandFor(percents[bucket])]}>
-                  {chargeOf(percents[bucket])}
-                </Text>
-              </Stack>
-            ))}
-          </Stack>
-          <Text variant="micro" tone="subtle">
-            Your five areas, blended — the emptiest one counts for half.
-          </Text>
+          <Reveal label="What this number is">
+            <Text variant="footnote" tone="muted">{CHARGE_NOTE[band]}</Text>
+            <Text variant="footnote" tone="muted">
+              Your five areas blended, with the emptiest counting for half. Your line sits at {ceiling}%.
+            </Text>
+          </Reveal>
         </Card>
 
-        {/* Five areas, five batteries. Shape beats total. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">YOUR AREAS</Text>
-          <Stack direction="row" gap={2}>
-            {BUCKETS.map((bucket) => (
-              <AreaTile
+        {/* Five areas, each with its own colour and shape. */}
+        <Stack direction="row" gap={2}>
+          {BUCKETS.map((bucket) => {
+            const left = chargeOf(percents[bucket]);
+            const areaBand = bandFor(percents[bucket]);
+            return (
+              <Pressable
                 key={bucket}
-                bucket={bucket}
-                percent={percents[bucket]}
-                band={bandFor(percents[bucket])}
-                hint=""
+                accessibilityRole="button"
+                accessibilityLabel={`${BUCKET_LABEL[bucket]}, ${left}% left`}
                 onPress={() => router.push(`/areas/${bucket}`)}
-              />
-            ))}
-          </Stack>
+                className="min-h-min flex-1 items-center gap-2 rounded-lg py-4 active:opacity-70"
+                style={{ backgroundColor: color.area[bucket].wash }}
+              >
+                <AreaIcon area={bucket} size={24} />
+                <Text variant="callout" weight="bold" tone={TONE[areaBand]}>{left}</Text>
+                <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].slice(0, 4)}</Text>
+              </Pressable>
+            );
+          })}
         </Stack>
 
-        {/* What's pulling you down, ranked. */}
-        {pulling.length > 0 ? (
-          <Stack gap={3}>
-            <Text variant="micro" tone="subtle">WHAT'S PULLING YOU DOWN</Text>
-            <Card pad={0} gap={0} className="px-5">
-              {pulling.map((row, index) => (
-                <Stack key={row.bucket}>
-                  {index > 0 ? <Divider /> : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${BUCKET_LABEL[row.bucket]}, ${row.cost}% of its limit used`}
-                    onPress={() => router.push(`/areas/${row.bucket}`)}
-                    className="min-h-row flex-row items-center justify-between gap-4 py-4 active:opacity-70"
-                  >
-                    <Stack gap={1} grow>
-                      <Text variant="body" weight="semibold">{BUCKET_LABEL[row.bucket]}</Text>
-                      <Text variant="footnote" tone="subtle">
-                        {row.cost > 100 ? `over its limit by ${row.cost - 100}%` : `${row.cost}% of its limit used`}
-                      </Text>
-                    </Stack>
-                    <Text variant="body" weight="semibold" tone={TONE[bandFor(row.cost)]}>{row.cost}%</Text>
-                  </Pressable>
-                </Stack>
-              ))}
-            </Card>
+        {/* The week, and the wall in it. */}
+        <Card gap={4}>
+          <WeekStrip
+            items={withLogs}
+            days={days}
+            today={today}
+            cluster={cluster}
+            onSelect={(date) => router.push(`/plan?day=${date}`)}
+          />
+          {collision ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${collision.headline} ${leadLabel(collision.leadDays)}`}
+              onPress={() => router.push('/plan')}
+              className="flex-row items-center gap-3 rounded-sm bg-heavy-wash px-4 py-3 active:opacity-70"
+            >
+              <Spot name="wall" size={28} />
+              <Text variant="footnote" tone="heavy" className="flex-1">{collision.headline}</Text>
+              <Text variant="micro" tone="heavy">{leadLabel(collision.leadDays)}</Text>
+            </Pressable>
+          ) : null}
+        </Card>
+
+        {pulling.length ? (
+          <Stack direction="row" gap={2}>
+            {pulling.map((row) => (
+              <Chip
+                key={row.bucket}
+                label={`${BUCKET_LABEL[row.bucket]} ${row.cost}%`}
+                tone={bandFor(row.cost) === 'heavy' ? 'heavy' : 'busy'}
+                onPress={() => router.push(`/areas/${row.bucket}`)}
+              />
+            ))}
+            <Chip label={`${restOwed}h rest owed`} tone="recovery" onPress={() => router.push('/recover')} />
           </Stack>
         ) : null}
 
-        {/* One thing, booked, with a time on it. Disappears once it is in. */}
-        {suggestion ? (
-          <Card tone="recovery" gap={4}>
-            <Text variant="micro" tone="recovery">SUGGESTED FOR YOU</Text>
-            <Stack gap={2}>
-              <Text variant="heading">{suggestion.title}</Text>
-              <Text variant="footnote" tone="muted">{suggestion.detail}</Text>
-            </Stack>
-            <Button label={`Put it in ${suggestion.slot}`} onPress={() => router.push('/prescription')} />
-          </Card>
-        ) : (
-          <Card tone="steady" gap={2}>
-            <Text variant="micro" tone="steady">RECOVERY BOOKED</Text>
-            <Text variant="callout">All four blocks are in your week. Nothing left to schedule.</Text>
-          </Card>
-        )}
-
-        {/* The rest of the week, which used to be invisible from here. */}
-        <Stack gap={3}>
-          <Stack direction="row" justify="between" align="center">
-            <Text variant="micro" tone="subtle">THIS WEEK</Text>
-            <Text variant="micro" tone="subtle">TAP A DAY</Text>
-          </Stack>
-          <Card gap={4}>
-            <WeekStrip
-              items={items}
-              days={days}
-              today={today}
-              cluster={cluster}
-              onSelect={(date) => router.push(`/plan?day=${date}`)}
-            />
-            {collision ? (
-              <Stack direction="row" gap={3} align="center" className="rounded-sm bg-heavy-wash px-4 py-3">
-                <View className="h-2 w-2 rounded-pill bg-heavy-fill" />
-                <Text variant="footnote" tone="heavy" className="flex-1">
-                  {collision.headline} {leadLabel(collision.leadDays).toLowerCase()}.
-                </Text>
-              </Stack>
-            ) : null}
-          </Card>
-        </Stack>
-
-        {/* When, not just what. Ordered by the clock, with the gaps left visible. */}
+        {/* Today. */}
         <Stack gap={3}>
           <Stack direction="row" justify="between" align="center">
             <Text variant="micro" tone="subtle">TODAY · {formatShort(today).toUpperCase()}</Text>
             <Stack direction="row" gap={2}>
-              <Chip label={`${hoursToday.committed}h booked`} readOnly />
+              <Chip label={`${hoursToday.committed}h`} readOnly />
               <Chip label={`${freeToday}h free`} tone={freeToday > 3 ? 'steady' : 'busy'} readOnly />
             </Stack>
           </Stack>
           <Card gap={4}>
             <DayTimeline
-              items={minimumViableWeek ? todayItems : items}
+              items={minimumViableWeek ? todayItems : withLogs}
               date={today}
               onSelect={(item) => router.push(`/decline/${item.id}`)}
-              onSchedule={(item, startHour) => {
-                scheduleItem(item.id, startHour);
-                successFeedback();
-              }}
+              onSchedule={(item, startHour) => { scheduleItem(item.id, startHour); successFeedback(); }}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
               todo={
                 <TodoList
-                  todo={openPrep(items, today)}
-                  items={items}
+                  todo={openPrep(withLogs, today)}
+                  items={withLogs}
                   today={today}
                   date={today}
                   onSchedule={(item, startHour, hours, note) => {
                     scheduleSessions(item.id, [{ date: today, startHour, hours, note }]);
                     successFeedback();
                   }}
-                  onPlan={(item, sessions) => {
-                    scheduleSessions(item.id, sessions, { replace: true });
-                    successFeedback();
-                  }}
-                  onDefer={(item, to) => {
-                    // The work moves; the deadline is not ours to move.
-                    pushSittings(item.id, today, to);
-                    successFeedback();
-                  }}
-                  onSetPercent={(item, percent) => {
-                    setProgressPercent(item.id, percent);
-                    successFeedback();
-                  }}
-                  onUnschedule={(sessionId) => {
-                    unscheduleSession(sessionId);
-                    successFeedback();
-                  }}
+                  onPlan={(item, sessions) => { scheduleSessions(item.id, sessions, { replace: true }); successFeedback(); }}
+                  onDefer={(item, to) => { pushSittings(item.id, today, to); successFeedback(); }}
+                  onSetPercent={(item, percent) => { setProgressPercent(item.id, percent); successFeedback(); }}
+                  onUnschedule={(sessionId) => { unscheduleSession(sessionId); successFeedback(); }}
                   onNote={(sessionId, note) => setSessionNote(sessionId, note)}
                 />
               }
@@ -273,31 +207,40 @@ export default function Home() {
 
         {hidden > 0 ? (
           <Card tone="sunken" gap={3}>
-            <Stack gap={1}>
-              <Text variant="callout" weight="semibold">Minimum viable week is on.</Text>
-              <Text variant="footnote" tone="muted">
-                {hidden} thing{hidden === 1 ? '' : 's'} hidden until Sunday. Nothing was deleted.
-              </Text>
-            </Stack>
-            <Button label="Show everything again" kind="secondary" onPress={() => setMinimumViableWeek(false)} />
+            <Text variant="callout" weight="semibold">{hidden} hidden until Sunday.</Text>
+            <Button label="Show everything" kind="secondary" onPress={() => setMinimumViableWeek(false)} />
           </Card>
         ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${restOwed} hours of rest owed. Opens the recovery ledger.`}
-          onPress={() => router.push('/recover')}
-          className="active:opacity-70"
-        >
-          <Card tone="sunken" gap={2}>
-            <Stack direction="row" justify="between" align="center">
-              <Text variant="callout" weight="semibold">{restOwed}h of rest owed</Text>
-              <Text variant="footnote" tone="subtle">Ledger →</Text>
+        {/* One thing that would help. */}
+        {suggestion ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${suggestion.title}. ${suggestion.detail}`}
+            onPress={() => router.push('/prescription')}
+            className="active:opacity-70"
+          >
+            <Card tone="recovery" gap={4}>
+              <Stack direction="row" gap={4} align="center">
+                <Spot name="clear" size={52} />
+                <Stack gap={1} grow>
+                  <Text variant="micro" tone="recovery">WOULD HELP</Text>
+                  <Text variant="heading">{suggestion.title}</Text>
+                  <Text variant="micro" tone="muted">{suggestion.slot}</Text>
+                </Stack>
+              </Stack>
+            </Card>
+          </Pressable>
+        ) : (
+          <Card tone="steady" gap={3}>
+            <Stack direction="row" gap={4} align="center">
+              <Spot name="done" size={44} />
+              <Text variant="callout" className="flex-1">All four recovery blocks are in your week.</Text>
             </Stack>
           </Card>
-        </Pressable>
+        )}
 
-        <View className="h-4" />
+        <View className="h-2" />
       </Stack>
     </Screen>
   );

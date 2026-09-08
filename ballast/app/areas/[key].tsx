@@ -1,5 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Battery, Button, Card, Screen, Stack, Text } from '@/components';
+import { AreaIcon, Battery, Button, Card, Screen, Stack, Text } from '@/components';
+import { View } from 'react-native';
+import { color } from '@design/tokens';
 import { BUCKET_LABEL, BUCKETS, bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
@@ -46,9 +48,17 @@ export default function Area() {
       footer={<Button label="Rebalance the week" kind="secondary" onPress={() => router.push('/rebalance')} />}
     >
       <Stack gap={6} className="pt-4">
-        <Stack gap={1}>
-          <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].toUpperCase()}</Text>
-          <Text variant="title" accessibilityRole="header">{charge}% left</Text>
+        <Stack direction="row" gap={4} align="center">
+          <View
+            className="h-14 w-14 items-center justify-center rounded-lg"
+            style={{ backgroundColor: color.area[bucket].wash }}
+          >
+            <AreaIcon area={bucket} size={28} />
+          </View>
+          <Stack gap={1} grow>
+            <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].toUpperCase()}</Text>
+            <Text variant="title" accessibilityRole="header">{charge}% left</Text>
+          </Stack>
         </Stack>
 
         <Card tone={band} gap={4}>

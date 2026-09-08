@@ -12,6 +12,7 @@ import { formatHour, startOptions } from '@/lib/schedule';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import type { BucketKey, CommitmentKind, Dread } from '@/lib/types';
 import { useStore } from '@/state/store';
+import { categorise } from '@/lib/errands';
 import { useItemsWithLogs } from '@/state/selectors';
 
 const PLACEHOLDER = 'OS assignment due thurs, about 8 hours, really not looking forward to it';
@@ -35,7 +36,7 @@ export default function Add() {
   // Prefilled when you arrive from a gap in a day: "add something here" should
   // mean here, not "somewhere on Tuesday".
   const params = useLocalSearchParams<{ date?: string; start?: string }>();
-  const { today, items, addItem } = useStore();
+  const { today, items, addItem, addErrand } = useStore();
   const scheduleItems = useItemsWithLogs();
 
   const [text, setText] = useState('');
@@ -97,19 +98,32 @@ export default function Add() {
               ? 'Type something first'
               : needsPrep
                 ? `Add ${prepHours}h of work, due ${formatShort(due)}`
-                : `Add it${time === null ? '' : ` at ${formatHour(time)}`}`
+                : `Add to ${offset0(date, today).toLowerCase()}${time === null ? '' : ` at ${formatHour(time)}`}`
           }
           kind={ready ? 'primary' : 'secondary'}
           accessibilityState={{ disabled: !ready }}
           onPress={() => {
             if (!ready) return;
-            addItem({
-              title: titleFrom(text),
-              bucket, dread, commitment, date,
-              hours: needsPrep ? prepHours : hours,
-              ...(time === null || needsPrep ? {} : { startHour: time }),
-              ...(needsPrep ? { deadline: due, prepHours, prepDone: 0, importance } : {}),
-            });
+            if (needsPrep) {
+              addItem({
+                title: titleFrom(text),
+                bucket, dread, commitment, date,
+                hours: prepHours,
+                deadline: due, prepHours, prepDone: 0, importance,
+              });
+            } else {
+              // Something you only have to turn up to is the same kind of object
+              // as an errand, so it goes in the one list rather than a parallel
+              // one - and therefore shows both on its day and under Errands.
+              addErrand(
+                titleFrom(text),
+                categorise(text),
+                hours,
+                (Math.min(3, Math.max(1, Math.round(dread * 0.6))) as 1 | 2 | 3),
+                { date, ...(time === null ? {} : { startHour: time }) },
+                bucket,
+              );
+            }
             successFeedback();
             router.back();
           }}
@@ -255,10 +269,13 @@ export default function Add() {
             <Text variant="footnote" tone="muted">
               An interview is an hour you turn up to. An assignment is hours spread across the days before it.
             </Text>
+            <Text variant="footnote" tone="subtle">
+              Things you just turn up to join your tasks and errands list, and show on the day you pick.
+            </Text>
           </Stack>
           <Stack direction="row" gap={3} wrap>
             <Chip
-              label="Just turn up"
+              label="Just turn up or do it"
               tone={!needsPrep ? 'selected' : 'plain'}
               onPress={() => { tapFeedback(); setNeedsPrep(false); }}
             />

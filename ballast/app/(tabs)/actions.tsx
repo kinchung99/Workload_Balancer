@@ -3,7 +3,7 @@ import { successFeedback } from '@/lib/haptics';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, DayTimeline, Divider, Screen, Slider, Stack, Text,
+  Battery, Button, Card, Chip, DayTimeline, Divider, Reveal, Screen, Slider, Spot, Stack, Text,
 } from '@/components';
 import {
   ACTIONS, OFF_HOURS, PRESETS, customAction, initialSim, note, pointsOf, project, readout, totalPoints,
@@ -12,7 +12,7 @@ import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
-import { formatHour, placeIn } from '@/lib/schedule';
+import { daySchedule, formatHour, placeIn, sleepWindow, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
 import type { Item } from '@/lib/types';
 import { color } from '@design/tokens';
@@ -40,6 +40,9 @@ export default function Actions() {
   const [newLabel, setNewLabel] = useState('');
   const [newHours, setNewHours] = useState(1);
   const [addingActivity, setAddingActivity] = useState(false);
+  /** Hours the student chose by hand, overriding where the app would put a block. */
+  const [chosenHour, setChosenHour] = useState<Record<string, number>>({});
+  const [pickingFor, setPickingFor] = useState<string | null>(null);
   // One evening at a time. A plan that spans days is a rebalance, not a night.
   const [day, setDay] = useState(today);
   const dayName = day === today ? 'Tonight' : day === addDays(today, 1) ? 'Tomorrow night' : formatShort(day);
@@ -74,7 +77,7 @@ export default function Actions() {
   const alreadyBooked = items.filter((item) => isPlanBlock(item.id));
 
   // Give each one a real slot in today, first gap that fits, none reused.
-  const placed = gains.reduce<Array<(typeof gains)[number] & { startHour?: number }>>((acc, block) => {
+  const placed = gains.reduce<Array<(typeof gains)[number] & { startHour?: number; suggested?: number }>>((acc, block) => {
     const taken: Item[] = acc
       .filter((b) => b.startHour !== undefined)
       .map((b) => ({
@@ -83,12 +86,17 @@ export default function Actions() {
       }));
     // Placed in the window the activity belongs in, and never on top of one
     // already placed by this same plan.
-    // Nothing before the hour the student says their day is their own.
-    return [...acc, { ...block, startHour: placeIn([...otherItems, ...taken], day, block.hours, block.preferred, offHour) }];
+    // Nothing before the hour the student says their day is their own - unless
+    // they picked an hour themselves, which always wins.
+    const suggested = placeIn([...otherItems, ...taken], day, block.hours, block.preferred, offHour);
+    return [...acc, { ...block, startHour: chosenHour[block.id] ?? suggested, suggested }];
   }, []);
 
   const sleepAction = allActions.find((a) => a.logOnly)!;
   const sleepChanged = sim[sleepAction.id] !== sleepAction.baseline;
+  // What a night of this length would actually mean in clock time.
+  const night = sleepWindow(items, day, value(sleepAction.id));
+  const firstTomorrow = daySchedule(items, addDays(day, 1)).timed[0];
   const toBook = placed.filter((b) => b.startHour !== undefined);
 
   if (committed) {
@@ -113,11 +121,14 @@ export default function Actions() {
           <Text variant="title" accessibilityRole="header" accessibilityLiveRegion="polite">
             {committed.blocks} block{committed.blocks === 1 ? '' : 's'} booked.
           </Text>
-          <Card tone="steady" gap={3}>
-            <Text variant="callout">
-              Protected time now. Rebalancing moves work around them, never through them.
-            </Text>
-            <Text variant="footnote" tone="muted">+{committed.points} charge points, and your battery already moved.</Text>
+          <Card tone="steady" gap={4}>
+            <Stack direction="row" gap={4} align="center">
+              <Spot name="done" size={48} />
+              <Stack gap={1} grow>
+                <Text variant="heading" tone="steady">+{committed.points} points</Text>
+                <Text variant="footnote" tone="muted">Protected time now.</Text>
+              </Stack>
+            </Stack>
           </Card>
 
           <Stack gap={3}>
@@ -153,39 +164,23 @@ export default function Actions() {
       }
     >
       <Stack gap={6} className="pt-4">
-        <Stack gap={2}>
-          <Text variant="micro" tone="subtle">TONIGHT</Text>
-          <Text variant="title" accessibilityRole="header">Try tonight before you live it.</Text>
-          <Text variant="callout" tone="muted">
-            Every other screen tells you what already happened. This one is the rest of today: choose how you
-            spend it, see what it costs or gives back, and book it only if you want to. Nothing is saved until
-            you press the button.
-          </Text>
-        </Stack>
-
-        {/* When the evening starts. Nothing is booked before it. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">MY DAY IS MY OWN FROM</Text>
-          <Stack direction="row" gap={2} wrap>
-            {OFF_HOURS.map((hour) => (
-              <Chip
-                key={hour}
-                label={formatHour(hour)}
-                tone={hour === offHour ? 'selected' : 'plain'}
-                onPress={() => setOffHour(hour)}
-              />
-            ))}
+        <Stack direction="row" gap={4} align="center">
+          <Spot name="night" size={56} />
+          <Stack gap={1} grow>
+            <Text variant="micro" tone="subtle">TONIGHT</Text>
+            <Text variant="title" accessibilityRole="header">Try it before you live it.</Text>
           </Stack>
-          <Text variant="footnote" tone="subtle">
-            Nothing here is booked before {formatHour(offHour)} — a run at 11am is not a plan for someone who
-            finishes at five.
-          </Text>
         </Stack>
+        <Reveal label="What this is for">
+          <Text variant="footnote" tone="muted">
+            Every other screen reports what happened. This is the rest of today — choose how you spend it, see
+            what it costs, and book it only if you want to. Nothing is saved until you press the button.
+          </Text>
+        </Reveal>
 
-        {/* One evening, chosen. */}
+        {/* Which evening, and when it starts being yours. */}
         <Stack gap={3}>
-          <Text variant="micro" tone="subtle">WHICH EVENING</Text>
-          <Stack direction="row" gap={3} wrap>
+          <Stack direction="row" gap={2} wrap>
             {[today, addDays(today, 1), addDays(today, 2)].map((option) => (
               <Chip
                 key={option}
@@ -195,6 +190,19 @@ export default function Actions() {
               />
             ))}
           </Stack>
+          <Reveal label={`Free from ${formatHour(offHour)}`}>
+            <Text variant="footnote" tone="muted">Nothing is booked before this.</Text>
+            <Stack direction="row" gap={2} wrap>
+              {OFF_HOURS.map((hour) => (
+                <Chip
+                  key={hour}
+                  label={formatHour(hour)}
+                  tone={hour === offHour ? 'selected' : 'plain'}
+                  onPress={() => setOffHour(hour)}
+                />
+              ))}
+            </Stack>
+          </Reveal>
         </Stack>
 
         {/* What is already booked for that evening, and a way to take it back. */}
@@ -208,9 +216,6 @@ export default function Actions() {
                 </Text>
               ))}
             </Stack>
-            <Text variant="footnote" tone="muted">
-              Booking again replaces these rather than adding to them.
-            </Text>
             <Button
               label="Clear this evening"
               kind="secondary"
@@ -224,7 +229,7 @@ export default function Actions() {
 
         {/* Most people are choosing a kind of night, not dialling in sliders. */}
         <Stack gap={3}>
-          <Text variant="micro" tone="subtle">OR START FROM ONE OF THESE</Text>
+          <Text variant="micro" tone="subtle">PICK A NIGHT</Text>
           <Stack gap={3}>
             {PRESETS.map((preset) => {
               const points = totalPoints(preset.state, allActions);
@@ -248,7 +253,6 @@ export default function Actions() {
                   <Stack direction="row" gap={4} align="center" justify="between">
                     <Stack gap={1} grow>
                       <Text variant="body" weight="semibold">{preset.label}</Text>
-                      <Text variant="footnote" tone="subtle">{preset.note}</Text>
                     </Stack>
                     <Stack gap={1} align="end">
                       <Text variant="heading" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'muted'}>
@@ -305,10 +309,10 @@ export default function Actions() {
             accessibilityLabel={`Projected ${projected} percent, ${delta > 0 ? 'up' : 'down'} ${Math.abs(delta)} points`}
           >
             {delta === 0
-              ? 'Drag a slider, or pick a night above, to see the difference.'
+              ? 'Drag a slider, or pick a night above.'
               : delta > 0
-                ? `That night leaves you ${delta} points better off than you are now.`
-                : `That night costs you ${Math.abs(delta)} points.`}
+                ? `${delta} points better off.`
+                : `Costs you ${Math.abs(delta)} points.`}
           </Text>
         </Card>
 
@@ -344,6 +348,47 @@ export default function Actions() {
                     <Text variant="footnote" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
                       {points !== 0 ? `${points > 0 ? '+' : ''}${points} pts · ` : ''}{text}
                     </Text>
+
+                    {/* Sleep is the one slider whose number means nothing on its
+                        own. Six hours is fine or impossible depending entirely on
+                        when tonight finishes, so it says so before you choose. */}
+                    {action.logOnly ? (
+                      <Stack gap={2} className={`rounded-sm px-3 py-3 ${night.clash ? 'bg-heavy-wash' : 'bg-sunken'}`}>
+                        <Stack direction="row" gap={3} justify="between" align="center">
+                          <Stack gap={1}>
+                            <Text variant="micro" tone="subtle">BED BY</Text>
+                            <Text variant="heading" tone={night.clash ? 'heavy' : 'default'}>
+                              {formatHour(night.bed)}
+                            </Text>
+                          </Stack>
+                          <Text variant="body" tone="subtle">→</Text>
+                          <Stack gap={1}>
+                            <Text variant="micro" tone="subtle">TO BE UP AT</Text>
+                            <Text variant="heading">{formatHour(night.wake)}</Text>
+                          </Stack>
+                          <Stack gap={1} align="end">
+                            <Text variant="micro" tone="subtle">FIRST THING</Text>
+                            <Text variant="footnote" tone="muted">
+                              {firstTomorrow ? formatHour(firstTomorrow.startHour!) : 'nothing booked'}
+                            </Text>
+                          </Stack>
+                        </Stack>
+                        {night.clash ? (
+                          <Text variant="footnote" tone="heavy">
+                            Tonight runs to {formatHour(night.lastEnd!)}, so {current}h is not available. Shorten
+                            the night, or move what runs late.
+                          </Text>
+                        ) : night.afterMidnight ? (
+                          <Text variant="footnote" tone="busy">
+                            That is past midnight — fine once, expensive as a habit.
+                          </Text>
+                        ) : (
+                          <Text variant="footnote" tone="steady">
+                            That fits: nothing tonight runs past {formatHour(night.bed)}.
+                          </Text>
+                        )}
+                      </Stack>
+                    ) : null}
                   </Stack>
                 </Stack>
               );
@@ -358,8 +403,17 @@ export default function Actions() {
             {sleepChanged ? (
               <Stack direction="row" gap={4} align="center" justify="between" className="min-h-row py-4">
                 <Stack gap={1} grow>
-                  <Text variant="body" weight="semibold">Sleep {sim[sleepAction.id]}h tonight</Text>
-                  <Text variant="footnote" tone="subtle">Logged for tonight — never placed on the timeline</Text>
+                  <Text variant="body" weight="semibold">Sleep {value(sleepAction.id)}h</Text>
+                  <Text variant="footnote" tone={night.clash ? 'heavy' : 'subtle'}>
+                    Bed by {formatHour(night.bed)} to be up at {formatHour(night.wake)}
+                  </Text>
+                  {night.clash ? (
+                    <Text variant="micro" tone="heavy">
+                      Tonight runs to {formatHour(night.lastEnd!)} — that bedtime cannot happen.
+                    </Text>
+                  ) : night.afterMidnight ? (
+                    <Text variant="micro" tone="busy">That is past midnight.</Text>
+                  ) : null}
                 </Stack>
                 <Chip
                   label={`${pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? '+' : ''}${pointsOf(sleepAction, sim[sleepAction.id])}`}
@@ -369,29 +423,83 @@ export default function Actions() {
               </Stack>
             ) : null}
 
-            {placed.map((block, index) => (
-              <Stack key={block.id}>
-                {(index > 0 || sleepChanged) ? <Divider /> : null}
-                <Stack direction="row" gap={4} align="center" justify="between" className="min-h-row py-4">
-                  <Stack gap={1} grow>
-                    <Text variant="body" weight="semibold">{block.label}</Text>
-                    <Text variant="footnote" tone={block.startHour === undefined ? 'heavy' : 'subtle'}>
-                      {block.startHour === undefined
-                        ? 'No gap long enough today'
-                        : `${formatHour(block.startHour)}–${formatHour(block.startHour + block.hours)} · protected`}
-                    </Text>
+            {placed.map((block, index) => {
+              const options = startOptions(otherItems, day, block.hours, 24).filter((h) => h >= offHour);
+              const picking = pickingFor === block.id;
+              return (
+                <Stack key={block.id}>
+                  {(index > 0 || sleepChanged) ? <Divider /> : null}
+                  <Stack gap={3} className="py-4">
+                    <Stack direction="row" gap={4} align="center" justify="between">
+                      <Stack gap={1} grow>
+                        <Text variant="body" weight="semibold">{block.label}</Text>
+                        <Text variant="footnote" tone={block.startHour === undefined ? 'heavy' : 'subtle'}>
+                          {block.startHour === undefined
+                            ? `No gap after ${formatHour(offHour)} is long enough`
+                            : `${formatHour(block.startHour)}–${formatHour(block.startHour + block.hours)} · protected`}
+                        </Text>
+                      </Stack>
+                      <Stack direction="row" gap={2} align="center">
+                        <Chip label={`+${block.credit}`} tone="steady" readOnly />
+                        {options.length ? (
+                          <Chip
+                            label={picking ? 'Close' : 'Change time'}
+                            tone={picking ? 'selected' : 'plain'}
+                            onPress={() => setPickingFor(picking ? null : block.id)}
+                          />
+                        ) : null}
+                      </Stack>
+                    </Stack>
+
+                    {/* Pick the hour yourself; the suggestion is only a default. */}
+                    {picking ? (
+                      <Stack gap={2}>
+                        <Stack direction="row" gap={2} wrap>
+                          {options.map((hour) => (
+                            <Chip
+                              key={hour}
+                              label={formatHour(hour)}
+                              tone={
+                                hour === block.startHour
+                                  ? 'selected'
+                                  : hour === block.suggested
+                                    ? 'steady'
+                                    : 'plain'
+                              }
+                              onPress={() => {
+                                setChosenHour((prev) => ({ ...prev, [block.id]: hour }));
+                                setPickingFor(null);
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                        {chosenHour[block.id] !== undefined ? (
+                          <Chip
+                            label="Back to the suggestion"
+                            onPress={() => {
+                              setChosenHour((prev) => {
+                                const next = { ...prev };
+                                delete next[block.id];
+                                return next;
+                              });
+                              setPickingFor(null);
+                            }}
+                          />
+                        ) : null}
+                      </Stack>
+                    ) : null}
                   </Stack>
-                  <Chip label={`+${block.credit}`} tone="steady" readOnly />
                 </Stack>
-              </Stack>
-            ))}
+              );
+            })}
 
             {!sleepChanged && placed.length === 0 ? (
-              <View className="py-5">
-                <Text variant="footnote" tone="subtle">
-                  Nothing yet. Move a slider above and what it would book appears here, with a time on it.
+              <Stack direction="row" gap={4} align="center" className="py-5">
+                <Spot name="nothing" size={40} />
+                <Text variant="footnote" tone="subtle" className="flex-1">
+                  Move a slider and what it books appears here, with a time on it.
                 </Text>
-              </View>
+              </Stack>
             ) : null}
           </Card>
         </Stack>
@@ -470,15 +578,13 @@ export default function Actions() {
                   setAddingActivity(false);
                 }}
               />
-              <Text variant="footnote" tone="subtle">
-                It becomes a slider like the rest, and gets booked after {formatHour(offHour)}.
-              </Text>
+
             </Card>
           ) : (
             <Text variant="footnote" tone="subtle">
               {customActions.length
-                ? `${customActions.length} of your own in the list above.`
-                : 'Badminton, a night run, band practice — add what your evenings actually contain.'}
+                ? `${customActions.length} of your own above.`
+                : 'Badminton, a night run, band practice.'}
             </Text>
           )}
         </Stack>

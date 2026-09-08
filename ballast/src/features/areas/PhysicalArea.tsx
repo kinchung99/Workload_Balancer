@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { Bar, Battery, Card, Chip, Divider, Stack, Text } from '@/components';
+import { Bar, Battery, Card, Chip, Divider, Reveal, Stack, Text } from '@/components';
 import { color } from '@design/tokens';
 import { SLEEP_TARGET, logItems } from '@/lib/logs';
 import { chargeOf } from '@/lib/battery';
@@ -98,9 +98,7 @@ export function PhysicalArea() {
               </Stack>
             </Stack>
           ) : (
-            <Text variant="footnote" tone="subtle">
-              Nothing is assumed until you tap. Each option shows what it would do first.
-            </Text>
+            <Text variant="footnote" tone="subtle">Each option shows what it would do first.</Text>
           )}
         </Card>
       </Stack>
@@ -171,9 +169,9 @@ export function PhysicalArea() {
         </Card>
       </Stack>
 
-      <Text variant="footnote" tone="subtle">
-        Steps are read on-device, opt-in, and never leave the phone.
-      </Text>
+      <Reveal label="Where this comes from">
+        <Text variant="footnote" tone="muted">Read on-device, opt-in, and never leaves the phone.</Text>
+      </Reveal>
     </Stack>
   );
 }

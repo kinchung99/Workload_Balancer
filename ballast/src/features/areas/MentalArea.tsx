@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { color } from '@design/tokens';
 import { Pressable, TextInput, View } from 'react-native';
-import { Card, Chip, Divider, MoodGrid, Stack, Text, Button, quadrantLabel, quadrantTone } from '@/components';
+import { Burst, Card, Chip, Divider, MoodGrid, Stack, Text, Button, quadrantLabel, quadrantTone } from '@/components';
 import type { ContributionTag, MoodQuadrant } from '@/lib/types';
 import { useStore } from '@/state/store';
 import { readingFrom, useReading } from '@/state/selectors';
@@ -18,6 +18,7 @@ export function MentalArea() {
   const todaysMoments = moments.filter((moment) => moment.date === today);
   const [picked, setPicked] = useState<string | null>(null);
   const [why, setWhy] = useState('');
+  const [celebrating, setCelebrating] = useState(false);
   const kind = MOMENT_KINDS.find((k) => k.id === picked);
   const alreadyLogged = picked ? todaysMoments.filter((m) => m.kind === picked).length : 0;
   const [quadrant, setQuadrant] = useState<MoodQuadrant | null>(null);
@@ -160,22 +161,23 @@ export function MentalArea() {
                 onPress={() => {
                   logMoment(kind.id, kind.bucket, kind.credit, why.trim() || undefined);
                   successFeedback();
+                  setCelebrating(true);
+                  setTimeout(() => setCelebrating(false), 2200);
                   setPicked(null);
                   setWhy('');
                 }}
               />
               {alreadyLogged > 0 ? (
                 <Text variant="micro" tone="subtle">
-                  Logged {alreadyLogged}× today, so this one is worth less than the first. A real day still
-                  counts fully; tapping one button twenty times does not.
+                  {alreadyLogged}× today, so this one is worth less than the first.
                 </Text>
               ) : null}
             </Stack>
           ) : (
-            <Text variant="footnote" tone="subtle">
-              Pick one and say why. It shows on the battery straight away.
-            </Text>
+            <Text variant="footnote" tone="subtle">Pick one and say why.</Text>
           )}
+
+          <Burst show={celebrating} label="Logged. Your battery went up." />
 
           {todaysMoments.length ? (
             <Stack gap={2}>

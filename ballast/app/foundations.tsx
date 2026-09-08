@@ -1,8 +1,12 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BandSwatch, Button, Card, Chip, Divider, DreadDots, Screen, Stack, Text } from '@/components';
+import {
+  AreaIcon, BandSwatch, Burst, Button, Card, Chip, Divider, DreadDots, MOOD_WORD, Mascot, Screen,
+  Spot, Stack, Text,
+} from '@/components';
 import { BAND_LABEL } from '@/lib/load';
 import { color, radius, space, target, type as typeScale } from '@design/tokens';
+import { BUCKETS, BUCKET_LABEL } from '@/lib/load';
 import { ARTBOARD, FIGMA_FRAMES } from '@design/figma';
 import type { BandName } from '@/lib/types';
 
@@ -84,6 +88,65 @@ export default function Foundations() {
               That was the test.
             </Text>
           </Stack>
+        </Card>
+
+        {/* The character, at every level it has. */}
+        <Card gap={5}>
+          <Stack gap={2}>
+            <Text variant="heading">How it looks at each level</Text>
+            <Text variant="callout" tone="muted">
+              Sympathetic at every reading. A heavy week is information, not a failure, so there is no frown
+              here at any charge.
+            </Text>
+          </Stack>
+          <Stack direction="row" gap={3} justify="between">
+            {[78, 45, 22, 8].map((level) => (
+              <Stack key={level} gap={2} align="center" grow>
+                <Mascot charge={level} loadPercent={100 - level} size={62} />
+                <Text variant="micro" weight="semibold">{level}%</Text>
+                <Text variant="micro" tone="subtle" className="text-center">{MOOD_WORD[level >= 60 ? 'great' : level >= 35 ? 'good' : level >= 15 ? 'tired' : 'spent']}</Text>
+              </Stack>
+            ))}
+          </Stack>
+        </Card>
+
+        {/* Area identity: shape and hue, kept away from what colour means. */}
+        <Card gap={4}>
+          <Stack gap={2}>
+            <Text variant="heading">The five areas</Text>
+            <Text variant="callout" tone="muted">
+              A hue and a glyph each, used only on icons and washes. Colour on a reading still means which band
+              it is in, so the two never compete.
+            </Text>
+          </Stack>
+          <Stack direction="row" gap={3} justify="between">
+            {BUCKETS.map((bucket) => (
+              <Stack key={bucket} gap={2} align="center" grow>
+                <View
+                  className="h-12 w-12 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: color.area[bucket].wash }}
+                >
+                  <AreaIcon area={bucket} size={24} />
+                </View>
+                <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].slice(0, 4)}</Text>
+              </Stack>
+            ))}
+          </Stack>
+        </Card>
+
+        {/* Drawings, and the one reward mechanic in the app. */}
+        <Card gap={4}>
+          <Text variant="heading">Drawings</Text>
+          <Stack direction="row" gap={3} justify="between">
+            {(['clear', 'night', 'done', 'nothing', 'wall'] as const).map((name) => (
+              <Spot key={name} name={name} size={48} />
+            ))}
+          </Stack>
+          <Burst show label="Celebration, shown when something good is logged" />
+          <Text variant="footnote" tone="muted">
+            Drawn as SVG, not fetched: they work offline, follow the theme and print in greyscale. The burst is
+            the only reward in the app and only ever fires for something you did.
+          </Text>
         </Card>
 
         {/* Type that can grow. */}

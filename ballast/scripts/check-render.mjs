@@ -31,35 +31,21 @@ const textOf = (route) =>
 
 const EXPECTATIONS = [
   ['index.html', 'Home', [
-    '13%',                                    // the battery: 100 - 87
-    'Running on empty',
-    'Something has to come off this week.',
-    '13 percent overall. Running on empty. Made of Mental 0%',  // spoken, with its parts
-    'Your five areas, blended',               // the headline number, explained
-    'YOUR AREAS', 'Mental', 'Time', 'Errands', 'Social', 'Physical',
-    '0% left',                                // mental is over its ceiling
-    '69% left',                               // physical has room
-    'of your week left',                      // the unit "13%" was missing
-    'THIS WEEK', 'TAP A DAY',                 // the other six days, visible from home
-    "WHAT'S PULLING YOU DOWN",
-    'over its limit by 4%',                   // mental, stated plainly
-    '82% of its limit used',
-    'TODAY \u00b7 MON 10 NOV',                    // the day now has a clock, not just a count
-    '1pm', '5pm', '11pm',                     // the timeline, in order
-    'OWING BEFORE A DEADLINE',                // deadline work and loose tasks, split apart
-    'Sits here every day until it is done',
-    "TODAY'S LIST", 'Just this day, no time set',
-    'Give it a time',                         // a loose task can be dropped into a slot
+    'WEEK 10',
+    '13%', 'Nearly empty',                    // the hero: a face, a number, a word
+    '13 percent left. Nearly empty. Made of Mental 0%',      // spoken, with its parts
+    'WHAT THIS NUMBER IS',                    // the explanation, behind a tap
+    'Mental, 0% left', 'Physical, 69% left',  // areas as icons plus a number
+    'M 10 10.3h', 'S 16 13h',                 // the week, at a glance
+    'Tuesday to Thursday next week is a wall',
+    'Mental 104%',                            // what is pulling you down, as chips
+    '11h rest owed',
+    'TODAY \u00b7 MON 10 NOV', '1pm', '5pm', '11pm',
+    'OWING', 'THIS DAY',                      // deadline work and loose tasks, split
     'Algorithms problem set', '75%', 'unplanned',
-    '1h done', '0h booked', '3h with no plan', // done / booked / neither
-    'Book', 'sitting',
-    'Progress \u00b7 25%',                      // progress is its own control now
-    'h free',                                 // the gaps are shown as usable space
-    'SUGGESTED FOR YOU', 'Walk the river loop',
-    'Put it in today at 5pm',                 // books for real
-    'your line sits at 85%',                  // the ceiling the daily tap moves
-    'Operating systems, part 2', 'Caf\u00e9 shift', 'Return the library books',
-    '11h of rest owed',
+    '1h done', '0h booked', '3h loose',
+    'Give it a time', 'Move', 'Unschedule',
+    'WOULD HELP', 'Walk the river loop',      // one suggestion, not a paragraph
   ]],
   ['welcome.html', 'Intro', [
     'THE WHOLE IDEA',
@@ -79,20 +65,22 @@ const EXPECTATIONS = [
     'ABOUT THIS BUILD', 'Replay the intro', 'Reset to the seeded week',
   ]],
   ['actions.html', 'Simulator', [
-    'TONIGHT', 'Try tonight before you live it.',   // the purpose, stated
-    'Nothing is saved until you press the button.',
-    'MY DAY IS MY OWN FROM', '5pm',                 // nothing booked before you finish
-    'WHICH EVENING', 'Tonight', 'Tomorrow',         // one evening, chosen
+    'TONIGHT', 'Try it before you live it.',        // the purpose, in five words
+    'WHAT THIS IS FOR',                             // the rest of it, behind a tap
+    'Free from 5pm',                                // off-hours, folded away
+    'BED BY', 'TO BE UP AT', 'FIRST THING',         // sleep says when, not only how long
+    'past midnight',                                // six hours means 1am, given a 7am start
+    'Tonight', 'Tomorrow',                          // one evening, chosen
     'WHAT YOU ACTUALLY DO', 'Add your own',         // your evening, in the model
     'Badminton, a night run, band practice',
-    'OR START FROM ONE OF THESE',                   // a kind of night, not a dial
+    'PICK A NIGHT',                                 // a kind of night, not a dial
     'A recovery night', 'A balanced night', 'Push through',
     'NOW', 'PROJECTED', 'YOUR ACTIONS',
     'Sleep tonight', '6 hrs', 'Take a walk', 'Text a friend', 'Study session', 'Late-night screen',
-    'Drag a slider, or pick a night above, to see the difference.',
+    'Drag a slider, or pick a night above.',
     'Move a slider first',                    // becomes a real count once a slider moves
     'WHAT THIS PUTS IN YOUR WEEK',            // the effect, stated before you tap
-    'what it would book appears here, with a time on it',
+    'Move a slider and what it books appears here',
   ]],
   ['areas/mental.html', 'Mental area', [
     'LOG YOUR MOOD', 'HIGH ENERGY', 'LOW ENERGY',
@@ -105,15 +93,14 @@ const EXPECTATIONS = [
   ]],
   ['areas/time.html', 'Time area', [
     'HRS COMMITTED', 'HRS RECOVERY', 'Committed', 'Protected recovery',
-    'unscheduled that day',                   // the grid is drawn from real items now
-    'Recovery blocks are protected time.',
+    'WHAT PROTECTED MEANS',                   // the explanation, behind a tap
   ]],
   ['areas/physical.html', 'Physical area', [
     'Tap and describe what you ate', "TODAY'S MEALS",
     'Breakfast', 'Ate \u00b7 Filling', 'Lunch', 'Light snack', 'Dinner', 'Not yet',
     'ACTIVITY TODAY', '4,200', '32 active min',
     'HOW DID YOU SLEEP?', '8h',               // logged on waking
-    'Nothing is assumed until you tap',       // each option previews its own effect
+    'Each option shows what it would do first',  // each option previews its own effect
   ]],
   ['areas/social.html', 'Social area', [
     'LOW-EFFORT RECONNECTION', 'Sam K.', '9 days since you spoke',
@@ -123,19 +110,18 @@ const EXPECTATIONS = [
     'Day trip', '71%',                        // Ravi's battery, shown before you invite him
   ]],
   ['areas/errands.html', 'Errands area', [
-    'ADD AN ERRAND', 'Pick up oat milk',      // a real field, not a dead microphone
-    'Type it as you would say it',
+    'ADD A TASK OR ERRAND', 'Pick up oat milk',  // one list for everything you just do
+    'Sorted into a batch, priced, and put on the day you choose',
+    'WHY BATCHING IS FREE',                   // the reasoning, behind a tap
     'Type something first',                   // empty submits are refused
     'GROCERIES', 'ADMIN', 'Pay the phone bill', 'ACADEMIC', 'Email Prof. Chen',
-    'Batched by where they are.',
   ]],
   ['plan.html', 'Plan', [
     'Next week, 4%',           // 100 - 96, the same number the other way up
-    'Tap any day to see it hour by hour.',
+    'Tap a day.',
     'THE COLLISION', '72 hours', '4 things',  // the pile-up as a shape, not a list
-    'Hard — never suggested for moving',
-    'Movable — the rebalance list works on these',
-    '+ Add here',                             // gaps are where things get added
+    'Hard', 'Movable',                        // the legend, trimmed to the words
+    'h free',                                 // gaps are where things get added
     'h booked', 'h free',
     'Tuesday to Thursday next week is a wall',
     'Four things inside seventy-two hours',
@@ -182,7 +168,13 @@ const EXPECTATIONS = [
   ]],
   ['decline/w11-birthday.html', 'Drafter', ["Aisyah's birthday dinner", 'Warm', 'Brief', 'Fully honest', "Actually, I'm going", 'Open in WhatsApp']],
   ['widget.html', 'Widget', ['Ballast', 'week 10', 'One thing today. The networks lab report', 'How was today?', '13%', 'Running on empty', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
-  ['foundations.html', 'Foundations', ['Colour is never the only signal', 'flat fill', 'diagonal hatch', 'cross hatch', 'vertical rule', 'colour taken away', '44 by 44 point minimum']],
+  ['foundations.html', 'Foundations', [
+    'Colour is never the only signal', 'flat fill', 'diagonal hatch', 'cross hatch', 'vertical rule',
+    'colour taken away', '44 by 44 point minimum',
+    'How it looks at each level', 'Full of it', 'Nearly empty',   // the character, at every reading
+    'The five areas', 'Drawings',
+    'Colour on a reading still means which band',                 // the rule the hues must not break
+  ]],
 ];
 
 /**

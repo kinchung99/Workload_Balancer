@@ -102,7 +102,8 @@ interface State {
     category: ErrandCategory,
     hours: number,
     effort: 1 | 2 | 3,
-    when?: { date: string; startHour: number },
+    when: { date: string; startHour?: number },
+    bucket?: BucketKey,
   ) => void;
   scheduleItem: (id: string, startHour: number | undefined) => void;
   cycleContact: (id: string) => void;
@@ -465,10 +466,18 @@ export const useStore = create<State>()(
       };
     }),
 
-  addErrand: (title, category, hours, effort, when) =>
+  /**
+   * One list for everything you just do.
+   *
+   * Whether it arrives from the errands screen or from capture as a thing you
+   * only have to turn up to, it is the same kind of object and lands in the same
+   * place - so it shows up on its day *and* in the list, rather than one or the
+   * other depending on where it was typed.
+   */
+  addErrand: (title, category, hours, effort, when, bucket) =>
     set((state) => ({
       errands: [
-        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, ...when },
+        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, bucket, ...when },
         ...state.errands,
       ],
     })),

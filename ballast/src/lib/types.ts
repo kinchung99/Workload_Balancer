@@ -228,9 +228,18 @@ export interface Errand {
    * interface study states until someone puts something into it themselves.
    */
   addedByUser?: boolean;
-  /** Optional slot. An errand with a time becomes a block like anything else. */
+  /** The day it belongs to. Everything you add lands on a day. */
   date?: string;
+  /** Optional slot. With one it becomes a block; without, it waits on that day. */
   startHour?: number;
+  /**
+   * Which area it costs.
+   *
+   * Not everything you "just turn up" to is an errand: an interview costs mental,
+   * a birthday costs social. The list holds one-off tasks of every kind; the
+   * bucket is what keeps the load honest.
+   */
+  bucket?: BucketKey;
 }
 
 /** Time: a block on the week grid. */

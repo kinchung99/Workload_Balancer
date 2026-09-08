@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
-import { Button, Card, Checkbox, Chip, Divider, Stack, Text } from '@/components';
+import { Button, Card, Checkbox, Chip, Divider, Reveal, Stack, Text } from '@/components';
 import { color } from '@design/tokens';
 import { DEFAULT_ERRAND_HOURS, EFFORTS, categorise, completionCredit, errandLoad } from '@/lib/errands';
 import { formatHour, startOptions } from '@/lib/schedule';
@@ -64,7 +64,8 @@ export function ErrandsArea() {
 
   const submit = () => {
     if (!title.trim()) return;
-    addErrand(title.trim(), category, hours, effort, startHour === null ? undefined : { date: day, startHour });
+    // Always on a day, so it shows in that day's list whether or not it has a time.
+    addErrand(title.trim(), category, hours, effort, { date: day, ...(startHour === null ? {} : { startHour }) });
     successFeedback();
     setTitle('');
     setOverride(null);
@@ -76,7 +77,7 @@ export function ErrandsArea() {
   return (
     <Stack gap={6}>
       <Stack gap={3}>
-        <Text variant="micro" tone="subtle">ADD AN ERRAND</Text>
+        <Text variant="micro" tone="subtle">ADD A TASK OR ERRAND</Text>
         <Card gap={4}>
           <TextInput
             value={title}
@@ -187,7 +188,7 @@ export function ErrandsArea() {
             </Stack>
           ) : (
             <Text variant="footnote" tone="subtle">
-              Type it as you would say it. Ballast sorts it into a batch and prices it.
+              Sorted into a batch, priced, and put on the day you choose.
             </Text>
           )}
 
@@ -213,9 +214,7 @@ export function ErrandsArea() {
           <Text variant="footnote" tone="muted">
             Worth {Math.round(mine.reduce((t, e) => t + errandLoad(e), 0) * 10) / 10} load. Tick one off to get it back.
           </Text>
-          <Text variant="micro" tone="subtle">
-            Everything on this list pays out when you finish it, seeded or not.
-          </Text>
+
         </Card>
       ) : null}
 
@@ -256,10 +255,11 @@ export function ErrandsArea() {
         );
       })}
 
-      <Card tone="steady" gap={2}>
-        <Text variant="callout" weight="semibold" tone="steady">Batched by where they are.</Text>
-        <Text variant="footnote" tone="muted">Same trip, four things — the one saving that costs you nothing.</Text>
-      </Card>
+      <Reveal label="Why batching is free">
+        <Text variant="footnote" tone="muted">
+          Same trip, four things — the one saving that costs you nothing. Everything here also shows on its day.
+        </Text>
+      </Reveal>
     </Stack>
   );
 }

@@ -11,7 +11,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
-import { DAY_END, endHour, formatHour, freeSlots, slotHours, daySchedule, startOptions } from '@/lib/schedule';
+import { DAY_END, endHour, formatHour, freeSlots, slotHours, daySchedule, placeIn, startOptions } from '@/lib/schedule';
 import { BUCKET_LABEL, bandFor, loadOf } from '@/lib/load';
 import type { Item } from '@/lib/types';
 import { tapFeedback } from '@/lib/haptics';
@@ -57,6 +57,12 @@ export function DayTimeline({
   const [scheduling, setScheduling] = useState<string | null>(null);
 
   const startsFor = (item: Item) => startOptions(items, date, item.hours);
+  /**
+   * Where this would go if it were being placed now. Marked in the picker so a
+   * fixed time is a starting point rather than a decision already taken.
+   */
+  const suggestedFor = (item: Item) =>
+    placeIn(items.filter((i) => i.id !== item.id), date, item.hours, item.isRecovery ? [12, 21] : undefined);
 
   // Interleave gaps between blocks so free time occupies real space on screen.
   const rows: Array<{ kind: 'item'; item: Item } | { kind: 'gap'; start: number; end: number }> = [];
@@ -89,10 +95,8 @@ export function DayTimeline({
               }`}
             >
               <Stack direction="row" gap={3} justify="between" align="center">
-                <Text variant="footnote" tone="subtle">
-                  {slotHours({ start: row.start, end: row.end })}h free
-                </Text>
-                {onAddAt ? <Text variant="footnote" tone="steady">+ Add here</Text> : null}
+                <Text variant="footnote" tone="subtle">{slotHours({ start: row.start, end: row.end })}h free</Text>
+                {onAddAt ? <Text variant="footnote" tone="steady">+</Text> : null}
               </Stack>
             </Pressable>
           </Stack>
@@ -116,19 +120,22 @@ export function DayTimeline({
                   {row.item.isRecovery ? null : <DreadDots value={row.item.dread} />}
                 </Stack>
                 <Text variant="micro" tone={row.item.isRecovery ? 'recovery' : 'subtle'}>
-                  {row.item.isRecovery ? 'Protected recovery' : `${BUCKET_LABEL[row.item.bucket]} · ${loadOf(row.item)} load`}
+                  {row.item.isRecovery ? 'Protected' : `${BUCKET_LABEL[row.item.bucket]} · ${loadOf(row.item)}`}
                 </Text>
-                {onSchedule && !row.item.isRecovery && !row.item.repeats ? (
+                {/* Protected recovery is movable too. Protected means work is
+                    planned around it, not that the hour is beyond question. */}
+                {onSchedule && !row.item.repeats ? (
                   <Stack direction="row" gap={2} wrap>
                     <Chip
-                      label={scheduling === row.item.id ? 'Close' : 'Move'}
+                      label={scheduling === row.item.id ? 'Close' : row.item.isRecovery ? 'Move this block' : 'Move'}
+                      tone={scheduling === row.item.id ? 'selected' : row.item.isRecovery ? 'recovery' : 'plain'}
                       onPress={() => {
                         tapFeedback();
                         setScheduling((id) => (id === row.item.id ? null : row.item.id));
                       }}
                     />
                     <Chip
-                      label="Unschedule"
+                      label={row.item.isRecovery ? 'Give it back' : 'Unschedule'}
                       onPress={() => {
                         onSchedule(row.item, undefined);
                         setScheduling(null);
@@ -140,6 +147,7 @@ export function DayTimeline({
                   <SlotPicker
                     starts={startsFor(row.item)}
                     current={row.item.startHour}
+                    suggested={suggestedFor(row.item)}
                     onPick={(hour) => {
                       onSchedule?.(row.item, hour);
                       setScheduling(null);
@@ -157,20 +165,14 @@ export function DayTimeline({
           list is why a deadline can hide among the errands. */}
       {todo ? (
         <Stack gap={3} className="pt-2">
-          <Stack gap={1}>
-            <Text variant="micro" tone="heavy">OWING BEFORE A DEADLINE</Text>
-            <Text variant="micro" tone="subtle">Sits here every day until it is done</Text>
-          </Stack>
+          <Text variant="micro" tone="heavy">OWING</Text>
           {todo}
         </Stack>
       ) : null}
 
       {anytime.length > 0 ? (
         <Stack gap={3} className="pt-2">
-          <Stack gap={1}>
-            <Text variant="micro" tone="subtle">TODAY'S LIST · {anytime.length}</Text>
-            <Text variant="micro" tone="subtle">Just this day, no time set</Text>
-          </Stack>
+          <Text variant="micro" tone="subtle">THIS DAY · {anytime.length}</Text>
           {anytime.map((item) => (
             <Stack key={item.id} direction="row" gap={4} align="start">
               <View className="w-14 pt-3">
@@ -190,7 +192,7 @@ export function DayTimeline({
                     <DreadDots value={item.dread} />
                   </Stack>
                   <Text variant="micro" tone={TONE[intensity(item)]}>
-                    {BUCKET_LABEL[item.bucket]} · {loadOf(item)} load · no slot yet
+                    {BUCKET_LABEL[item.bucket]} · {loadOf(item)}
                   </Text>
                   {onSchedule ? (
                     <Stack gap={3}>
@@ -205,6 +207,7 @@ export function DayTimeline({
                       {scheduling === item.id ? (
                         <SlotPicker
                           starts={startsFor(item)}
+                          suggested={suggestedFor(item)}
                           onPick={(hour) => {
                             onSchedule(item, hour);
                             setScheduling(null);
@@ -229,33 +232,48 @@ export function DayTimeline({
   );
 }
 
-/** The gaps this task would fit into, as tappable times. */
+/**
+ * The gaps this would fit into, as tappable times.
+ *
+ * One is marked as the suggestion — where the app would put it — so the choice
+ * is guided without being made for you.
+ */
 function SlotPicker({
   starts,
   current,
+  suggested,
   onPick,
 }: {
   starts: number[];
   current?: number;
+  suggested?: number;
   onPick: (hour: number) => void;
 }) {
   if (starts.length === 0) {
     return (
       <Text variant="micro" tone="heavy">
-        Nothing free today is long enough. Move something else first.
+        Nothing free that day is long enough. Move something else first.
       </Text>
     );
   }
   return (
-    <Stack direction="row" gap={2} wrap>
-      {starts.map((hour) => (
-        <Chip
-          key={hour}
-          label={formatHour(hour)}
-          tone={hour === current ? 'selected' : 'plain'}
-          onPress={() => onPick(hour)}
-        />
-      ))}
+    <Stack gap={2}>
+      <Stack direction="row" gap={2} wrap>
+        {starts.map((hour) => (
+          <Chip
+            key={hour}
+            label={hour === suggested && hour !== current ? `${formatHour(hour)} ·` : formatHour(hour)}
+            tone={hour === current ? 'selected' : hour === suggested ? 'steady' : 'plain'}
+            onPress={() => onPick(hour)}
+            accessibilityHint={hour === suggested ? 'Suggested' : undefined}
+          />
+        ))}
+      </Stack>
+      {suggested !== undefined && suggested !== current ? (
+        <Text variant="micro" tone="subtle">
+          {formatHour(suggested)} is where it would go on its own. Any of these work.
+        </Text>
+      ) : null}
     </Stack>
   );
 }

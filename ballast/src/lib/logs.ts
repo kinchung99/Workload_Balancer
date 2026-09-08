@@ -9,7 +9,7 @@
  * Nothing is inferred: until you log, every one of these contributes zero, which
  * is why the seeded week reads exactly as the interface study says it does.
  */
-import { errandLoad, outstandingLoad, scheduledErrands } from './errands';
+import { errandLoad, openErrands, outstandingLoad } from './errands';
 import { momentCredits } from './moments';
 import type { BucketKey, Errand, Item, Meal, MealStatus, Moment, MoodCheckIn, MoodQuadrant } from './types';
 
@@ -96,15 +96,17 @@ export function logItems({ today, sleepHours, meals, moods, errands = [], moment
   // Errands you added yourself, while they are still outstanding. Ticking one
   // off takes its weight back, which is the whole point of a list that costs
   // something to keep.
-  const floating = outstandingLoad(errands);
-  if (floating !== 0) {
-    out.push({ ...entry('errands', 'Errands you added', 'errands', floating), date: today });
-  }
-
-  // Errands with a time are real blocks on their day, not an anonymous lump.
-  for (const errand of scheduledErrands(errands)) {
+  /*
+   * Every task you added, on the day you gave it.
+   *
+   * These used to be an anonymous lump of load unless they had a time, which
+   * meant a thing you had written down could not be seen on the day it was for.
+   * Each is now its own row: timed ones sit in the timeline, the rest wait in
+   * that day's list, and both cost what they weigh in the area they belong to.
+   */
+  for (const errand of openErrands(errands)) {
     out.push({
-      ...entry(`errand-${errand.id}`, errand.title, 'errands', errandLoad(errand)),
+      ...entry(`errand-${errand.id}`, errand.title, errand.bucket ?? 'errands', errandLoad(errand)),
       date: errand.date ?? today,
       hours: errand.hours ?? 0.33,
       startHour: errand.startHour,

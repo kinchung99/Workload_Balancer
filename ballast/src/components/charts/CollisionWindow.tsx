@@ -97,11 +97,11 @@ export function CollisionWindow({
       <Stack direction="row" gap={4} wrap>
         <Stack direction="row" gap={2} align="center">
           <View className="h-3 w-1 rounded-pill bg-heavy-fill" />
-          <Text variant="micro" tone="subtle">Hard — never suggested for moving</Text>
+          <Text variant="micro" tone="subtle">Hard</Text>
         </Stack>
         <Stack direction="row" gap={2} align="center">
           <View className="h-3 w-1 rounded-pill bg-busy-fill" />
-          <Text variant="micro" tone="subtle">Movable — the rebalance list works on these</Text>
+          <Text variant="micro" tone="subtle">Movable</Text>
         </Stack>
       </Stack>
     </Stack>

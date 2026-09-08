@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Card, Chip, DayTimeline, Stack, Text, WeekGrid } from '@/components';
+import { Card, Chip, DayTimeline, Reveal, Stack, Text, WeekGrid } from '@/components';
 import { color } from '@design/tokens';
 import { DAY_LETTER, dayIndex, formatShort } from '@/lib/dates';
 import { dayHours, freeSlots, slotHours, weekDays } from '@/lib/schedule';
@@ -54,7 +54,7 @@ export function TimeArea() {
             <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: color.band.steady.wash, borderWidth: 1, borderColor: color.band.steady.fill }} />
             <Text variant="micro" tone="subtle">Protected recovery</Text>
           </Stack>
-          <Text variant="micro" tone="subtle">+n = unscheduled that day</Text>
+
         </Stack>
       </Card>
 
@@ -81,10 +81,9 @@ export function TimeArea() {
         </Card>
       </Stack>
 
-      <Card tone="steady" gap={2}>
-        <Text variant="callout" weight="semibold" tone="steady">Recovery blocks are protected time.</Text>
-        <Text variant="footnote" tone="muted">Rebalancing moves work around them, never through them.</Text>
-      </Card>
+      <Reveal label="What protected means">
+        <Text variant="footnote" tone="muted">Rebalancing moves work around these blocks, never through them.</Text>
+      </Reveal>
     </Stack>
   );
 }

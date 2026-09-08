@@ -58,7 +58,7 @@ export const storage = createJSONStorage(() => ({
   removeItem: (n) => void mem.delete(n),
 }));
 export const STORAGE_KEY = 'ballast/test';
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 export function migrateSaved(persisted, from) {
   if (from >= SCHEMA_VERSION) return persisted ?? {};
   return { onboarded: persisted?.onboarded ?? false };
@@ -72,8 +72,8 @@ const { useStore, weekReading, liveCeiling, restOwedFrom, itemsOnDay, itemsInWee
 const { logItems } = await import(join(tmp, 'logs.ts'));
 const { migrateSaved } = await import(join(tmp, 'storage.ts'));
 const { chargeOf } = await import(join(tmp, 'battery.ts'));
-const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn } = await import(join(tmp, 'schedule.ts'));
-const { categorise, errandLoad, outstandingLoad } = await import(join(tmp, 'errands.ts'));
+const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn, sleepWindow, formatHour } = await import(join(tmp, 'schedule.ts'));
+const { categorise, errandLoad, outstandingLoad, openErrands } = await import(join(tmp, 'errands.ts'));
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
 const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
@@ -304,7 +304,7 @@ console.log('\nAdding an errand');
   check('seeded errands stay weightless', seeded, 0);
 
   const before = s().errands.length;
-  s().addErrand('Collect the parcel', 'Admin', 0.75, 2);
+  s().addErrand('Collect the parcel', 'Admin', 0.75, 2, { date: s().today });
   check('it lands in the list', s().errands.length, before + 1);
   check('marked as yours', s().errands[0].addedByUser, true);
   check('and it is priced', errandLoad(s().errands[0]), 1.5);
@@ -339,6 +339,77 @@ console.log('\nAdding an errand');
   check('a scheduled errand becomes a timed block', scheduled.some((i) => i.title === 'Collect the parcel' && i.startHour === 9), true);
   check('and is not also counted as floating', outstandingLoad(s().errands), 0);
   check('so it shows up on the day it was given', daySchedule([...s().items, ...scheduled], s().today).timed.some((i) => i.title === 'Collect the parcel'), true);
+}
+
+console.log('\nSleep says when, not only how long');
+{
+  s().reset();
+  // Tomorrow opens with an 8am walk, so waking is 7 and the rest follows.
+  const nine = sleepWindow(s().items, s().today, 9);
+  check('waking is pinned an hour before the first thing', nine.wake, 7);
+  check('nine hours means a 10pm bedtime', nine.bed, 22);
+  check('which is not past midnight', nine.afterMidnight, false);
+
+  const seven = sleepWindow(s().items, s().today, 7);
+  check('seven hours lands exactly on midnight', seven.bed, 0);
+  check('and that is flagged as past midnight', seven.afterMidnight, true);
+  check('six hours pushes it to 1am', sleepWindow(s().items, s().today, 6).bed, 1);
+
+  // The café shift runs to 11pm tonight, so a long night cannot start at ten.
+  const long = sleepWindow(s().items, s().today, 12);
+  check('it knows what runs latest tonight', long.lastEnd, 23);
+  check('and flags a bedtime that cannot happen', long.clash, true);
+  check('a night that fits does not flag', sleepWindow(s().items, s().today, 6).clash, false);
+}
+
+console.log('\nProtected recovery can be moved');
+{
+  s().reset();
+  const river = prescriptions.find((p) => p.id === 'river');
+  s().bookRecovery(river, 12, 1);
+  const block = s().items.find((i) => i.id === `recovery-${river.id}`);
+  check('it books where asked', block.startHour, 12);
+  check('and it is protected', block.isRecovery, true);
+
+  // Protected means work is planned around it, not that the hour is fixed.
+  s().scheduleItem(block.id, 19);
+  check('the hour can be changed afterwards', s().items.find((i) => i.id === block.id).startHour, 19);
+  check('it is still protected', s().items.find((i) => i.id === block.id).isRecovery, true);
+  check('and still on the timeline', daySchedule(s().items, s().today).timed.some((i) => i.id === block.id), true);
+
+  const suggestion = placeIn(s().items.filter((i) => i.id !== block.id), s().today, 1, [12, 21]);
+  check('a suggested hour is offered', typeof suggestion, 'number');
+  check('and it sits inside the window', suggestion >= 12 && suggestion <= 21, true);
+
+  s().scheduleItem(block.id, undefined);
+  check('or it can be handed back entirely', s().items.find((i) => i.id === block.id).startHour, undefined);
+}
+
+console.log('\nOne list for everything you just do');
+{
+  s().reset();
+  // Added from the errands screen: it belongs to a day, so it shows there too.
+  s().addErrand('Collect the parcel', 'Admin', 0.75, 2, { date: s().today });
+  const logged = () => logItems({ today: s().today, sleepHours: null, meals: s().meals, moods: s().moods, errands: s().errands, moments: s().moments });
+  const withLogs = () => [...s().items, ...logged()];
+  check('it appears on its own day, not as a lump', logged().some((i) => i.title === 'Collect the parcel'), true);
+  check("and waits in that day's list", daySchedule(withLogs(), s().today).anytime.some((i) => i.title === 'Collect the parcel'), true);
+  check('it is still on the errands list', s().errands.some((e) => e.title === 'Collect the parcel'), true);
+
+  // Added from capture as "just turn up": same object, so it lands in both too.
+  s().addErrand('Dentist appointment', categorise('dentist appointment'), 1, 2, { date: s().today, startHour: 9 }, 'errands');
+  check('a turn-up thing joins the same list', s().errands.some((e) => e.title === 'Dentist appointment'), true);
+  check('and takes its slot in the timeline', daySchedule(withLogs(), s().today).timed.some((i) => i.title === 'Dentist appointment'), true);
+
+  // A thing you turn up to is not always an errand, and the load must follow it.
+  s().addErrand('Interview', 'Admin', 1, 3, { date: s().today }, 'mental');
+  check('it costs the area it belongs to', logged().find((i) => i.title === 'Interview').bucket, 'mental');
+
+  // Tomorrow's task is not on today's list.
+  s().addErrand('Post the parcel', 'Admin', 0.5, 2, { date: addDaysISO(s().today, 1) });
+  check("tomorrow's task stays on tomorrow", daySchedule(withLogs(), s().today).all.some((i) => i.title === 'Post the parcel'), false);
+  check('and is there tomorrow', daySchedule(withLogs(), addDaysISO(s().today, 1)).all.some((i) => i.title === 'Post the parcel'), true);
+  check('four of your own are outstanding', openErrands(s().errands).length, 4);
 }
 
 console.log('\nThings do not pile up when you repeat yourself');
@@ -455,7 +526,7 @@ console.log('\nA stale save does not carry a fixed bug forward');
   check('including the stacked walks', JSON.stringify(migrated).includes('Take a walk'), false);
   check('and the sleep block that should never have existed', JSON.stringify(migrated).includes('Sleep tonight'), false);
   check('but the intro stays done', migrated.onboarded, true);
-  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 7).sleepHours, 8);
+  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 8).sleepHours, 8);
 }
 
 console.log('\nThings happen at a sensible hour');

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View } from 'react-native';
 import {
-  Button, Card, Chip, CollisionWindow, DayTimeline, Divider, ForecastStrip, Screen, Stack, Text, TodoList,
+  Button, Card, Chip, CollisionWindow, DayTimeline, Divider, ForecastStrip, Reveal, Screen, Spot,
+  Stack, Text, TodoList,
 } from '@/components';
 import { threshold } from '@design/tokens';
 import { buildForecast, findCollision, leadLabel, speakForecast } from '@/lib/forecast';
@@ -84,7 +85,7 @@ export default function Plan() {
             <Text variant="footnote" tone="muted">This week, {chargeOf(thisWeek.overall)}% left</Text>
             <Text variant="footnote" weight="semibold" tone="heavy">Next week, {chargeOf(next.overall)}%</Text>
           </Stack>
-          <Text variant="micro" tone="subtle">Tap any day to see it hour by hour.</Text>
+          <Text variant="micro" tone="subtle">Tap a day.</Text>
         </Card>
 
         {/* The selected day, in full. This is the part that was missing. */}
@@ -106,8 +107,7 @@ export default function Plan() {
 
           {inWall ? (
             <Card tone="heavy" gap={2}>
-              <Text variant="callout" weight="semibold" tone="heavy">This day is part of the wall.</Text>
-              <Text variant="footnote" tone="muted">{collision?.detail}</Text>
+              <Text variant="callout" weight="semibold" tone="heavy">Part of the wall.</Text>
             </Card>
           ) : null}
 
@@ -180,15 +180,22 @@ export default function Plan() {
             </Card>
           </Stack>
         ) : (
-          <Card gap={2}>
-            <Text variant="heading">Nothing is colliding.</Text>
-            <Text variant="callout" tone="muted">An ordinary two weeks.</Text>
+          <Card gap={4}>
+            <Stack direction="row" gap={4} align="center">
+              <Spot name="clear" size={48} />
+              <Stack gap={1} grow>
+                <Text variant="heading">Nothing is colliding.</Text>
+                <Text variant="footnote" tone="muted">An ordinary two weeks.</Text>
+              </Stack>
+            </Stack>
           </Card>
         )}
 
-        <Text variant="footnote" tone="subtle">
-          One notification, eight days out. Nothing at 11pm.
-        </Text>
+        <Reveal label="When we notify you">
+          <Text variant="footnote" tone="muted">
+            One message, eight days out, only for a genuine collision. No daily digest, nothing at 11pm.
+          </Text>
+        </Reveal>
         <View className="h-2" />
       </Stack>
     </Screen>

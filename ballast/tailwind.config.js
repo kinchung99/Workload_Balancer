@@ -52,6 +52,7 @@ module.exports = {
       busy: colors.band.busy,
       heavy: colors.band.heavy,
       recovery: colors.band.recovery,
+      area: colors.area,
       ink: colors.ink,
       line: colors.line,
       control: colors.control,

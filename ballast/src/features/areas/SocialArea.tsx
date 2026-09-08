@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { successFeedback } from '@/lib/haptics';
-import { Bar, Button, Card, Chip, Divider, Stack, Text } from '@/components';
+import { Bar, Button, Card, Chip, Divider, Reveal, Stack, Text } from '@/components';
 import { BAND_LABEL } from '@/lib/load';
 import { circle, cohort } from '@/data/seed';
 import { useStore } from '@/state/store';
@@ -121,7 +121,7 @@ export function SocialArea() {
           <View className="flex-1"><Bar band="busy" percent={cohort.percent} /></View>
           <Text variant="heading" tone="busy">{cohort.percent}%</Text>
         </Stack>
-        <Text variant="footnote" tone="muted">Week 10 is like this for everyone, every year.</Text>
+        <Text variant="micro" tone="muted">Week 10 is like this every year.</Text>
       </Card>
 
       {noticed ? (

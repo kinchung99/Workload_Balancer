@@ -141,6 +141,52 @@ export const weekDays = (anchor: string): string[] => {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 };
 
+/**
+ * When a night of this length would actually have to happen.
+ *
+ * The sleep slider said how long and never when, which is the part that decides
+ * whether it is possible. Waking is pinned to tomorrow's first commitment — an
+ * hour before a 9am lecture — and bedtime follows from that, so the number turns
+ * into an instruction: "bed by 11pm to be up at 8".
+ */
+export interface SleepWindow {
+  bed: number;
+  wake: number;
+  /** End of the last thing booked tonight, if there is one. */
+  lastEnd?: number;
+  /** Bedtime lands before tonight's commitments finish. */
+  clash: boolean;
+  /** Past midnight, which is worth saying out loud. */
+  afterMidnight: boolean;
+}
+
+const DEFAULT_WAKE = 8;
+const READY_BEFORE = 1;
+
+export function sleepWindow(items: Item[], date: string, hours: number): SleepWindow {
+  const tomorrow = addDays(date, 1);
+  const first = daySchedule(items, tomorrow).timed[0];
+  const wake = first?.startHour !== undefined
+    ? Math.max(5, first.startHour - READY_BEFORE)
+    : DEFAULT_WAKE;
+
+  // Wrap into a real clock: waking at 7 after seven hours is midnight, not 24.
+  const bed = ((((wake - hours) % 24) + 24) % 24);
+  const afterMidnight = bed >= 0 && bed < 5;
+
+  const tonight = daySchedule(items, date).timed;
+  const lastEnd = tonight.length ? Math.max(...tonight.map(endHour)) : undefined;
+
+  return {
+    bed,
+    wake,
+    lastEnd,
+    // Only a clash if bedtime is in the evening and something runs past it.
+    clash: lastEnd !== undefined && bed >= 12 && lastEnd > bed,
+    afterMidnight,
+  };
+}
+
 /** Evening slots shared by everyone, for the social invite flow. */
 export function overlap(all: Slot[][], minHours = 1): Slot[] {
   if (all.length === 0) return [];

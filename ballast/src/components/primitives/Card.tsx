@@ -15,5 +15,5 @@ export interface CardProps extends StackProps {
 }
 
 export function Card({ tone = 'plain', pad = 5, gap = 4, className = '', ...rest }: CardProps) {
-  return <Stack pad={pad} gap={gap} className={`rounded-md border ${TONE[tone]} ${className}`} {...rest} />;
+  return <Stack pad={pad} gap={gap} className={`rounded-lg border ${TONE[tone]} ${className}`} {...rest} />;
 }
