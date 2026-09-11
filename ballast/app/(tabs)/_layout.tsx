@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { color, target, type } from '@design/tokens';
+import { color, frame, target } from '@design/tokens';
+import { Text } from '@/components';
 import { TabIcon, type TabName } from '@/components/layout/TabIcon';
 
 /**
@@ -26,15 +27,30 @@ export default function TabsLayout() {
           borderTopColor: color.line.hairline,
           height: target.tabBar + 24,
           paddingTop: 6,
+          // Held to the artboard and centred, like every screen above it. On a
+          // desktop browser the bar used to run the full width of the window
+          // while the content sat in a 390pt column, which read as broken.
+          alignSelf: 'center',
+          width: '100%',
+          maxWidth: frame.width,
         },
-        tabBarLabelStyle: { fontSize: type.micro.fontSize, letterSpacing: type.micro.letterSpacing },
+        tabBarItemStyle: { paddingHorizontal: 0 },
       }}
     >
       {TABS.map(({ name, title, icon }) => (
         <Tabs.Screen
           key={name}
           name={name}
-          options={{ title, tabBarIcon: ({ focused }) => <TabIcon name={icon} active={focused} /> }}
+          options={{
+            title,
+            tabBarIcon: ({ focused }) => <TabIcon name={icon} active={focused} />,
+            // Our own Text rather than the navigator's, which clips to one line
+            // inside its own padding - "Tonight" was arriving as "Toni...". Only
+            // visible once the bar was held to 390pt; full width had hidden it.
+            tabBarLabel: ({ focused }) => (
+              <Text variant="micro" tone={focused ? 'default' : 'subtle'}>{title}</Text>
+            ),
+          }}
         />
       ))}
     </Tabs>

@@ -1,55 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 420" width="940" height="420" font-family="-apple-system, Segoe UI, Roboto, sans-serif">
-  <rect width="940" height="420" fill="#FFFFFF"/>
-  <text x="24" y="32" font-size="15" font-weight="700" fill="#14161A">User flow — the loop that prevents a bad week</text>
-  <text x="24" y="52" font-size="12" fill="#6B7079">Amira, week 10. Every box is a screen that exists in the prototype.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" width="1000" height="560" font-family="-apple-system, Segoe UI, Roboto, Helvetica, sans-serif">
+  <defs>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#14161A" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L9 5 L0 10 z" fill="#14161A"/>
+    </marker>
+  </defs>
 
-  <g stroke="#16261F" stroke-width="1.8" fill="none" marker-end="url(#a)">
-    <defs>
-      <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-        <path d="M0 0 L8 4.5 L0 9 z" fill="#16261F"/>
-      </marker>
-    </defs>
-    <path d="M170 116 H214"/>
-    <path d="M360 116 H404"/>
-    <path d="M550 116 H594"/>
-    <path d="M740 140 V196"/>
-    <path d="M690 232 H360"/>
-    <path d="M264 268 V318"/>
-    <path d="M170 344 H214"/>
-    <path d="M454 344 H500"/>
+  <rect width="1000" height="560" fill="#FFF7EC" rx="18"/>
+
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#14161A">The loop that stops a bad week</text>
+  <text x="40" y="78" font-size="15" fill="#565A62">Amira, week 10. Every box is a screen you can open in the prototype right now.</text>
+
+  <g fill="none" stroke="#14161A" stroke-width="2.5" marker-end="url(#arrow)">
+    <path d="M256 152 H296"/>
+    <path d="M488 152 H528"/>
+    <path d="M720 178 V236"/>
+    <path d="M604 272 H372"/>
+    <path d="M256 308 V368"/>
+    <path d="M256 404 H296"/>
+    <path d="M604 404 H644"/>
   </g>
+  <path d="M912 404 H944 Q960 404 960 420 V462 Q960 478 944 478 H36 Q20 478 20 462 V168 Q20 152 36 152 H44"
+        fill="none" stroke="#8FE0C2" stroke-width="3" stroke-dasharray="9 7" marker-end="url(#arrow)"/>
+  <rect x="372" y="464" width="256" height="28" rx="14" fill="#FFF7EC"/>
+  <text x="500" y="483" font-size="13" font-weight="700" fill="#1B5C46" text-anchor="middle">…and the week starts again, lighter</text>
 
-  <g stroke-width="1.8">
-    <rect x="24" y="88" width="146" height="56" rx="12" fill="#E2F1F7" stroke="#0C6E8F"/>
-    <rect x="214" y="88" width="146" height="56" rx="12" fill="#E2F1F7" stroke="#0C6E8F"/>
-    <rect x="404" y="88" width="146" height="56" rx="12" fill="#FBE9EC" stroke="#B32540"/>
-    <rect x="594" y="88" width="292" height="56" rx="12" fill="#FBE9EC" stroke="#B32540"/>
-    <rect x="594" y="196" width="292" height="72" rx="12" fill="#FBF0DC" stroke="#C4881B"/>
-    <rect x="214" y="196" width="292" height="72" rx="12" fill="#FBF0DC" stroke="#C4881B"/>
-    <rect x="24" y="318" width="146" height="56" rx="12" fill="#EAF1F9" stroke="#6B95C9"/>
-    <rect x="214" y="318" width="240" height="56" rx="12" fill="#EAF1F9" stroke="#6B95C9"/>
-    <rect x="500" y="318" width="386" height="56" rx="12" fill="#E8F2ED" stroke="#2F8265"/>
-  </g>
+  <!-- capture -->
+  <g filter="url(#s)"><rect x="40" y="118" width="216" height="68" rx="18" fill="#F0EAFC" stroke="#14161A" stroke-width="2.5"/></g>
+  <text x="62" y="146" font-size="15" font-weight="700" fill="#14161A">1 · Add anything</text>
+  <text x="62" y="168" font-size="13" fill="#14161A">Four pages, five dials</text>
 
-  <g font-size="12" fill="#14161A">
-    <text x="38" y="112" font-weight="700">Add anything</text><text x="38" y="130">one box, one dread tap</text>
-    <text x="228" y="112" font-weight="700">Home</text><text x="228" y="130">13% · a face, five areas</text>
-    <text x="418" y="112" font-weight="700">Plan</text><text x="418" y="130">14 days, tap any day</text>
-    <text x="608" y="112" font-weight="700">Collision found — 8 days out</text><text x="608" y="130">four things inside 72 hours</text>
+  <g filter="url(#s)"><rect x="296" y="118" width="192" height="68" rx="18" fill="#EEF5E2" stroke="#14161A" stroke-width="2.5"/></g>
+  <text x="318" y="146" font-size="15" font-weight="700" fill="#14161A">2 · Home</text>
+  <text x="318" y="168" font-size="13" fill="#14161A">13% left, five areas</text>
 
-    <text x="608" y="222" font-weight="700">Rebalance</text>
-    <text x="608" y="240">toggle trades, battery moves live</text>
-    <text x="608" y="258">hard deadlines locked, recovery protected</text>
+  <g filter="url(#s)"><rect x="528" y="118" width="384" height="68" rx="18" fill="#FBE9EC" stroke="#B32540" stroke-width="2.5"/></g>
+  <text x="550" y="146" font-size="15" font-weight="700" fill="#A31C38">3 · Plan spots the wall — 8 days early</text>
+  <text x="550" y="168" font-size="13" fill="#14161A">Four things inside one 72-hour window</text>
 
-    <text x="228" y="222" font-weight="700">Saying no</text>
-    <text x="228" y="240">the message written for you, three tones</text>
-    <text x="228" y="258">“Actually, I’m going” re-plans instead</text>
+  <!-- rebalance -->
+  <g filter="url(#s)"><rect x="604" y="236" width="308" height="72" rx="18" fill="#FBF0DC" stroke="#C4881B" stroke-width="2.5"/></g>
+  <text x="626" y="264" font-size="15" font-weight="700" fill="#7A5200">4 · Rebalance</text>
+  <text x="626" y="286" font-size="13" fill="#14161A">Priced trades. Hard deadlines stay locked.</text>
 
-    <text x="38" y="342" font-weight="700">Recover</text><text x="38" y="360">the debt, in hours</text>
-    <text x="228" y="342" font-weight="700">Book it at a real time</text><text x="228" y="360">picked from gaps that exist</text>
-    <text x="514" y="342" font-weight="700">Wednesday evening opens up</text>
-    <text x="514" y="360">the first free evening in eleven days</text>
-  </g>
+  <g filter="url(#s)"><rect x="140" y="236" width="232" height="72" rx="18" fill="#FBF0DC" stroke="#C4881B" stroke-width="2.5"/></g>
+  <text x="162" y="264" font-size="15" font-weight="700" fill="#7A5200">5 · Saying no</text>
+  <text x="162" y="286" font-size="13" fill="#14161A">It writes the message</text>
 
-  <text x="24" y="400" font-size="11.5" fill="#6B7079">Daily cost to the student: one dread tap when something goes in, and one tap on the widget. That is the whole ask.</text>
+  <!-- recovery -->
+  <g filter="url(#s)"><rect x="40" y="368" width="216" height="72" rx="18" fill="#EAF1F9" stroke="#6B95C9" stroke-width="2.5"/></g>
+  <text x="62" y="396" font-size="15" font-weight="700" fill="#2C5C8F">6 · Recovery owed</text>
+  <text x="62" y="418" font-size="13" fill="#14161A">11 hours down, 9 days</text>
+
+  <g filter="url(#s)"><rect x="296" y="368" width="308" height="72" rx="18" fill="#EAF1F9" stroke="#6B95C9" stroke-width="2.5"/></g>
+  <text x="318" y="396" font-size="15" font-weight="700" fill="#2C5C8F">7 · Book it into a real gap</text>
+  <text x="318" y="418" font-size="13" fill="#14161A">Protected time, at an hour you pick</text>
+
+  <g filter="url(#s)"><rect x="644" y="368" width="268" height="72" rx="18" fill="#E8F2ED" stroke="#2F8265" stroke-width="2.5"/></g>
+  <text x="666" y="396" font-size="15" font-weight="700" fill="#1B5C46">8 · Next week survivable</text>
+  <text x="666" y="418" font-size="13" fill="#14161A">96% → 71%, and the wall is gone</text>
+
+  <text x="40" y="522" font-size="13" fill="#6B7079">Daily cost to the student: one tap. Everything above runs on the phone, offline.</text>
 </svg>

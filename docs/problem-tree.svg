@@ -1,68 +1,89 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" font-family="-apple-system, Segoe UI, Roboto, sans-serif">
-  <rect width="900" height="560" fill="#FFFFFF"/>
-  <text x="24" y="34" font-size="15" font-weight="700" fill="#14161A">Problem tree — why students burn out</text>
-  <text x="24" y="54" font-size="12" fill="#6B7079">Roots are causes. The trunk is the problem. Branches are what it costs.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" font-family="-apple-system, Segoe UI, Roboto, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFF7EC"/><stop offset="1" stop-color="#FFFFFF"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#14161A" flood-opacity="0.10"/>
+    </filter>
+  </defs>
 
-  <!-- effects -->
-  <text x="24" y="98" font-size="11" font-weight="700" fill="#A31C38" letter-spacing="1">EFFECTS</text>
-  <g fill="#FBE9EC" stroke="#B32540" stroke-width="1.5">
-    <rect x="24" y="110" width="196" height="52" rx="10"/>
-    <rect x="240" y="110" width="196" height="52" rx="10"/>
-    <rect x="456" y="110" width="196" height="52" rx="10"/>
-    <rect x="672" y="110" width="204" height="52" rx="10"/>
+  <rect width="960" height="640" fill="url(#sky)" rx="18"/>
+
+  <text x="40" y="56" font-size="26" font-weight="700" fill="#14161A">Why students burn out</text>
+  <text x="40" y="82" font-size="15" fill="#565A62">One thing you can feel. Six causes nobody was counting.</text>
+
+  <!-- the symptom -->
+  <g filter="url(#soft)">
+    <rect x="238" y="110" width="484" height="76" rx="38" fill="#16261F"/>
   </g>
-  <g font-size="12" fill="#14161A">
-    <text x="38" y="132">Missed deadlines and</text><text x="38" y="149">all-nighters</text>
-    <text x="254" y="132">Rest feels like</text><text x="254" y="149">something to feel guilty for</text>
-    <text x="470" y="132">Withdrawal from</text><text x="470" y="149">friends and exercise</text>
-    <text x="686" y="132">Dropping out, or a</text><text x="686" y="149">term repeated</text>
+  <text x="480" y="145" font-size="19" font-weight="700" fill="#F7F6F2" text-anchor="middle">“I’m exhausted and I don’t know why.”</text>
+  <text x="480" y="169" font-size="13" fill="#A8A9A3" text-anchor="middle">The only symptom a student can actually see</text>
+
+  <path d="M480 186 V214" stroke="#C9C6BE" stroke-width="3" stroke-linecap="round"/>
+  <path d="M140 214 H820" stroke="#C9C6BE" stroke-width="3" stroke-linecap="round"/>
+  <path d="M140 214 V240 M480 214 V240 M820 214 V240" stroke="#C9C6BE" stroke-width="3" stroke-linecap="round"/>
+  <path d="M140 372 V398 M480 372 V398 M820 372 V398" stroke="#C9C6BE" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- row 1 -->
+  <g filter="url(#soft)">
+    <rect x="26" y="240" width="288" height="132" rx="20" fill="#F0EAFC" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="336" y="240" width="288" height="132" rx="20" fill="#E2F1F7" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="646" y="240" width="288" height="132" rx="20" fill="#FAE9F5" stroke="#14161A" stroke-width="2.5"/>
   </g>
 
-  <!-- trunk -->
-  <path d="M122 162 V196 M338 162 V196 M554 162 V196 M774 162 V196" stroke="#C9C6BE" stroke-width="1.5"/>
-  <rect x="238" y="196" width="424" height="62" rx="12" fill="#16261F"/>
-  <text x="450" y="222" font-size="15" font-weight="700" fill="#F7F6F2" text-anchor="middle">A student cannot see which part of their life</text>
-  <text x="450" y="243" font-size="15" font-weight="700" fill="#F7F6F2" text-anchor="middle">is overflowing — until it already has</text>
-  <path d="M450 258 V292" stroke="#C9C6BE" stroke-width="1.5"/>
+  <circle cx="66" cy="280" r="19" fill="#C4A9F0" stroke="#14161A" stroke-width="2.2"/>
+  <path d="M66 269 v11 l7 5" stroke="#14161A" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <text x="98" y="278" font-size="16" font-weight="700" fill="#14161A">Hours are not the cost</text>
+  <text x="48" y="312" font-size="13.5" fill="#14161A">An hour of laundry and an hour of a group</text>
+  <text x="48" y="332" font-size="13.5" fill="#14161A">presentation are not the same hour. Every</text>
+  <text x="48" y="352" font-size="13.5" fill="#14161A">planner measures hours.</text>
 
-  <!-- causes -->
-  <text x="24" y="312" font-size="11" font-weight="700" fill="#1B5C46" letter-spacing="1">ROOT CAUSES</text>
-  <g fill="#E8F2ED" stroke="#2F8265" stroke-width="1.5">
-    <rect x="24" y="324" width="270" height="72" rx="10"/>
-    <rect x="314" y="324" width="270" height="72" rx="10"/>
-    <rect x="604" y="324" width="272" height="72" rx="10"/>
-    <rect x="24" y="412" width="270" height="72" rx="10"/>
-    <rect x="314" y="412" width="270" height="72" rx="10"/>
-    <rect x="604" y="412" width="272" height="72" rx="10"/>
+  <circle cx="376" cy="280" r="19" fill="#9CCDF5" stroke="#14161A" stroke-width="2.2"/>
+  <path d="M368 274h16M368 280h16M368 286h10" stroke="#14161A" stroke-width="2.2" stroke-linecap="round"/>
+  <text x="408" y="278" font-size="16" font-weight="700" fill="#14161A">Half the week is uncounted</text>
+  <text x="358" y="312" font-size="13.5" fill="#14161A">Shifts, commuting, chores, caring. For a</text>
+  <text x="358" y="332" font-size="13.5" fill="#14161A">student working 12 hours a week that is</text>
+  <text x="358" y="352" font-size="13.5" fill="#14161A">most of the load — and nobody asks.</text>
+
+  <circle cx="686" cy="280" r="19" fill="#FFB3D1" stroke="#14161A" stroke-width="2.2"/>
+  <rect x="678" y="272" width="16" height="5" rx="2" fill="#14161A"/>
+  <rect x="678" y="280" width="16" height="5" rx="2" fill="#14161A"/>
+  <rect x="678" y="288" width="10" height="5" rx="2" fill="#14161A"/>
+  <text x="718" y="278" font-size="16" font-weight="700" fill="#14161A">Clustering, not volume</text>
+  <text x="668" y="312" font-size="13.5" fill="#14161A">Three deadlines across ten days is an</text>
+  <text x="668" y="332" font-size="13.5" fill="#14161A">ordinary fortnight. The same three inside</text>
+  <text x="668" y="352" font-size="13.5" fill="#14161A">72 hours is what breaks people.</text>
+
+  <!-- row 2 -->
+  <g filter="url(#soft)">
+    <rect x="26" y="398" width="288" height="132" rx="20" fill="#FBF0DC" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="336" y="398" width="288" height="132" rx="20" fill="#EEF5E2" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="646" y="398" width="288" height="132" rx="20" fill="#FBE9EC" stroke="#14161A" stroke-width="2.5"/>
   </g>
-  <g font-size="12.5" fill="#14161A">
-    <text x="38" y="348" font-weight="700">Hours are not the cost</text>
-    <text x="38" y="367">An hour of laundry and an hour of a</text>
-    <text x="38" y="384">group presentation are not the same hour.</text>
 
-    <text x="328" y="348" font-weight="700">Half the week is uncounted</text>
-    <text x="328" y="367">Shifts, commuting, chores, caring —</text>
-    <text x="328" y="384">no planner ever asked about them.</text>
+  <circle cx="66" cy="438" r="19" fill="#FFD37A" stroke="#14161A" stroke-width="2.2"/>
+  <path d="M57 432h18v10h-9l-5 5v-5h-4z" fill="#14161A"/>
+  <text x="98" y="436" font-size="16" font-weight="700" fill="#14161A">Saying no is expensive</text>
+  <text x="48" y="470" font-size="13.5" fill="#14161A">The hard part is not knowing what to cut.</text>
+  <text x="48" y="490" font-size="13.5" fill="#14161A">It is sitting down to compose the message,</text>
+  <text x="48" y="510" font-size="13.5" fill="#14161A">which is why it waits four days.</text>
 
-    <text x="618" y="348" font-weight="700">Clustering, not volume</text>
-    <text x="618" y="367">Three deadlines over ten days is fine.</text>
-    <text x="618" y="384">The same three in 72 hours is not.</text>
+  <circle cx="376" cy="438" r="19" fill="#8FE0C2" stroke="#14161A" stroke-width="2.2"/>
+  <path d="M369 438l5 5 9-10" stroke="#14161A" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="408" y="436" font-size="16" font-weight="700" fill="#14161A">Logging is itself work</text>
+  <text x="358" y="470" font-size="13.5" fill="#14161A">The student who most needs a tracker has</text>
+  <text x="358" y="490" font-size="13.5" fill="#14161A">the least capacity to keep one. Most apps</text>
+  <text x="358" y="510" font-size="13.5" fill="#14161A">ask for minutes a day.</text>
 
-    <text x="38" y="436" font-weight="700">Saying no is expensive</text>
-    <text x="38" y="455">The hard part is not knowing what to cut.</text>
-    <text x="38" y="472">It is composing the message.</text>
+  <circle cx="686" cy="438" r="19" fill="#FF8FAB" stroke="#14161A" stroke-width="2.2"/>
+  <path d="M686 428a7 7 0 0 0-7 7v6l-2 3h18l-2-3v-6a7 7 0 0 0-7-7zM683 448a3 3 0 0 0 6 0" fill="#14161A"/>
+  <text x="718" y="436" font-size="16" font-weight="700" fill="#14161A">Warnings arrive too late</text>
+  <text x="668" y="470" font-size="13.5" fill="#14161A">A notification the night before is not a</text>
+  <text x="668" y="490" font-size="13.5" fill="#14161A">warning. It is a commiseration. You need</text>
+  <text x="668" y="510" font-size="13.5" fill="#14161A">days, not hours.</text>
 
-    <text x="328" y="436" font-weight="700">Logging is itself work</text>
-    <text x="328" y="455">The student who most needs a tracker</text>
-    <text x="328" y="472">has the least capacity to keep one.</text>
-
-    <text x="618" y="436" font-weight="700">Warnings arrive too late</text>
-    <text x="618" y="455">A notification the night before is not</text>
-    <text x="618" y="472">a warning. It is a commiseration.</text>
-  </g>
-  <path d="M159 324 V300 H450 M449 324 V300 M740 324 V300 M159 412 V300 M449 412 V300 M740 412 V300"
-        stroke="#C9C6BE" stroke-width="1.5" fill="none"/>
-
-  <text x="24" y="524" font-size="11.5" fill="#6B7079">Stakeholders: the student · flatmates and friends who absorb the cancellations ·</text>
-  <text x="24" y="542" font-size="11.5" fill="#6B7079">tutors and shift managers who receive the late request · university wellbeing services, downstream of all of it.</text>
+  <text x="40" y="574" font-size="13" font-weight="700" fill="#6B7079">WHO IT LANDS ON</text>
+  <text x="40" y="596" font-size="13.5" fill="#565A62">The student first. Then flatmates and friends who absorb the cancelled plans, tutors and shift managers who get</text>
+  <text x="40" y="616" font-size="13.5" fill="#565A62">the late request, and university wellbeing services — who see everyone else's week too late to change it.</text>
 </svg>

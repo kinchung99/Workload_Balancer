@@ -44,6 +44,7 @@ npm run model:check      # the load model reproduces the study's stated figures
 npm run behaviour:check  # every button actually changes the state it claims to
 npm run render:check     # those figures actually reach the rendered screens
 npm run figma:canvas   # build figma/canvas.html — all 27 frames, ready to import
+npm run shots          # re-photograph every screen into docs/shots/ for the submission README
 ```
 
 ---
@@ -1054,6 +1055,28 @@ numbers, controls and one short line.
 
 ---
 
+## Screenshots that cannot go stale
+
+Screenshots in a submission rot the moment the UI moves, so `npm run shots` makes
+them a build step. It exports the web build, serves it on a local port, and
+photographs all twenty-six pages at phone size through headless Chrome into
+`docs/shots/`.
+
+Two things it has to work around, both worth knowing:
+
+- **Chrome will not open a window narrower than about 500px.** Ask for
+  `--window-size=390` and you get a 534px viewport cropped to 390, which looks
+  exactly like a broken layout and is not one. So we render wide, let
+  `max-w-frame` hold the column at 390, and crop the middle out with `sips`.
+- **Home redirects a first-time visitor to the intro.** The export is built with
+  the intro already marked done, and that one-line edit is reverted in a
+  `finally` so it can never be committed by accident.
+
+The little file server runs in its own process, because `execFileSync` blocks the
+event loop for as long as Chrome is open — a server sharing that loop would sit
+there unable to answer the page it was being asked for, which is a deadlock that
+looks like a hang.
+
 ## Tech stack
 
 | Layer | Choice | Why this one |
@@ -1172,7 +1195,7 @@ ballast/
 │   ├── tokens.json             W3C DTCG. The source of truth for every value.
 │   └── canvas.html             Generated: 27 frames, one page, import-ready
 │
-└── scripts/                    Four verification/build scripts, no build step
+└── scripts/                    Verification and build scripts, no build step
 ```
 
 **The dependency rule is one-directional:** `app/` → `components/` → `lib/` →
@@ -1326,7 +1349,7 @@ npx serve figma               # serve it (html.to.design needs a URL)
    text stays editable; the band patterns arrive as vector fills, not bitmaps.
 3. Bind the imported hex values to the variables from step 1. They match exactly,
    because both came out of the same file.
-4. `/foundations` is frame 17 of 18 and doubles as the design file's cover page — every
+4. `/foundations` is the last frame and doubles as the design file's cover page — every
    band, pattern, type step and dread state rendered from the same tokens.
 
 `figma/canvas.html` is generated and safe to delete; regenerate it any time the

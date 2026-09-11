@@ -1,94 +1,99 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 600" width="940" height="600" font-family="-apple-system, Segoe UI, Roboto, sans-serif">
-  <rect width="940" height="600" fill="#FFFFFF"/>
-  <text x="24" y="32" font-size="15" font-weight="700" fill="#14161A">Ideation mindmap — what we explored, kept and dropped</text>
-  <text x="24" y="52" font-size="12" fill="#6B7079">Solid = built. Dashed = considered and dropped, with the reason.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" width="1000" height="700" font-family="-apple-system, Segoe UI, Roboto, Helvetica, sans-serif">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="60%">
+      <stop offset="0" stop-color="#2A4034"/><stop offset="1" stop-color="#16261F"/>
+    </radialGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#14161A" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="700" fill="#FFF7EC" rx="18"/>
+
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#14161A">What we explored — and what survived</text>
+  <text x="40" y="78" font-size="15" fill="#565A62">Eight ideas. Four are in the app. Four we killed, and here is why.</text>
+
+  <!-- connectors -->
+  <g fill="none" stroke-width="2.5" stroke-linecap="round">
+    <path d="M420 350 C360 330 350 180 336 150" stroke="#C4A9F0"/>
+    <path d="M420 350 C370 340 370 300 336 288" stroke="#8FE0C2"/>
+    <path d="M420 350 C370 360 370 400 336 426" stroke="#9CCDF5"/>
+    <path d="M420 350 C360 370 350 530 336 564" stroke="#FFB3D1"/>
+    <path d="M580 350 C640 330 650 180 664 150" stroke="#C9C6BE" stroke-dasharray="7 6"/>
+    <path d="M580 350 C630 340 630 300 664 288" stroke="#C9C6BE" stroke-dasharray="7 6"/>
+    <path d="M580 350 C630 360 630 400 664 426" stroke="#C9C6BE" stroke-dasharray="7 6"/>
+    <path d="M580 350 C640 370 650 530 664 564" stroke="#C9C6BE" stroke-dasharray="7 6"/>
+  </g>
 
   <!-- centre -->
-  <ellipse cx="470" cy="300" rx="104" ry="46" fill="#16261F"/>
-  <text x="470" y="294" font-size="14" font-weight="700" fill="#F7F6F2" text-anchor="middle">Beating the</text>
-  <text x="470" y="313" font-size="14" font-weight="700" fill="#F7F6F2" text-anchor="middle">burnout</text>
+  <g filter="url(#s)"><circle cx="500" cy="350" r="84" fill="url(#glow)"/></g>
+  <circle cx="500" cy="350" r="84" fill="none" stroke="#FFD37A" stroke-width="3"/>
+  <text x="500" y="332" font-size="13" font-weight="700" fill="#FFD37A" text-anchor="middle" letter-spacing="1.4">THE BRIEF</text>
+  <text x="500" y="362" font-size="19" font-weight="700" fill="#F7F6F2" text-anchor="middle">Beating the</text>
+  <text x="500" y="385" font-size="19" font-weight="700" fill="#F7F6F2" text-anchor="middle">burnout</text>
 
-  <!-- branch lines -->
-  <g stroke="#C9C6BE" stroke-width="1.6" fill="none">
-    <path d="M366 276 C300 250 260 190 214 168"/>
-    <path d="M366 300 C300 300 260 300 214 300"/>
-    <path d="M366 324 C300 350 260 410 214 432"/>
-    <path d="M574 276 C640 250 680 190 726 168"/>
-    <path d="M574 300 C640 300 680 300 726 300"/>
-    <path d="M574 324 C640 350 680 410 726 432"/>
+  <text x="36" y="112" font-size="13" font-weight="700" fill="#1B5C46" letter-spacing="1.2">✓ BUILT</text>
+  <text x="664" y="112" font-size="13" font-weight="700" fill="#6B7079" letter-spacing="1.2">✕ DROPPED, ON PURPOSE</text>
+
+  <!-- kept -->
+  <g filter="url(#s)">
+    <rect x="36" y="124" width="300" height="112" rx="20" fill="#F0EAFC" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="36" y="262" width="300" height="112" rx="20" fill="#EEF5E2" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="36" y="400" width="300" height="112" rx="20" fill="#E2F1F7" stroke="#14161A" stroke-width="2.5"/>
+    <rect x="36" y="538" width="300" height="112" rx="20" fill="#FAE9F5" stroke="#14161A" stroke-width="2.5"/>
+  </g>
+  <g font-size="16" font-weight="700" fill="#14161A">
+    <text x="60" y="160">load = time × dread</text>
+    <text x="60" y="298">A battery, with a face</text>
+    <text x="60" y="436">The What-If simulator</text>
+    <text x="60" y="574">The decline drafter</text>
+  </g>
+  <g font-size="13.5" fill="#14161A">
+    <text x="60" y="184">The one multiplication every other</text>
+    <text x="60" y="204">screen is downstream of. No planner</text>
+    <text x="60" y="224">weighs a task by how much you mind it.</text>
+
+    <text x="60" y="322">“13% left” lands in half a second.</text>
+    <text x="60" y="342">“87% of capacity used” does not. Same</text>
+    <text x="60" y="362">number, kinder end of it.</text>
+
+    <text x="60" y="460">Being told to sleep more changes</text>
+    <text x="60" y="480">nothing. Dragging a slider and watching</text>
+    <text x="60" y="500">the battery move is arguable advice.</text>
+
+    <text x="60" y="598">It does not just say what to cut — it</text>
+    <text x="60" y="618">writes the message. “Actually, I’m going”</text>
+    <text x="60" y="638">is a real button that re-plans the week.</text>
   </g>
 
-  <!-- MEASURE -->
-  <rect x="24" y="140" width="190" height="56" rx="12" fill="#F0EAFC" stroke="#6B3FC0" stroke-width="1.6"/>
-  <text x="40" y="164" font-size="13" font-weight="700" fill="#6B3FC0">1 · MEASURE</text>
-  <text x="40" y="182" font-size="11.5" fill="#14161A">load = hours × dread</text>
-  <g font-size="11" fill="#14161A">
-    <text x="40" y="212">• five areas, five ceilings</text>
-    <text x="40" y="229">• set-once repeating load</text>
-    <text x="40" y="246" fill="#6B7079">• dropped: a 1–10 stress slider</text>
-    <text x="52" y="261" fill="#6B7079">(a number with no units)</text>
+  <!-- dropped -->
+  <g>
+    <rect x="664" y="124" width="300" height="112" rx="20" fill="#FFFFFF" stroke="#C9C6BE" stroke-width="2.5" stroke-dasharray="8 6"/>
+    <rect x="664" y="262" width="300" height="112" rx="20" fill="#FFFFFF" stroke="#C9C6BE" stroke-width="2.5" stroke-dasharray="8 6"/>
+    <rect x="664" y="400" width="300" height="112" rx="20" fill="#FFFFFF" stroke="#C9C6BE" stroke-width="2.5" stroke-dasharray="8 6"/>
+    <rect x="664" y="538" width="300" height="112" rx="20" fill="#FFFFFF" stroke="#C9C6BE" stroke-width="2.5" stroke-dasharray="8 6"/>
   </g>
+  <g font-size="16" font-weight="700" fill="#565A62">
+    <text x="688" y="160">A Pomodoro timer</text>
+    <text x="688" y="298">A mood journal</text>
+    <text x="688" y="436">Streaks and leaderboards</text>
+    <text x="688" y="574">An LLM doing the thinking</text>
+  </g>
+  <g font-size="13.5" fill="#565A62">
+    <text x="688" y="184">Focus was never the problem. A student</text>
+    <text x="688" y="204">juggling a job and coursework is</text>
+    <text x="688" y="224">overcommitted, not distracted.</text>
 
-  <!-- CAPTURE -->
-  <rect x="24" y="274" width="190" height="52" rx="12" fill="#E2F1F7" stroke="#0C6E8F" stroke-width="1.6"/>
-  <text x="40" y="296" font-size="13" font-weight="700" fill="#0C6E8F">2 · CAPTURE</text>
-  <text x="40" y="314" font-size="11.5" fill="#14161A">one box, plain language</text>
-  <g font-size="11" fill="#14161A">
-    <text x="40" y="342">• guesses shown as chips</text>
-    <text x="40" y="359" fill="#6B7079">• dropped: LLM parsing</text>
-    <text x="52" y="374" fill="#6B7079">(demo cannot need wifi)</text>
-  </g>
+    <text x="688" y="322">Dropped as a product, kept as a feature.</text>
+    <text x="688" y="342">Logging a mood describes your week. It</text>
+    <text x="688" y="362">survives only because it feeds the battery.</text>
 
-  <!-- FORECAST -->
-  <rect x="24" y="404" width="190" height="56" rx="12" fill="#FBE9EC" stroke="#B32540" stroke-width="1.6"/>
-  <text x="40" y="428" font-size="13" font-weight="700" fill="#A31C38">3 · FORECAST</text>
-  <text x="40" y="446" font-size="11.5" fill="#14161A">clustering, not totals</text>
-  <g font-size="11" fill="#14161A">
-    <text x="40" y="476">• 72-hour window, 8 days out</text>
-    <text x="40" y="493">• repeating load excluded</text>
-    <text x="40" y="510" fill="#6B7079">• dropped: daily digest</text>
-    <text x="52" y="525" fill="#6B7079">(one notification, or none)</text>
-  </g>
+    <text x="688" y="460">They punish exactly the weeks this app</text>
+    <text x="688" y="480">exists for, and a leaderboard makes</text>
+    <text x="688" y="500">suffering competitive.</text>
 
-  <!-- REBALANCE -->
-  <rect x="726" y="140" width="190" height="56" rx="12" fill="#FBF0DC" stroke="#C4881B" stroke-width="1.6"/>
-  <text x="742" y="164" font-size="13" font-weight="700" fill="#7A5200">4 · REBALANCE</text>
-  <text x="742" y="182" font-size="11.5" fill="#14161A">trade, never delete</text>
-  <g font-size="11" fill="#14161A">
-    <text x="742" y="212">• hard deadlines locked</text>
-    <text x="742" y="229">• errands batch by place</text>
-    <text x="742" y="246">• the decline drafter</text>
+    <text x="688" y="598">A demo cannot depend on venue wifi.</text>
+    <text x="688" y="618">Regex plus a keyword dictionary does the</text>
+    <text x="688" y="638">same job, offline, and can be explained.</text>
   </g>
-
-  <!-- RECOVER -->
-  <rect x="726" y="274" width="190" height="52" rx="12" fill="#EAF1F9" stroke="#6B95C9" stroke-width="1.6"/>
-  <text x="742" y="296" font-size="13" font-weight="700" fill="#2C5C8F">5 · RECOVER</text>
-  <text x="742" y="314" font-size="11.5" fill="#14161A">rest as a credit owed</text>
-  <g font-size="11" fill="#14161A">
-    <text x="742" y="342">• booked at a real time</text>
-    <text x="742" y="359">• matched to the empty area</text>
-    <text x="742" y="376" fill="#6B7079">• dropped: streaks and badges</text>
-    <text x="754" y="391" fill="#6B7079">(punish the bad weeks)</text>
-  </g>
-
-  <!-- TOGETHER -->
-  <rect x="726" y="404" width="190" height="56" rx="12" fill="#FAE9F5" stroke="#A63A8C" stroke-width="1.6"/>
-  <text x="742" y="428" font-size="13" font-weight="700" fill="#A63A8C">6 · TOGETHER</text>
-  <text x="742" y="446" font-size="11.5" fill="#14161A">one word each</text>
-  <g font-size="11" fill="#14161A">
-    <text x="742" y="476">• free-evening overlap</text>
-    <text x="742" y="493">• cohort average, anonymous</text>
-    <text x="742" y="510" fill="#6B7079">• dropped: leaderboards</text>
-    <text x="754" y="525" fill="#6B7079">(makes suffering a contest)</text>
-  </g>
-
-  <!-- dropped whole directions -->
-  <rect x="300" y="486" width="340" height="86" rx="12" fill="#FFFFFF" stroke="#C9C6BE" stroke-width="1.6" stroke-dasharray="6 5"/>
-  <text x="316" y="508" font-size="12" font-weight="700" fill="#6B7079">Whole directions we dropped</text>
-  <g font-size="11" fill="#6B7079">
-    <text x="316" y="528">Pomodoro timer — focus was never the problem</text>
-    <text x="316" y="545">Mood journal — records the week, changes nothing</text>
-    <text x="316" y="562">Habit streaks — the exact mechanic that shames a bad week</text>
-  </g>
-  <path d="M470 346 V486" stroke="#C9C6BE" stroke-width="1.6" stroke-dasharray="6 5" fill="none"/>
 </svg>
