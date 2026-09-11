@@ -43,7 +43,7 @@ npm run tokens:check     # figma/tokens.json and src/design/tokens.ts have not d
 npm run model:check      # the load model reproduces the study's stated figures
 npm run behaviour:check  # every button actually changes the state it claims to
 npm run render:check     # those figures actually reach the rendered screens
-npm run figma:canvas   # build figma/canvas.html — all 18 frames, ready to import
+npm run figma:canvas   # build figma/canvas.html — all 27 frames, ready to import
 ```
 
 ---
@@ -142,7 +142,7 @@ Three specific things a fresh reader tripped on, now fixed: the battery says
 - **It resets.** No settings screen — cut on purpose — so *Replay the intro*,
   *Design foundations* and *Reset to the seeded week* live at the bottom of
   Areas. A demo you cannot reset is a demo you get one take at.
-- **Every screen has a way out.** Tab screens have the tab bar; the fourteen that
+- **Every screen has a way out.** Tab screens have the tab bar; the twenty-four that
   do not now carry a labelled back control — *Areas*, *Plan*, *Recovery*, *Home*
   — and it falls back to a real destination rather than `router.back()`, because
   a link opened from a share has no history to pop. `render:check` fails if any
@@ -396,6 +396,170 @@ same honesty as the parser: rule-based, and labelled as such.
 
 One thing it can tell you that no list does: whether there is genuinely enough
 free time left before the deadline. If not, the row turns red and says so.
+
+## The timetable, made real
+
+The interface study calls the timetable "imported, zero effort", and the build
+took that literally: fourteen hours a week as a **single item marked `spread`**.
+It counted towards the load and appeared nowhere in the week — the fullest part
+of a student's day, invisible on the one screen meant to show their day.
+
+It is now eight real classes with a time, a length, a room and a module. Same
+fourteen hours at the same dread, so the study's figures are untouched — but
+Monday now opens with *Operating Systems lecture, 9am–11am, Kilburn LT1* instead
+of a number you could not look at.
+
+### Dread belongs to the module
+
+You do not dread Tuesday. You dread networks. Dread and importance live on the
+**module**, and setting either re-prices every class in it at once — which is the
+only way to keep the number honest without asking for a rating on all fourteen
+contact hours.
+
+### Why an hour can be worth more than its length
+
+A lecture is an hour of load like any other **until it is the one where the exam
+hints get given**. Three flags say so:
+
+| Flag | What it changes |
+|---|---|
+| **Gives exam tips** | Never proposed for moving, and it cannot be dragged off its slot |
+| **Sets coursework** | Adds *"Anything set in this one?"* — capture at the moment work is announced |
+| **Attendance counted** | Feeds the register, and warns before you cross the line |
+
+The first is the point of the whole feature. The lecture where the hints get
+given is the first thing a stressed student drops and the last thing they can
+afford to, so the rebalance sheet lists it **locked**, like a hard deadline —
+refusing visibly rather than silently.
+
+### Attendance, only where somebody is counting
+
+Each module carries what the department expects, or `null` when nobody is. The
+screen warns at *"one more absence takes you under 80%"* rather than after, and
+claims nothing about modules with no policy.
+
+### Import is a paste, not a scan
+
+Every portal copies as text and every student already has that text. A parser
+reads the day, the time, the module code, the kind and the room from whatever
+shape it arrives in — `Mon 09:00-11:00 CS2040 … Kilburn LT1`, `Thu 8-10am`,
+`in Lab A`. **A line it cannot read is handed back on screen rather than dropped**,
+so nothing disappears quietly.
+
+Scanning was the obvious alternative and was rejected for the same reason as the
+LLM parser: OCR needs a camera, a permission dialogue and usually a network, and
+this app works in a basement lecture theatre.
+
+## One thing, five areas
+
+The model's oldest simplification was **one bucket per task**. A group
+presentation was filed under "mental" and that was that.
+
+It is the assumption that lets a week read 60% while the person is finished. A
+group presentation is not mental. It is heavy mental, real time, and a social
+cost most people would never have thought to name — and filing it under one
+heading throws away exactly the thing the five areas exist to show.
+
+Capture now asks all five. `Item.mix` is a weight per area, `loadByBucket`
+splits the load in those proportions, and every bar, battery, ceiling and warning
+in the app is downstream of that one function.
+
+**The total does not change.** `load = hours × dread` still holds, and dread is
+read off the mix rather than asked for separately: it is the **worst** area, not
+the sum. Three areas at "a fair bit" is still dread 4, landing in three places —
+not dread 12.
+
+That distinction is the whole point, and it is arithmetic you can check:
+
+| Same 4 hours, same dread 3 | Where it lands | Overall |
+|---|---|---|
+| All mental | 12 mental | higher |
+| Mental + time + social | 4, 4, 4 | lower |
+
+Overall is `(mean + worst) / 2`, so spreading a load lowers the worst without
+touching the mean. A thing that hits one area hard genuinely is more dangerous
+than one spread thin — which is "shape beats total", finally available at the
+moment the thing is written down rather than only in the weekly reading.
+
+The honest other half, also asserted: spreading into a **smaller** ceiling reads
+*higher*. Four load of social is a quarter of Amira's social ceiling and a
+twenty-fifth of her mental one. Per-area ceilings are what make that true, and if
+the model did not say so they would not be worth having.
+
+### Where it shows up
+
+- **The battery and the five areas** — automatically, through `loadByBucket`
+- **The day's list** — rows read *"Mental & social · 12"* rather than a single heading
+- **Recovery** — the prescription screen orders suggestions by the area that still
+  has room. Drain physical with the dials and physical stops being the area with
+  room, so a different kind of rest leads. That loop is what makes the dials mean
+  something beyond a prettier form.
+
+Fixing the ordering exposed that the seeded prescription list had never been
+ordered at all — it was offering the river walk first because it was written
+first, and matching the screen's own sentence by coincidence.
+
+## Capture, as four pages
+
+Capture is the screen with the highest drop-off in any planner ever built, and
+the reason is always the same: **it looks like a form**.
+
+Everything used to be on one scroll. That sounds efficient and reads as homework
+— you cannot answer the first question without seeing the other six waiting.
+
+| Page | Asks | Why there |
+|---|---|---|
+| **1 · What** | One box, or a drawing to start from | Nothing else until there is a thing |
+| **2 · How big** | Turn up, or work first? Then hours | Everything after this depends on which |
+| **3 · What it takes** | Five dials, five faces | The load, where it actually lands |
+| **4 · When** | Day, time, can it move | And the battery, before you commit |
+
+The shape question moved to page two deliberately. An interview is an hour you
+turn up to; an assignment is hours spread across the days before it. Which one it
+is changes what every later page should ask, so asking it late made the rest of
+the form guess.
+
+Each page is also a **real route** — `/add/takes` opens on the dials — which is
+worth having twice over: a link can point at one question, and the static export
+renders each page separately, so all four are covered by `render:check` instead
+of only the first. The flow itself is local state in one component, so moving
+between pages never risks what you have typed.
+
+`/add` stays a flat `add.tsx` rather than `add/index.tsx`. Static hosting serves
+a directory index at `/add/` only, so the folder version made the canonical link
+every other screen uses answer **404 on a cold load** — fine while clicking
+around, broken the moment somebody refreshes or shares it.
+
+### A dial with a face on it
+
+Nobody has to learn what "dread 4" means to answer *"how much does this take out
+of you?"*. The knob carries a small character — serene at nought, dizzy at five,
+with a bead of sweat from four up.
+
+Strained, never scolded. This is the face of the **task**, not of the person
+holding the phone, which is the same line the mascot holds: there is no frown at
+any battery level, but a thing that flattens you is allowed to look like it.
+
+### Colour that cannot lie
+
+The app has one hard rule — **colour on a reading means which band it is in** —
+and "make it colourful" is exactly the request that quietly breaks it.
+
+So decoration got its own namespace. `color.decor` is seven candy hues used for
+stickers, confetti and the wash behind a heading, documented on `/foundations`
+as *"a decor hue on a bar, a number or a meter is a bug, not a style choice"*.
+The rule is now more checkable than it was before, not less.
+
+Area hues on the dials are the existing identity palette doing its existing job:
+which area, never how much. The load those dials produce is still shown in band
+colour.
+
+### Drawings, not GIFs
+
+Twelve stickers, drawn as SVG. A GIF would need a network, an asset pipeline and
+a licence; each of these is a few dozen bytes that renders identically offline,
+in a static export and on a Figma frame. The motion is real motion — a slow lean
+either side — and it stops dead under Reduce Motion.
 
 ## Looking like something you would open
 
@@ -727,6 +891,75 @@ keep the study's figures exact — `model:check` still passes all thirteen.
 
 ---
 
+## One style, everywhere
+
+Capture got the four-page treatment first and it worked, so the rest of the app
+now opens the same way: **a drawing on a coloured disc, a short title, one line
+under it.** That is `PageHeader`, and it exists as a component precisely so the
+app cannot drift back into fifteen slightly different headings.
+
+`src/design/screens.ts` holds the map — which sticker and which colour each
+screen gets — for the same reason. A screen's colour identifies the screen, the
+way its drawing does.
+
+### Two illustration systems became one
+
+There were two: `Spot`, five muted abstract drawings on the band palette, and
+`Sticker`, the cute ones with faces. Two visual voices on one app reads as an
+accident, so `Spot` is gone and its five moments moved across — a clear day is
+now a sun, a pile-up is a stack of blocks with a slightly worried face.
+
+Twenty-two stickers, all SVG, all offline, the whole sheet on `/foundations`.
+
+### The colour rule survived being asked to be colourful
+
+Ballast has one hard rule — **colour on a reading means which band it is in** —
+and "make it colourful" is the request that quietly breaks it.
+
+Decoration has its own namespace, `color.decor`, and the header washes come from
+it. Nothing is ever read off one. The five areas keep their own identity hues on
+their own screens, which is the job those hues already had. Anything carrying a
+value is still band-coloured, and `/foundations` states the rule with the
+palette next to it.
+
+## Screens that were doing too much
+
+Three screens were a single scroll doing three jobs. Each is now short pages,
+with every feature intact.
+
+| Screen | Was | Now |
+|---|---|---|
+| **Tonight** | 604 lines: day, off-hour, presets, sliders, what-it-books, timeline, custom activities | **Which night** → **What you do** → **Book it** |
+| **Recovery** | activity, duration, day, time, preview, timeline, all at once | **What would help** → **When does it go** |
+| **Timetable** | week, modules and a hidden import toggle | **Week** · **Modules** · **Import** |
+
+The Tonight split is the one that matters. Choosing an evening, deciding what is
+in it, and committing to it are three different decisions, and the old screen
+made you scroll past the third while making the first.
+
+### Steps and tabs are not the same control
+
+The timetable's three are **tabs**, not steps: week, modules and import are three
+views of one screen and any of them can be first. The others are **sequences** —
+you cannot pick a time before saying what the thing is.
+
+`StepDots` now draws both, and the difference is behavioural rather than
+decorative: a sequence only lets you go back to pages you have answered, tabs let
+you go anywhere. Building the timetable as a sequence first made its middle page
+**unreachable** — no forward jump and no next button — which is exactly the bug
+that distinction prevents.
+
+### Routes, again
+
+Every split screen keeps the pattern capture established: a flat route for the
+screen, plus `[step].tsx` beside it as a second way in. `/tonight/book`,
+`/timetable/modules` and `/prescription/when` all open where they say.
+
+Worth it twice over. A link can point at one question, and the static export
+renders each page separately — so `render:check` covers **26 pages** rather than
+the first page of each of nineteen screens. Splitting a screen without this would
+have quietly halved the coverage.
+
 ## Nothing is a dead button
 
 An audit found nine controls that looked functional and were not, including two
@@ -768,10 +1001,10 @@ The things most likely to break later, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 257 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 203 actions |
+| A component hard-codes a number | `render:check` asserts 325 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 259 actions |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
-| A screen becomes a dead end | `render:check` asserts all 14 non-tab routes carry an exit |
+| A screen becomes a dead end | `render:check` asserts all 24 non-tab routes carry an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
 | Typed routes go stale after adding a screen | `expo start` regenerates `.expo/types`; typecheck fails loudly until it does |
 | SDK upgrade breaks the build | See *A note on Expo Go and SDK versions* |
@@ -888,7 +1121,12 @@ ballast/
 │   │   ├── plan.tsx            14-day forecast + clustering flag
 │   │   └── actions.tsx         The What-If simulator
 │   ├── areas/[key].tsx         Dispatches to the five area screens
-│   ├── add.tsx                 Capture sheet
+│   ├── timetable.tsx           Classes, modules, flags
+│   ├── add.tsx                 Capture, page one
+│   ├── add/[step].tsx          …and a way into any of its four pages
+│   ├── tonight/[step].tsx      Tonight, opened at a chosen page
+│   ├── timetable/[step].tsx    Week · modules · import
+│   ├── prescription/[step].tsx What would help · when it goes
 │   ├── rebalance.tsx           Trade sheet
 │   ├── prescription.tsx        Matched recovery
 │   ├── recover.tsx             The ledger
@@ -900,22 +1138,29 @@ ballast/
 ├── src/
 │   ├── design/
 │   │   ├── tokens.ts           Typed mirror of figma/tokens.json
+│   │   ├── screens.ts          Which drawing and colour each screen opens with
 │   │   └── figma.ts            The Figma bridge: rules, frame map, component map
 │   ├── components/
 │   │   ├── primitives/         Stack Text Card Button Chip Toggle Divider
 │   │   │                       DreadDots ItemRow Slider Checkbox MoodGrid AreaTile
+│   │   │                       AreaDial StepDots Sticker Reveal DatePicker
 │   │   ├── charts/             BandPattern Bar Battery ForecastStrip WeekGrid
-│   │   └── layout/             Screen TabIcon
+│   │   └── layout/             Screen PageHeader StepNav TabIcon
 │   ├── features/
 │   │   ├── home/CalmMode.tsx
+│   │   ├── add/Capture.tsx     The four-page capture flow
+│   │   ├── tonight/Tonight.tsx The three-page evening planner
+│   │   ├── timetable/          Week, modules, import
+│   │   ├── recover/Prescribe.tsx  What would help, and when
 │   │   └── areas/              Mental Time Physical Social Errands
 │   ├── lib/                    The model. No React in this directory.
-│   │   ├── load.ts             load = hours × dread, buckets, bands, diagnosis
+│   │   ├── load.ts             load = hours × dread, the five-area mix, bands
 │   │   ├── battery.ts          charge = 100 − load%, drains, labels
 │   │   ├── simulate.ts         What-If actions and the projection
 │   │   ├── forecast.ts         14-day strip, clustering detection
 │   │   ├── rebalance.ts        Trade generation and pricing
 │   │   ├── parser.ts           Plain-language capture, regex + keywords
+│   │   ├── timetable.ts        Paste-import parser, attendance, class flags
 │   │   ├── drafter.ts          Three-tone decline messages
 │   │   ├── dates.ts            ISO/UTC helpers, deterministic
 │   │   └── types.ts            Domain types
@@ -925,7 +1170,7 @@ ballast/
 │
 ├── figma/
 │   ├── tokens.json             W3C DTCG. The source of truth for every value.
-│   └── canvas.html             Generated: 18 frames, one page, import-ready
+│   └── canvas.html             Generated: 27 frames, one page, import-ready
 │
 └── scripts/                    Four verification/build scripts, no build step
 ```
@@ -1068,7 +1313,7 @@ enforced throughout and documented in `src/design/figma.ts`:
 
 ```bash
 cd ballast
-npm run figma:canvas          # writes figma/canvas.html — all 18 frames
+npm run figma:canvas          # writes figma/canvas.html — all 27 frames
 npx serve figma               # serve it (html.to.design needs a URL)
 ```
 
@@ -1164,9 +1409,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 257 strings against
-the rendered HTML of all eighteen screens, and `npm run behaviour:check` asserts
-203 state changes behind the buttons.
+figures against the model, and `npm run render:check` asserts 325 strings against
+the rendered HTML of all twenty-six pages, and `npm run behaviour:check` asserts
+259 state changes behind the buttons.
 
 ---
 
@@ -1179,7 +1424,7 @@ two scripts below check the things that would actually be wrong.
   Node's native TypeScript stripping and asserts the study's numbers. It catches
   a seed edit that silently moves Amira off 87%.
 - `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 203 checks covering
+  actions the buttons call and asserts the state moved: 259 checks covering
   booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
   capture with and without a time, the area logs, the time layer, scheduling,
   errands and inviting people. Several assert that a slot is never offered

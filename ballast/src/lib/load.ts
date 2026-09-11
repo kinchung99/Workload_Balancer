@@ -8,7 +8,7 @@
  * tell a student they are about to break.
  */
 import { threshold } from '@design/tokens';
-import type { BandName, BucketKey, Item } from './types';
+import type { BandName, BucketKey, Dread, Item, Mix } from './types';
 
 export const BUCKETS: BucketKey[] = ['mental', 'time', 'errands', 'social', 'physical'];
 
@@ -63,9 +63,97 @@ export const DEFAULT_OVERALL_CEILING = 85;
 export const sumLoad = (items: Item[]): number =>
   Math.round(items.reduce((total, item) => total + loadOf(item), 0) * 10) / 10;
 
+/** Top of the per-area drain scale at capture. Five areas, nought to five each. */
+export const MIX_MAX = 5;
+
+/** The word under each notch. Plain language, because a number means nothing here. */
+export const MIX_WORD = ['Nothing', 'A bit', 'Some', 'A fair bit', 'A lot', 'Everything'] as const;
+
+/**
+ * The mix as proportions that sum to one.
+ *
+ * Returns null when there is nothing to split by - no mix, or one that is all
+ * zeroes - and the caller falls back to the single bucket. Both are real: a
+ * seeded item has never been through capture, and a student who drags nothing
+ * has not answered the question.
+ */
+export function mixShares(mix: Mix | undefined): Record<BucketKey, number> | null {
+  if (!mix) return null;
+  const total = BUCKETS.reduce((sum, key) => sum + Math.max(0, mix[key] ?? 0), 0);
+  if (total <= 0) return null;
+  const out = { mental: 0, time: 0, errands: 0, social: 0, physical: 0 };
+  for (const key of BUCKETS) out[key] = Math.max(0, mix[key] ?? 0) / total;
+  return out;
+}
+
+/**
+ * Dread, read off the mix rather than asked for separately.
+ *
+ * The worst area is the dread. Something that takes a fair bit out of three
+ * areas is not three times as bad as one that takes a fair bit out of one - it
+ * is the same weight, landing in three places. That distinction is exactly what
+ * the five buckets exist to show, and collapsing it into a bigger total would
+ * throw it away.
+ */
+export function dreadFromMix(mix: Mix | undefined): Dread {
+  const worst = BUCKETS.reduce((most, key) => Math.max(most, mix?.[key] ?? 0), 0);
+  return Math.min(5, Math.max(1, Math.round(worst))) as Dread;
+}
+
+/** The loudest area. Keeps the icon, the filters and the old single-bucket code honest. */
+export function dominantArea(mix: Mix | undefined, fallback: BucketKey): BucketKey {
+  const shares = mixShares(mix);
+  if (!shares) return fallback;
+  return BUCKETS.reduce((a, b) => (shares[a] >= shares[b] ? a : b));
+}
+
+/**
+ * The mix, short enough for a row: "Mental & social", "Mental & 3 areas".
+ *
+ * A thing that costs you in three places should say so where you see it, not
+ * only inside the model. Kept under about twenty characters so it can sit in
+ * the same slot the single area label used to.
+ */
+export function shortMix(mix: Mix | undefined, fallback: BucketKey): string {
+  const shares = mixShares(mix);
+  if (!shares) return BUCKET_LABEL[fallback];
+  const ranked = BUCKETS.filter((key) => shares[key] > 0).sort((a, b) => shares[b] - shares[a]);
+  const lead = BUCKET_LABEL[ranked[0]];
+  if (ranked.length === 1) return lead;
+  if (ranked.length === 2) return `${lead} & ${BUCKET_LABEL[ranked[1]].toLowerCase()}`;
+  if (ranked.length === 3) return `${lead}, ${BUCKET_LABEL[ranked[1]].toLowerCase()} & ${BUCKET_LABEL[ranked[2]].toLowerCase()}`;
+  return `${lead} & ${ranked.length - 1} areas`;
+}
+
+/** "Mostly mental, some social" - the mix as a sentence, for rows and screen readers. */
+export function describeMix(mix: Mix | undefined, fallback: BucketKey): string {
+  const shares = mixShares(mix);
+  if (!shares) return BUCKET_LABEL[fallback];
+  const ranked = BUCKETS.filter((key) => shares[key] > 0).sort((a, b) => shares[b] - shares[a]);
+  if (ranked.length === 1) return BUCKET_LABEL[ranked[0]];
+  const [first, ...rest] = ranked;
+  const lead = shares[first] >= 0.5 ? 'Mostly' : 'Part';
+  return `${lead} ${BUCKET_LABEL[first].toLowerCase()}, some ${rest.map((k) => BUCKET_LABEL[k].toLowerCase()).join(' and ')}`;
+}
+
+/**
+ * Load, landed in the areas it actually costs.
+ *
+ * The single choke point for the whole five-bucket reading: every bar, battery,
+ * ceiling and warning in the app comes through here. An item with a mix is
+ * split by it; an item without one behaves exactly as it always did.
+ */
 export function loadByBucket(items: Item[]): Record<BucketKey, number> {
   const out = { mental: 0, time: 0, errands: 0, social: 0, physical: 0 };
-  for (const item of items) out[item.bucket] += loadOf(item);
+  for (const item of items) {
+    const load = loadOf(item);
+    const shares = mixShares(item.mix);
+    if (!shares) {
+      out[item.bucket] += load;
+      continue;
+    }
+    for (const key of BUCKETS) out[key] += load * shares[key];
+  }
   for (const key of BUCKETS) out[key] = Math.round(out[key] * 10) / 10;
   return out;
 }

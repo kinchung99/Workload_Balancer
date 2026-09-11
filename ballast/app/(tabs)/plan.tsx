@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View } from 'react-native';
 import {
-  Button, Card, Chip, CollisionWindow, DayTimeline, Divider, ForecastStrip, Reveal, Screen, Spot,
-  Stack, Text, TodoList,
+  Button, Card, Chip, CollisionWindow, DayTimeline, Divider, ForecastStrip, PageHeader, Reveal, Screen,
+  Sticker, Stack, Text, TodoList,
 } from '@/components';
 import { threshold } from '@design/tokens';
+import { SCREEN } from '@design/screens';
 import { buildForecast, findCollision, leadLabel, speakForecast } from '@/lib/forecast';
 import { isMovable, loadOf } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
@@ -49,6 +50,8 @@ export default function Plan() {
   const hours = dayHours(items, selected);
   const free = freeSlots(items, selected, 1);
   const freeHours = Math.round(free.reduce((total, slot) => total + slotHours(slot), 0) * 10) / 10;
+  const owing = openPrep(items, selected);
+  const owingMeta = `${owing.length} · ${Math.round(owing.reduce((total, item) => total + remaining(item), 0) * 10) / 10}h to go`;
   const inWall = cluster.has(selected);
   const away = daysBetween(today, selected);
 
@@ -68,10 +71,12 @@ export default function Plan() {
       }
     >
       <Stack gap={6} className="pt-4">
-        <Stack direction="row" justify="between" align="center">
-          <Text variant="title" accessibilityRole="header">Next {threshold.forecastDays} days</Text>
-          <Text variant="footnote" tone="subtle">Week {WEEK_NUMBER} to {WEEK_NUMBER + 2}</Text>
-        </Stack>
+        <PageHeader
+          {...SCREEN.plan}
+          eyebrow={`Week ${WEEK_NUMBER} to ${WEEK_NUMBER + 2}`}
+          title={`Next ${threshold.forecastDays} days`}
+          sub="Tap any day to open it hour by hour."
+        />
 
         <Card gap={5}>
           <ForecastStrip
@@ -121,6 +126,7 @@ export default function Plan() {
                 successFeedback();
               }}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
+              todoMeta={owingMeta}
               todo={
                 <TodoList
                   todo={openPrep(items, selected)}
@@ -182,7 +188,7 @@ export default function Plan() {
         ) : (
           <Card gap={4}>
             <Stack direction="row" gap={4} align="center">
-              <Spot name="clear" size={48} />
+              <Sticker name="sun" size={48} />
               <Stack gap={1} grow>
                 <Text variant="heading">Nothing is colliding.</Text>
                 <Text variant="footnote" tone="muted">An ordinary two weeks.</Text>

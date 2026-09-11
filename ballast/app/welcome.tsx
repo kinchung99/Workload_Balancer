@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, BatteryMini, Button, Card, Chip, DreadPicker, Screen, Stack, Text,
+  Battery, BatteryMini, Button, Card, Chip, DreadPicker, Screen, Stack, Text, PageHeader, StepDots,
 } from '@/components';
 import { color } from '@design/tokens';
 import { BUCKETS, BUCKET_LABEL, bandFor, loadOf } from '@/lib/load';
@@ -26,6 +26,8 @@ const HOURS = [1, 2, 4, 8];
  * Three steps, skippable, and it ends with the student's own task in their own
  * week rather than with a "Get started" button.
  */
+const STEPS = ['The idea', 'Your areas', 'Your turn'];
+
 export default function Welcome() {
   const router = useRouter();
   const { items, ceilings, today, addItem, finishOnboarding } = useStore();
@@ -99,25 +101,17 @@ export default function Welcome() {
       }
     >
       <Stack gap={6} className="pt-6">
-        {/* Progress. Three steps, and you can see all three. */}
-        <Stack direction="row" gap={2} accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of 3`}>
-          {[0, 1, 2].map((index) => (
-            <View
-              key={index}
-              className={`h-1 flex-1 rounded-pill ${index <= step ? 'bg-inverse' : 'bg-track'}`}
-            />
-          ))}
-        </Stack>
+        <StepDots labels={STEPS} current={step} onJump={setStep} />
 
         {step === 0 ? (
           <Stack gap={6}>
-            <Stack gap={3}>
-              <Text variant="micro" tone="subtle">THE WHOLE IDEA</Text>
-              <Text variant="title" accessibilityRole="header">Not every hour costs the same.</Text>
-              <Text variant="callout" tone="muted">
-                Two tasks, same afternoon. Drag the dots and watch what happens.
-              </Text>
-            </Stack>
+            <PageHeader
+              sticker="wave"
+              wash={color.decor.lemon}
+              eyebrow="The whole idea"
+              title="Not every hour costs the same."
+              sub="Two tasks, same afternoon. Drag the dots."
+            />
 
             <Card gap={5}>
               <Stack gap={2}>
@@ -149,10 +143,13 @@ export default function Welcome() {
 
         {step === 1 ? (
           <Stack gap={6}>
-            <Stack gap={3}>
-              <Text variant="micro" tone="subtle">WHY ONE NUMBER IS NOT ENOUGH</Text>
-              <Text variant="title" accessibilityRole="header">You do not run flat. You run out in one place.</Text>
-            </Stack>
+            <PageHeader
+              sticker="battery"
+              wash={color.decor.mint}
+              eyebrow="Why one number is not enough"
+              title="You run out in one place."
+              sub="Five areas, five ceilings, one blended reading."
+            />
 
             <Card tone={bandFor(overall)} gap={5}>
               <Stack direction="row" gap={5} align="center">
@@ -196,11 +193,13 @@ export default function Welcome() {
 
         {step === 2 ? (
           <Stack gap={6}>
-            <Stack gap={3}>
-              <Text variant="micro" tone="subtle">YOUR TURN</Text>
-              <Text variant="title" accessibilityRole="header">What are you dreading this week?</Text>
-              <Text variant="callout" tone="muted">One thing. It goes straight into your week.</Text>
-            </Stack>
+            <PageHeader
+              sticker="star"
+              wash={color.decor.candy}
+              eyebrow="Your turn"
+              title="What are you dreading?"
+              sub="One thing. It goes straight into your week."
+            />
 
             <TextInput
               value={title}

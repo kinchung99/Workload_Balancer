@@ -40,21 +40,23 @@ managers who receive the late request · university wellbeing services, downstre
 ### Our Solution
 
 Ballast measures load as **time × dread**, because an hour you are dreading costs more than an hour you
-are not. It splits that load across five areas with their own limits, so it can see *which part* of you
-is overflowing rather than just how full you are. It then looks fourteen days ahead, finds the pile-up
+are not. It splits that load across five areas with their own limits — and one thing can land in several
+at once, because a group presentation is not "mental", it is mental *and* time *and* a social cost nobody
+would have thought to name. So it sees *which part* of you is overflowing, not just how full you are. It then looks fourteen days ahead, finds the pile-up
 before it arrives, and offers specific things you could put down — including writing the awkward message
 for you. It runs entirely on the phone, and the whole daily ask is one tap.
 
 **Feature set**
 
 - 🔋 **The battery** — one honest number, with a face. Five areas, each with its own ceiling.
-- ✍️ **One-box capture** — plain language in, dread in one tap, every guess correctable.
+- ✍️ **Four-page capture** — one question per page, five dials with faces for where it lands, and the battery before you commit.
 - 📅 **Fourteen-day forecast** — flags *clustering*, eight days out. The only screen that can prevent anything.
 - ⚖️ **Rebalance** — priced trades with a live meter. Hard deadlines locked, recovery protected.
 - 💬 **The decline drafter** — writes the message in three tones. Never sends it.
-- 🌙 **Tonight** — try an evening before you live it, then book it at a time you choose.
+- 🌙 **Tonight** — three pages: which night, what you'd do, and what booking it costs.
 - 🧩 **Five area screens** — mood grid, week grid, meals and sleep, contact gaps, batched errands.
 - 📈 **Deadline work** — anything needing preparation sits on every day until done, with sittings you can plan.
+- 🎓 **Timetable** — paste it from your portal. Dread per module, and flags for the lecture that gives exam tips.
 - 🎉 **Good moments** — the one input that puts charge *back*. No streaks, ever.
 
 ---
@@ -103,22 +105,24 @@ for you. It runs entirely on the phone, and the whole daily ask is one tap.
 
 ### ▶ [load-balancer-ballast.expo.app](https://load-balancer-ballast.expo.app)
 
-Live, clickable, and it opens in an incognito window. No install, no sign-in. Eighteen screens; every
+Live, clickable, and it opens in an incognito window. No install, no sign-in. Twenty-six pages; every
 number on every one is computed from a seeded fictional semester rather than hard-coded.
 
 | Screen | Link | What to try |
 |---|---|---|
 | **Intro** | [`/welcome`](https://load-balancer-ballast.expo.app/welcome) | Drag the dread dots on two tasks. 3h of dreaded work overtakes 6h of enjoyable reading — the whole idea, in ten seconds. |
+| **Add anything** | [`/add`](https://load-balancer-ballast.expo.app/add) | Four pages, one question each. Page three has five dials with faces on them — drag one and watch where the load actually lands. |
+| **Foundations** | [`/foundations`](https://load-balancer-ballast.expo.app/foundations) | The whole sticker sheet, the dial at all six levels, and the rule that keeps the app colourful without colour ever lying. |
+| **Timetable** | [`/timetable`](https://load-balancer-ballast.expo.app/timetable) | Three tabs: week, modules, import. Fourteen real hours with rooms; set dread once per module and every class re-prices. Paste to import — unreadable lines are handed back, never dropped. |
 | **Home** | [`/`](https://load-balancer-ballast.expo.app/) | The character reads 13% before you read anything. Five areas below it; mental is flat while physical still has 69%. |
 | **Plan** | [`/plan`](https://load-balancer-ballast.expo.app/plan) | Tap any of fourteen days to open it hour by hour. The collision is drawn as three columns, not a list. |
 | **Rebalance** | [`/rebalance`](https://load-balancer-ballast.expo.app/rebalance) | Toggle trades and watch the battery move live. The group presentation cannot be toggled — hard deadlines are locked, not discouraged. |
-| **Tonight** | [`/actions`](https://load-balancer-ballast.expo.app/actions) | Pick "a recovery night" and see it land at 32%. The sleep slider tells you the bedtime it implies, and whether tonight allows it. |
+| **Tonight** | [`/actions`](https://load-balancer-ballast.expo.app/actions) | Three pages: which night, what you'd do, book it. Pick "a recovery night" and see it land at 32%. The sleep slider tells you the bedtime it implies. |
 | **Saying no** | [`/decline/w11-birthday`](https://load-balancer-ballast.expo.app/decline/w11-birthday) | Three tones. "Actually, I'm going" is a real button that re-plans the week instead of guilt-tripping you. |
 | **An area** | [`/areas/mental`](https://load-balancer-ballast.expo.app/areas/mental) | Log something good and watch the battery go *up* — the one input that adds charge. |
-| **Foundations** | [`/foundations`](https://load-balancer-ballast.expo.app/foundations) | The design system: four bands as colour *and* word *and* fill pattern, the character at every level, the type scale. |
 
-All eighteen frames can be exported to Figma in one import — `npm run figma:canvas` builds a single page
-of 390×844 artboards, and `figma/tokens.json` imports as Figma variables.
+All twenty-seven frames export to Figma in one import — `npm run figma:canvas` builds a single page of
+390×844 artboards, and `figma/tokens.json` imports as Figma variables.
 
 ---
 
@@ -132,7 +136,9 @@ of 390×844 artboards, and `figma/tokens.json` imports as Figma variables.
 | 4 | **Recovery counted in the same units as work** | Rest is a credit you are owed, in hours, carried forward — not an absence. Booking it writes a protected block at a time you pick from gaps that actually exist. |
 | 5 | **Shape beats total** | Five areas with separate ceilings. Someone at 60% overall with 100% mental is closer to the edge than someone evenly at 75%, and the maths says so: `overall = (mean + worst) ÷ 2`. |
 | 6 | **The interface gets simpler as the week gets worse** | Above 90% the app collapses to one number, one sentence, one button. Most apps add urgency when things get bad; that is precisely backwards. |
-| 7 | **A battery with a face — and no streaks** | Game feel without game pressure. The character is sympathetic at every level, including 8%. There is no frown, no streak and no score, because those punish the exact weeks this app exists for. |
+| 7 | **Classes marked for *why* they matter** | A lecture is an hour of load like any other until it is the one where the exam hints get given. Flagging it means the rebalancer refuses to move it — visibly, listed and locked — because that lecture is the first thing a stressed student drops and the last they can afford to. |
+| 8 | **One thing, five areas — set at capture** | Every other planner files a task under one heading. Ballast asks how much it takes out of each of the five, with a dial and a face rather than a number. The total is unchanged — dread is the *worst* area, not the sum — but it lands where it actually costs you, and the recovery it offers changes with it. |
+| 9 | **Game feel without game pressure** | A character on the battery, a drawing on every screen, a face on every dial — and no streak, no score, no leaderboard, because those punish the exact weeks this app exists for. The character is sympathetic at 8% as well as 80%: there is no frown anywhere in it. |
 
 ---
 
@@ -175,9 +181,9 @@ No manual clicking. Four checks run before anything deploys:
 | Check | What it proves |
 |---|---|
 | `model:check` | **13** figures from the design study are reproduced by the seed and the maths |
-| `behaviour:check` | **203** state changes — every button moves the state it claims to |
-| `render:check` | **257** strings across 18 screens, plus every route having a way out |
-| `tokens:check` | **83** design tokens identical between the code and the Figma source |
+| `behaviour:check` | **259** state changes — every button moves the state it claims to |
+| `render:check` | **325** strings across 26 pages, plus every route having a way out |
+| `tokens:check` | **90** design tokens identical between the code and the Figma source |
 
 `npm run deploy` refuses to publish if any of them fail.
 

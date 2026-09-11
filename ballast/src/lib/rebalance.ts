@@ -11,6 +11,7 @@
  * tagging commitments at capture.
  */
 import { dayName } from './dates';
+import { isProtectedClass } from './timetable';
 import { loadOf, sumLoad } from './load';
 import type { Item, Trade } from './types';
 
@@ -102,6 +103,28 @@ export function buildTrades(week: Item[]): Trade[] {
       detail: `Batch into one trip ${dayName(group[0].date)}, saves ${saved}`,
       saves: saved,
       selected: true,
+    });
+  }
+
+  /*
+   * Classes marked as giving tips or taking a register.
+   *
+   * Listed rather than silently excluded: the lecture where the hints get given
+   * is the first thing a stressed student drops, and seeing the app refuse to
+   * suggest it is the point. Shown locked, like a hard deadline.
+   */
+  const flagged = week.filter(isProtectedClass).sort(byLoad)[0];
+  if (flagged) {
+    trades.push({
+      id: `class-${flagged.id}`,
+      itemId: flagged.id,
+      title: flagged.title,
+      detail: (flagged.flags ?? []).includes('tips')
+        ? 'Gives exam tips. Never suggested for skipping.'
+        : 'Attendance is counted. Never suggested for skipping.',
+      saves: 0,
+      locked: true,
+      selected: false,
     });
   }
 

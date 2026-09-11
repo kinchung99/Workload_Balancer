@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Card, Chip, DayTimeline, Reveal, Stack, Text, WeekGrid } from '@/components';
+import { Button, Card, Chip, DayTimeline, Reveal, Stack, Text, WeekGrid } from '@/components';
 import { color } from '@design/tokens';
 import { DAY_LETTER, dayIndex, formatShort } from '@/lib/dates';
 import { dayHours, freeSlots, slotHours, weekDays } from '@/lib/schedule';
@@ -28,6 +28,8 @@ export function TimeArea() {
 
   return (
     <Stack gap={6}>
+      <Button label="Your timetable" onPress={() => router.push('/timetable')} />
+
       <Card gap={4}>
         <Text variant="micro" tone="subtle">THIS WEEK</Text>
         <Stack direction="row" gap={5}>

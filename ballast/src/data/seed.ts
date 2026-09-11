@@ -10,7 +10,7 @@
  * `new Date()` so the demo reads the same on every phone in every timezone.
  */
 import type {
-  CircleMember, Contact, Errand, Item, Meal, MoodCheckIn, Prescription, RecoveryEntry,
+  CircleMember, Contact, Errand, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry,
 } from '@/lib/types';
 import { addDays } from '@/lib/dates';
 
@@ -42,7 +42,72 @@ export const CEILINGS = {
 /** Overall ceiling. Also hers, also moved. */
 export const OVERALL_CEILING = 85;
 
+/**
+ * Four modules, second year computer science.
+ *
+ * Dread lives on the module rather than the class, because you do not dread
+ * Tuesday - you dread networks. Changing it here changes every class in it.
+ */
+export const modules: Module[] = [
+  { id: 'os',  code: 'CS2040', name: 'Operating Systems',   dread: 4, importance: 3, attended: 8,  held: 9,  requiredAttendance: 80 },
+  { id: 'net', code: 'CS2035', name: 'Networks',            dread: 2, importance: 3, attended: 11, held: 12, requiredAttendance: 80 },
+  { id: 'alg', code: 'CS2011', name: 'Algorithms',          dread: 3, importance: 2, attended: 7,  held: 9,  requiredAttendance: 80 },
+  { id: 'ds',  code: 'CS3012', name: 'Distributed Systems', dread: 3, importance: 2, attended: 6,  held: 9,  requiredAttendance: null },
+];
+
+/**
+ * The timetable, as fourteen real hours rather than one invisible lump.
+ *
+ * It used to be a single "Timetabled lectures and labs" item marked `spread`,
+ * which counted toward the week and appeared nowhere in it - so the fullest part
+ * of a student's day was the part the calendar could not show. These are the
+ * same fourteen hours at the same dread, now with a time, a room and a module.
+ */
+const classes = (week: string, prefix: string): Item[] => [
+  klass(prefix, 'os',  'Lecture',  week, 0, 9,  2, 'Kilburn LT1',  ['tips', 'attendance']),
+  klass(prefix, 'net', 'Tutorial', week, 0, 11, 1, 'IT407',        ['coursework']),
+  klass(prefix, 'alg', 'Tutorial', week, 1, 9,  1, 'Kilburn 1.5',  []),
+  klass(prefix, 'os',  'Lab',      week, 1, 17, 2, 'Lab B',        ['attendance']),
+  klass(prefix, 'ds',  'Seminar',  week, 2, 15, 2, 'Crawford H',   ['tips']),
+  klass(prefix, 'net', 'Lecture',  week, 3, 8,  2, 'Stopford TH2', ['tips', 'coursework']),
+  klass(prefix, 'alg', 'Lab',      week, 3, 14, 2, 'Lab A',        ['attendance']),
+  klass(prefix, 'net', 'Lab',      week, 4, 8,  2, 'Lab C',        []),
+];
+
+function klass(
+  prefix: string,
+  moduleId: string,
+  kind: string,
+  week: string,
+  offset: number,
+  startHour: number,
+  hours: number,
+  room: string,
+  flags: Item['flags'],
+): Item {
+  const module = modules.find((m) => m.id === moduleId)!;
+  return {
+    id: `${prefix}class-${moduleId}-${offset}-${startHour}`,
+    title: `${module.name} ${kind.toLowerCase()}`,
+    bucket: 'time',
+    hours,
+    // Every class in a module carries that module's dread, so the fourteen hours
+    // still weigh exactly what the single blob weighed: 14 x 2.
+    dread: 2,
+    commitment: 'hard',
+    date: d(week, offset),
+    startHour,
+    repeats: true,
+    moduleId,
+    sessionKind: kind.toLowerCase() as Item['sessionKind'],
+    room,
+    flags,
+  };
+}
+
 export const seedItems: Item[] = [
+  ...classes(W10, ''),
+  ...classes(W11, 'w11-'),
   // ---------------------------------------------------------------- week 10
   // Mental. Coursework and the thinking that comes with it.
   { id: 'os-2',      title: 'Operating systems, part 2',  bucket: 'mental',  hours: 4,    dread: 4, commitment: 'hard', date: d(W10, 0), when: 'Hard deadline Thursday', startHour: 13 },
@@ -57,7 +122,6 @@ export const seedItems: Item[] = [
   { id: 'good-read', title: 'Reading you actually enjoy', bucket: 'mental',  hours: 6,    dread: 1, commitment: 'self', date: d(W10, 6) },
 
   // Time. The invisible half of the week, entered once in September.
-  { id: 'timetable', title: 'Timetabled lectures and labs', bucket: 'time', hours: 14,   dread: 2, commitment: 'hard', date: d(W10, 0), when: 'Across the week', repeats: true, spread: true },
   { id: 'shift-mon', title: 'Café shift',                 bucket: 'time',    hours: 6,    dread: 2, commitment: 'hard', date: d(W10, 0), when: '5pm to 11pm', repeats: true, startHour: 17 },
   { id: 'shift-fri', title: 'Café shift',                 bucket: 'time',    hours: 6,    dread: 2, commitment: 'hard', date: d(W10, 4), when: '5pm to 11pm', repeats: true, startHour: 17 },
   { id: 'bus',       title: 'Bus to campus',              bucket: 'time',    hours: 8,    dread: 2, commitment: 'hard', date: d(W10, 0), when: '50 minutes each way', repeats: true, spread: true },
@@ -98,7 +162,6 @@ export const seedItems: Item[] = [
   { id: 'w11-catchup',  title: 'Lecture catch-up, week 11', bucket: 'mental', hours: 4,   dread: 2, commitment: 'self', date: d(W11, 0), startHour: 13 },
   { id: 'w11-set-read', title: 'Set reading, week 11',    bucket: 'mental',  hours: 4,    dread: 2, commitment: 'self', date: d(W11, 5) },
   { id: 'w11-revision', title: 'Revision, week 11',       bucket: 'mental',  hours: 4,    dread: 3, commitment: 'self', date: d(W11, 5), startHour: 15 },
-  { id: 'w11-timetable',title: 'Timetabled lectures and labs', bucket: 'time', hours: 14, dread: 2, commitment: 'hard', date: d(W11, 0), when: 'Across the week', repeats: true, spread: true },
   { id: 'w11-shift-mon',title: 'Café shift',              bucket: 'time',    hours: 6,    dread: 2, commitment: 'hard', date: d(W11, 0), when: '5pm to 11pm', repeats: true, startHour: 17 },
   { id: 'w11-shift-fri',title: 'Café shift',              bucket: 'time',    hours: 6,    dread: 2, commitment: 'hard', date: d(W11, 4), when: '5pm to 11pm', repeats: true, startHour: 17 },
   { id: 'w11-bus',      title: 'Bus to campus',           bucket: 'time',    hours: 8,    dread: 2, commitment: 'hard', date: d(W11, 0), when: '50 minutes each way', repeats: true, spread: true },

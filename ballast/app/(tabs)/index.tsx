@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import {
-  AreaIcon, Button, Card, Chip, DayTimeline, MOOD_WORD, Mascot, Reveal, Screen, Spot, Stack, Text,
-  TodoList, WeekStrip, moodFor,
+  AreaIcon, Button, Card, Chip, DayTimeline, MOOD_WORD, Mascot, PageHeader, Reveal, Screen, Sticker,
+  Stack, Text, TodoList, WeekStrip, moodFor, type StickerName,
 } from '@/components';
+import { SCREEN } from '@design/screens';
 import { CalmMode } from '@/features/home/CalmMode';
 import { CHARGE_NOTE, chargeOf, drains } from '@/lib/battery';
 import { color } from '@design/tokens';
@@ -25,6 +26,9 @@ const greeting = () => {
   const hour = new Date().getHours();
   return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 };
+
+/** The drawing follows the time of day, because the greeting already does. */
+const timeSticker = (): StickerName => (new Date().getHours() < 18 ? 'sun' : 'moon');
 
 /**
  * Home — one battery, then the part of you that is empty.
@@ -62,6 +66,10 @@ export default function Home() {
   const hoursToday = dayHours(withLogs, today);
   const freeToday = Math.round(freeSlots(withLogs, today, 1).reduce((t, s) => t + slotHours(s), 0) * 10) / 10;
 
+  // What the Owing band says it adds up to. The list is a node and cannot count itself.
+  const owing = openPrep(withLogs, today);
+  const owingMeta = `${owing.length} · ${Math.round(owing.reduce((total, item) => total + remaining(item), 0) * 10) / 10}h to go`;
+
   const pulling = drains(percents).slice(0, 2);
   const unbooked = prescriptions.filter((entry) => !booked.includes(entry.id));
   const suggestion = unbooked.find((entry) => entry.best) ?? unbooked[0];
@@ -83,7 +91,13 @@ export default function Home() {
   return (
     <Screen footer={<Button label="Add anything" onPress={() => router.push('/add')} />}>
       <Stack gap={6} className="pt-4">
-        <Text variant="micro" tone="subtle">{greeting().toUpperCase()} · WEEK {WEEK_NUMBER}</Text>
+        <PageHeader
+          sticker={timeSticker()}
+          wash={SCREEN.home.wash}
+          eyebrow={`Week ${WEEK_NUMBER}`}
+          title={greeting()}
+          right={<Chip label={`${allToday.length} today`} readOnly />}
+        />
 
         {/* The character. You can read how the week is going before you read
             anything at all, which is the point. */}
@@ -147,7 +161,7 @@ export default function Home() {
               onPress={() => router.push('/plan')}
               className="flex-row items-center gap-3 rounded-sm bg-heavy-wash px-4 py-3 active:opacity-70"
             >
-              <Spot name="wall" size={28} />
+              <Sticker name="wall" size={28} />
               <Text variant="footnote" tone="heavy" className="flex-1">{collision.headline}</Text>
               <Text variant="micro" tone="heavy">{leadLabel(collision.leadDays)}</Text>
             </Pressable>
@@ -184,6 +198,7 @@ export default function Home() {
               onSelect={(item) => router.push(`/decline/${item.id}`)}
               onSchedule={(item, startHour) => { scheduleItem(item.id, startHour); successFeedback(); }}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
+              todoMeta={owingMeta}
               todo={
                 <TodoList
                   todo={openPrep(withLogs, today)}
@@ -222,7 +237,7 @@ export default function Home() {
           >
             <Card tone="recovery" gap={4}>
               <Stack direction="row" gap={4} align="center">
-                <Spot name="clear" size={52} />
+                <Sticker name="sun" size={52} />
                 <Stack gap={1} grow>
                   <Text variant="micro" tone="recovery">WOULD HELP</Text>
                   <Text variant="heading">{suggestion.title}</Text>
@@ -234,7 +249,7 @@ export default function Home() {
         ) : (
           <Card tone="steady" gap={3}>
             <Stack direction="row" gap={4} align="center">
-              <Spot name="done" size={44} />
+              <Sticker name="star" size={44} />
               <Text variant="callout" className="flex-1">All four recovery blocks are in your week.</Text>
             </Stack>
           </Card>

@@ -22,6 +22,7 @@ import { color } from '@design/tokens';
 import { tapFeedback } from '@/lib/haptics';
 import type { Item } from '@/lib/types';
 import { Chip } from '../primitives/Chip';
+import { Sticker } from '../primitives/Sticker';
 import { Stack } from '../primitives/Stack';
 import { Text } from '../primitives/Text';
 
@@ -75,13 +76,20 @@ export function TodoList({
         return (
           <Stack
             key={item.id}
-            gap={3}
-            className={`rounded-md border px-4 py-4 ${risk ? 'border-heavy-fill bg-heavy-wash' : 'border-line-hairline bg-raised'}`}
+            gap={4}
+            className={`rounded-lg border-2 px-4 py-4 ${risk ? 'border-heavy-fill bg-heavy-wash' : 'border-line-hairline bg-raised'}`}
           >
-            <Stack direction="row" gap={3} justify="between" align="start">
+            <Stack direction="row" gap={3} align="center">
+              {/* A piece of work, drawn. Same language as the rest of the app. */}
+              <View
+                className="items-center justify-center rounded-pill"
+                style={{ width: 40, height: 40, backgroundColor: risk ? color.decor.blush : color.decor.candy }}
+              >
+                <Sticker name={risk ? 'wall' : 'assignment'} size={27} />
+              </View>
               <Stack gap={1} grow>
                 <Text variant="body" weight="semibold">{item.title}</Text>
-                <Text variant="micro" tone="subtle">
+                <Text variant="micro" tone={due <= 1 ? 'heavy' : 'subtle'}>
                   {due === 0 ? 'Due today' : due === 1 ? 'Due tomorrow' : `${due} days left`} · {left}h to go
                 </Text>
               </Stack>
@@ -94,19 +102,34 @@ export function TodoList({
             </Stack>
 
             {/* Done, booked, and neither — three states, one bar. */}
-            <View className="h-3 w-full flex-row overflow-hidden rounded-pill bg-track">
-              <View style={{ flexGrow: parts.done || 0.0001, backgroundColor: color.band.steady.fill }} />
-              <View style={{ flexGrow: parts.scheduled || 0.0001, backgroundColor: color.band.recovery.fill }} />
-              <View style={{ flexGrow: parts.unplanned || 0.0001, backgroundColor: color.surface.track }} />
-            </View>
-            <Stack direction="row" gap={3} wrap>
-              <Text variant="micro" tone="steady">{item.prepDone ?? 0}h done</Text>
-              <Text variant="micro" tone="recovery">{booked}h booked</Text>
-              <Text variant="micro" tone="subtle">{loose}h loose</Text>
+            <Stack gap={3}>
+              <View className="h-4 w-full flex-row overflow-hidden rounded-pill bg-track">
+                <View style={{ flexGrow: parts.done || 0.0001, backgroundColor: color.band.steady.fill }} />
+                <View style={{ flexGrow: parts.scheduled || 0.0001, backgroundColor: color.band.recovery.fill }} />
+                <View style={{ flexGrow: parts.unplanned || 0.0001, backgroundColor: color.surface.track }} />
+              </View>
+              {/* A key, because three colours with no legend is a puzzle. */}
+              <Stack direction="row" gap={4} wrap>
+                {([
+                  [color.band.steady.fill, `${item.prepDone ?? 0}h done`, 'steady'],
+                  [color.band.recovery.fill, `${booked}h booked`, 'recovery'],
+                  [color.surface.track, `${loose}h loose`, 'subtle'],
+                ] as const).map(([dot, label, tone]) => (
+                  <Stack key={label} direction="row" gap={2} align="center">
+                    <View style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: dot }} />
+                    <Text variant="micro" tone={tone}>{label}</Text>
+                  </Stack>
+                ))}
+              </Stack>
             </Stack>
 
             {risk ? (
-              <Text variant="micro" tone="heavy">Not enough free time left. Something has to move.</Text>
+              <Stack direction="row" gap={3} align="center" className="rounded-md bg-heavy-wash px-3 py-3">
+                <Sticker name="wall" size={26} />
+                <Text variant="micro" tone="heavy" className="flex-1">
+                  Not enough free time left. Something has to move.
+                </Text>
+              </Stack>
             ) : null}
 
             <Stack direction="row" gap={2} wrap>
@@ -144,9 +167,12 @@ export function TodoList({
             {/* Sittings already booked, each with what it is for. */}
             {sessions.length ? (
               <Stack gap={2}>
-                <Text variant="micro" tone="subtle">BOOKED SITTINGS</Text>
+                <Stack direction="row" gap={2} align="center">
+                  <Sticker name="calendar" size={18} />
+                  <Text variant="micro" tone="subtle">BOOKED SITTINGS</Text>
+                </Stack>
                 {sessions.map((session) => (
-                  <Stack key={session.id} gap={2} className="rounded-sm bg-recovery-wash px-3 py-3">
+                  <Stack key={session.id} gap={2} className="rounded-md bg-recovery-wash px-3 py-3">
                     <Stack direction="row" gap={3} justify="between" align="center">
                       <Text variant="footnote" weight="semibold" tone="recovery">
                         {formatShort(session.date)} · {formatHour(session.startHour ?? 0)}–
@@ -168,8 +194,11 @@ export function TodoList({
             ) : null}
 
             {tracking ? (
-              <Stack gap={3} className="rounded-sm bg-sunken px-4 py-4">
-                <Text variant="micro" tone="subtle">HOW FAR THROUGH ARE YOU?</Text>
+              <Stack gap={3} className="rounded-md bg-decor-cream px-4 py-4">
+                <Stack direction="row" gap={2} align="center">
+                  <Sticker name="star" size={20} />
+                  <Text variant="micro" tone="subtle">HOW FAR THROUGH ARE YOU?</Text>
+                </Stack>
                 <Stack direction="row" gap={2} wrap>
                   {PERCENTS.map((percent) => (
                     <Chip
@@ -187,7 +216,7 @@ export function TodoList({
             ) : null}
 
             {planning ? (
-              <Stack gap={4} className="rounded-sm bg-sunken px-4 py-4">
+              <Stack gap={4} className="rounded-md bg-decor-cream px-4 py-4">
                 {plan.length ? (
                   <Stack gap={2}>
                     <Text variant="micro" tone="subtle">WHAT IT WOULD BOOK</Text>

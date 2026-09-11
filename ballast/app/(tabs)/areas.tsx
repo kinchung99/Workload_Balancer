@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import { AreaIcon, Battery, Button, Card, Screen, Stack, Text } from '@/components';
+import { AreaIcon, Battery, Button, Card, PageHeader, Screen, Stack, Text } from '@/components';
 import { color } from '@design/tokens';
+import { SCREEN } from '@design/screens';
 import { BUCKETS, BUCKET_LABEL, bandFor, speakBuckets } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
@@ -33,10 +34,12 @@ export default function Areas() {
   return (
     <Screen>
       <Stack gap={6} className="pt-4">
-        <Stack gap={1}>
-          <Text variant="micro" tone="subtle">EMPTIEST FIRST</Text>
-          <Text variant="title" accessibilityRole="header">Your areas</Text>
-        </Stack>
+        <PageHeader
+          {...SCREEN.areas}
+          eyebrow="Emptiest first"
+          title="Your areas"
+          sub="One number hides which part of you is empty."
+        />
 
         {/* The whole chart as one sentence, for anyone not reading the picture. */}
         <Stack gap={4} accessible accessibilityLabel={speakBuckets(percents)}>

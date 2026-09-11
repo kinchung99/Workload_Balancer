@@ -111,6 +111,9 @@ export function logItems({ today, sleepHours, meals, moods, errands = [], moment
       hours: errand.hours ?? 0.33,
       startHour: errand.startHour,
       spread: false,
+      // The split given at capture travels with it, or the load would collapse
+      // back into one heading the moment it became a row.
+      mix: errand.mix,
     });
   }
 

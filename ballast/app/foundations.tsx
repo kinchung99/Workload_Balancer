@@ -1,12 +1,13 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  AreaIcon, BandSwatch, Burst, Button, Card, Chip, Divider, DreadDots, MOOD_WORD, Mascot, Screen,
-  Spot, Stack, Text,
+  AreaIcon, BandSwatch, Burst, Button, Card, Chip, Divider, DrainFace, DreadDots, MOOD_WORD, Mascot,
+  PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
+import { SCREEN } from '@design/screens';
 import { BAND_LABEL } from '@/lib/load';
 import { color, radius, space, target, type as typeScale } from '@design/tokens';
-import { BUCKETS, BUCKET_LABEL } from '@/lib/load';
+import { BUCKETS, BUCKET_LABEL, MIX_WORD } from '@/lib/load';
 import { ARTBOARD, FIGMA_FRAMES } from '@design/figma';
 import type { BandName } from '@/lib/types';
 
@@ -42,11 +43,11 @@ export default function Foundations() {
       }
     >
       <Stack gap={5} className="pt-4">
-        <Text variant="title" accessibilityRole="header">Foundations</Text>
-        <Text variant="callout" tone="muted">
-          Tested on a tired person, one-handed, on a bus, at 11pm, with a cracked screen. That is the design
-          condition, not an edge case.
-        </Text>
+        <PageHeader
+          {...SCREEN.foundations}
+          title="Foundations"
+          sub="Tested on a tired person, one-handed, on a bus, at 11pm."
+        />
 
         {/* Colour is never the only signal. */}
         <Card gap={5}>
@@ -137,15 +138,70 @@ export default function Foundations() {
         {/* Drawings, and the one reward mechanic in the app. */}
         <Card gap={4}>
           <Text variant="heading">Drawings</Text>
-          <Stack direction="row" gap={3} justify="between">
-            {(['clear', 'night', 'done', 'nothing', 'wall'] as const).map((name) => (
-              <Spot key={name} name={name} size={48} />
+          <Stack direction="row" gap={3} wrap>
+            {([
+              'assignment', 'class', 'shift', 'move', 'people', 'chore', 'basket',
+              'sun', 'moon', 'cloud', 'leaf', 'star', 'sparkle', 'heart', 'wall',
+              'scales', 'chat', 'battery', 'clock', 'calendar', 'wave', 'palette',
+            ] as const).map((name) => (
+              <Sticker key={name} name={name} size={40} />
             ))}
           </Stack>
           <Burst show label="Celebration, shown when something good is logged" />
           <Text variant="footnote" tone="muted">
             Drawn as SVG, not fetched: they work offline, follow the theme and print in greyscale. The burst is
             the only reward in the app and only ever fires for something you did.
+          </Text>
+        </Card>
+
+        {/* The decorative palette, and the line it must not cross. */}
+        <Card gap={4}>
+          <Stack gap={2}>
+            <Text variant="heading">Decoration has its own palette</Text>
+            <Text variant="callout" tone="muted">
+              Stickers and confetti use these and only these. Nothing on screen is ever read off one, which is
+              what keeps colour free to mean a band everywhere it matters.
+            </Text>
+          </Stack>
+          <Stack direction="row" gap={3} wrap>
+            {(Object.keys(color.decor) as Array<keyof typeof color.decor>).map((key) => (
+              <Stack key={key} gap={2} align="center">
+                <View
+                  className="h-10 w-10 rounded-md border border-line-hairline"
+                  style={{ backgroundColor: color.decor[key] }}
+                />
+                <Text variant="micro" tone="subtle">{key}</Text>
+              </Stack>
+            ))}
+          </Stack>
+          <Text variant="footnote" tone="muted">
+            A decor hue on a bar, a number or a meter is a bug, not a style choice.
+          </Text>
+        </Card>
+
+        {/* The control capture is built on. */}
+        <Card gap={4}>
+          <Stack gap={2}>
+            <Text variant="heading">One thing, five areas</Text>
+            <Text variant="callout" tone="muted">
+              A task lands in as many of the five as it actually costs you. The dial asks with a face rather than
+              a number, so nobody has to learn what &quot;dread 4&quot; means to answer it.
+            </Text>
+          </Stack>
+          <Stack direction="row" gap={4} align="center" justify="between">
+            {[0, 1, 2, 3, 4, 5].map((level) => (
+              <Stack key={level} gap={2} align="center">
+                <View
+                  className="h-11 w-11 items-center justify-center rounded-pill border-2 border-line-strong bg-raised"
+                >
+                  <DrainFace level={level} size={26} />
+                </View>
+                <Text variant="micro" tone="subtle">{MIX_WORD[level].split(' ')[0]}</Text>
+              </Stack>
+            ))}
+          </Stack>
+          <Text variant="footnote" tone="muted">
+            Strained, never scolded. This is the face of the task, not of the person holding the phone.
           </Text>
         </Card>
 

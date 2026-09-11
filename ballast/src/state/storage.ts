@@ -43,8 +43,10 @@ export const STORAGE_KEY = 'ballast/v1';
  *   6  only the intro flag persists; a week never outlives a reload
  *   7  off-hours, custom evening activities, errand effort
  *   8  one list for tasks and errands; each lands on its own day
+ *   9  timetable as real classes, with modules and flags
+ *  10  one thing can drain several areas; capture is four pages
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 10;
 
 /**
  * What survives an upgrade.

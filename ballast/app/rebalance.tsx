@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, Divider, Screen, Stack, Text, Toggle, WeekStrip,
+  Battery, Button, Card, Chip, Divider, PageHeader, Screen, Stack, Text, Toggle, WeekStrip,
 } from '@/components';
+import { SCREEN } from '@design/screens';
 import { bandFor, overallPercent, percentByBucket } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { applySelection, buildTrades, totalSaved } from '@/lib/rebalance';
@@ -180,7 +181,12 @@ export default function Rebalance() {
       }
     >
       <Stack gap={6} className="pt-4">
-        <Text variant="micro" tone="muted">REBALANCING NEXT WEEK</Text>
+        <PageHeader
+          {...SCREEN.rebalance}
+          eyebrow="Next week"
+          title="Something has to come off"
+          sub="Toggle a trade and watch the battery move."
+        />
 
         <Card gap={5}>
           <Stack direction="row" gap={4} align="center">

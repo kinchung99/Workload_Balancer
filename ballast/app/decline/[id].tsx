@@ -3,7 +3,8 @@ import { Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { successFeedback } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Card, Chip, Screen, Stack, Text } from '@/components';
+import { Button, Card, Chip, PageHeader, Screen, Stack, Text } from '@/components';
+import { SCREEN } from '@design/screens';
 import { TONES, draft, reword, type Tone } from '@/lib/drafter';
 import { dayName } from '@/lib/dates';
 import { isMovable, loadOf } from '@/lib/load';
@@ -142,10 +143,11 @@ export default function Decline() {
       }
     >
       <Stack gap={5} className="pt-4">
-        <Stack direction="row" justify="between" align="center">
-          <Text variant="title" accessibilityRole="header">Saying no</Text>
-          <Text variant="footnote" tone="subtle">Step 3 of 4</Text>
-        </Stack>
+        <PageHeader
+          {...SCREEN.decline}
+          title="Saying no"
+          sub="The app writes it. It never sends it."
+        />
 
         {/* a. It names the trade in one line. No lecture about boundaries, no
             wellbeing language, just the arithmetic that makes it obvious. */}

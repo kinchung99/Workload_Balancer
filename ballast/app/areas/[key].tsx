@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AreaIcon, Battery, Button, Card, Screen, Stack, Text } from '@/components';
+import { Battery, Button, Card, PageHeader, Screen, Stack, Text } from '@/components';
 import { View } from 'react-native';
 import { color } from '@design/tokens';
+import { AREA_STICKER } from '@design/screens';
 import { BUCKET_LABEL, BUCKETS, bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import type { BucketKey } from '@/lib/types';
@@ -23,6 +24,15 @@ const AREA = {
   mental: MentalArea, time: TimeArea, physical: PhysicalArea,
   social: SocialArea, errands: ErrandsArea,
 } as const;
+
+/** One line saying why you would open this one. */
+const WHAT: Record<BucketKey, string> = {
+  mental: 'How today feels, and what is behind it',
+  time: 'Committed hours and protected recovery',
+  physical: 'Meals, movement and sleep',
+  social: 'Who you have not spoken to',
+  errands: 'Small things, batched into trips',
+};
 
 /**
  * One screen per area, each logging the thing that area is actually made of -
@@ -48,18 +58,16 @@ export default function Area() {
       footer={<Button label="Rebalance the week" kind="secondary" onPress={() => router.push('/rebalance')} />}
     >
       <Stack gap={6} className="pt-4">
-        <Stack direction="row" gap={4} align="center">
-          <View
-            className="h-14 w-14 items-center justify-center rounded-lg"
-            style={{ backgroundColor: color.area[bucket].wash }}
-          >
-            <AreaIcon area={bucket} size={28} />
-          </View>
-          <Stack gap={1} grow>
-            <Text variant="micro" tone="subtle">{BUCKET_LABEL[bucket].toUpperCase()}</Text>
-            <Text variant="title" accessibilityRole="header">{charge}% left</Text>
-          </Stack>
-        </Stack>
+        {/* The area keeps its own identity hue here rather than a decor one:
+            these five already have a palette and it is the one thing on screen
+            that says which area you are in. */}
+        <PageHeader
+          sticker={AREA_STICKER[bucket]}
+          wash={color.area[bucket].wash}
+          eyebrow={BUCKET_LABEL[bucket]}
+          title={`${charge}% left`}
+          sub={WHAT[bucket]}
+        />
 
         <Card tone={band} gap={4}>
           <Stack direction="row" gap={5} align="center">

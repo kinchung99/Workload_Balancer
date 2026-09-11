@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
-import { Button, Card, Chip, Divider, Screen, Stack, Text } from '@/components';
+import { Button, Card, Chip, Divider, PageHeader, Screen, Stack, Text } from '@/components';
+import { SCREEN } from '@design/screens';
 import { DEFICIT_DAYS } from '@/data/seed';
 import { restOwedFrom, useStore } from '@/state/store';
 
@@ -84,7 +85,11 @@ export default function Recover() {
       }
     >
       <Stack gap={6} className="pt-4">
-        <Text variant="title" accessibilityRole="header">Recovery</Text>
+        <PageHeader
+          {...SCREEN.recover}
+          title="Recovery"
+          sub="Rest is a credit you are owed, not an absence."
+        />
 
         <Card tone={inDeficit ? 'recovery' : 'steady'} gap={4}>
           <Stack direction="row" justify="between" align="center">

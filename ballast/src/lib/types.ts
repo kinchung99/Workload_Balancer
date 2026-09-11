@@ -12,6 +12,21 @@ export type CommitmentKind = 'hard' | 'soft' | 'self';
 /** How much are you dreading this, one to five. The one thing a calendar cannot know. */
 export type Dread = 1 | 2 | 3 | 4 | 5;
 
+/**
+ * What one thing takes out of each of the five areas, 0 to 5.
+ *
+ * A single bucket per task was always the model's weakest assumption. A group
+ * presentation is not "mental"; it is heavy mental, real time, and a social
+ * cost most people would not have thought to name. Filing it under one heading
+ * is how a week reads 60% while the person is finished.
+ *
+ * So capture takes five readings instead of one, and the load lands in the
+ * proportions given. The total is unchanged - hours x dread still - because an
+ * hour is still an hour. What changes is the SHAPE, which is the app's whole
+ * argument, now available at the moment the thing is written down.
+ */
+export type Mix = Partial<Record<BucketKey, number>>;
+
 export type BandName = 'steady' | 'busy' | 'heavy' | 'recovery';
 
 export interface Item {
@@ -77,6 +92,54 @@ export interface Item {
   parentId?: string;
   /** What you mean to get through in this sitting. Yours, in your words. */
   note?: string;
+  /**
+   * Where this lands across all five areas, when one heading was not enough.
+   *
+   * Absent means the old behaviour: the whole load sits in `bucket`. Present
+   * means `bucket` is only the loudest of several, kept for the icon and the
+   * filters, while the load itself is split by these weights.
+   */
+  mix?: Mix;
+
+  // --- timetabled classes ---------------------------------------------------
+  /** The module this belongs to. Lets load roll up per course. */
+  moduleId?: string;
+  /** What kind of contact hour it is. */
+  sessionKind?: SessionKind;
+  /** Where it is. Two rooms ten minutes apart is a real scheduling problem. */
+  room?: string;
+  /**
+   * Why this particular hour matters more than its length suggests.
+   *
+   * A lecture is an hour of load like any other until it is the one where the
+   * exam hints get given. Marking it changes what the app will let you move.
+   */
+  flags?: ClassFlag[];
+}
+
+export type SessionKind = 'lecture' | 'lab' | 'tutorial' | 'seminar';
+
+/**
+ * The three reasons a class is worth more than its hours.
+ *
+ *   tips       — exam hints, past papers, "this will come up"
+ *   coursework — work gets set here, so it is where you find out what is coming
+ *   attendance — it is counted, and missing it costs more than the hour
+ */
+export type ClassFlag = 'tips' | 'coursework' | 'attendance';
+
+export interface Module {
+  id: string;
+  code: string;
+  name: string;
+  /** How much you mind this subject. Sets the dread on every class in it. */
+  dread: Dread;
+  importance: 1 | 2 | 3;
+  /** Sessions attended out of those held so far. */
+  attended: number;
+  held: number;
+  /** Percentage the department expects. Null when nobody is counting. */
+  requiredAttendance: number | null;
 }
 
 /**
@@ -240,6 +303,8 @@ export interface Errand {
    * bucket is what keeps the load honest.
    */
   bucket?: BucketKey;
+  /** The five-area split, when the student gave one at capture. */
+  mix?: Mix;
 }
 
 /** Time: a block on the week grid. */

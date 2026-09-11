@@ -32,6 +32,7 @@ for (const [from, to] of [
   ['src/lib/forecast.ts', 'forecast.ts'],
   ['src/lib/prep.ts', 'prep.ts'],
   ['src/lib/moments.ts', 'moments.ts'],
+  ['src/lib/timetable.ts', 'timetable.ts'],
   ['src/lib/battery.ts', 'battery.ts'],
   ['src/lib/simulate.ts', 'simulate.ts'],
   ['src/data/seed.ts', 'seed.ts'],
@@ -58,7 +59,7 @@ export const storage = createJSONStorage(() => ({
   removeItem: (n) => void mem.delete(n),
 }));
 export const STORAGE_KEY = 'ballast/test';
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 10;
 export function migrateSaved(persisted, from) {
   if (from >= SCHEMA_VERSION) return persisted ?? {};
   return { onboarded: persisted?.onboarded ?? false };
@@ -70,7 +71,7 @@ writeFileSync(join(tmp, 'package.json'), '{"type":"module"}');
 
 const { useStore, weekReading, liveCeiling, restOwedFrom, itemsOnDay, itemsInWeek, nextWeek } = await import(join(tmp, 'store.ts'));
 const { logItems } = await import(join(tmp, 'logs.ts'));
-const { migrateSaved } = await import(join(tmp, 'storage.ts'));
+const { migrateSaved, SCHEMA_VERSION } = await import(join(tmp, 'storage.ts'));
 const { chargeOf } = await import(join(tmp, 'battery.ts'));
 const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn, sleepWindow, formatHour } = await import(join(tmp, 'schedule.ts'));
 const { categorise, errandLoad, outstandingLoad, openErrands } = await import(join(tmp, 'errands.ts'));
@@ -78,13 +79,14 @@ const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
 const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
-const { percentByBucket, overallPercent } = await import(join(tmp, 'load.ts'));
+const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
+const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, MIX_MAX } = await import(join(tmp, 'load.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
 const charge = (extra = []) => {
   const st = useStore.getState();
-  const all = [...st.items, ...extra, ...logItems({ today: st.today, sleepHours: st.sleepHours, meals: st.meals, moods: st.moods })];
-  return chargeOf(overallPercent(percentByBucket(all.filter((i) => !i.date || i.date >= st.today.slice(0, 8)), st.ceilings)));
+  const all = [...st.items, ...extra, ...logItems({ today: st.today, sleepHours: st.sleepHours, meals: st.meals, moods: st.moods, errands: st.errands, moments: st.moments })];
+  return chargeOf(overallPercent(percentByBucket(itemsInWeek(all, st.today), st.ceilings)));
 };
 const { prescriptions } = await import(join(tmp, 'seed.ts'));
 const { ACTIONS, PRESETS, initialSim, pointsOf, project, totalPoints } = await import(join(tmp, 'simulate.ts'));
@@ -385,6 +387,99 @@ console.log('\nProtected recovery can be moved');
   check('or it can be handed back entirely', s().items.find((i) => i.id === block.id).startHour, undefined);
 }
 
+console.log('\nThe timetable is fourteen real hours');
+{
+  s().reset();
+  const week = ['0','1','2','3','4','5','6'].map((_, i) => addDaysISO(s().today, i));
+  const classes = week.flatMap((d) => classesOn(s().items, d));
+  check('every class has a time', classes.every((c) => c.startHour !== undefined), true);
+  check('and a room', classes.every((c) => !!c.room), true);
+  check('they total fourteen hours', classes.reduce((t, c) => t + c.hours, 0), 14);
+  // Same fourteen hours the invisible blob weighed, so the study's figures hold.
+  check('and twenty-eight load', classes.reduce((t, c) => t + loadOf(c), 0), 28);
+  check('none of them is hidden from the day', classes.every((c) => !c.spread), true);
+
+  const mon = classesOn(s().items, s().today);
+  check('Monday opens with three hours of class', mon.reduce((t, c) => t + c.hours, 0), 3);
+  check('in clock order', mon.map((c) => c.startHour), [...mon.map((c) => c.startHour)].sort((a, b) => a - b));
+}
+
+console.log('\nDread belongs to the module, not the hour');
+{
+  s().reset();
+  const net = () => s().modules.find((m) => m.id === 'net');
+  const netClasses = () => s().items.filter((i) => i.moduleId === 'net');
+  check('networks starts at dread 2', net().dread, 2);
+  s().setModuleDread('net', 5);
+  check('raising it re-prices every class in the module', netClasses().every((c) => c.dread === 5), true);
+  check('and leaves other modules alone', s().items.filter((i) => i.moduleId === 'os').every((c) => c.dread === 2), true);
+  check('the module remembers it', net().dread, 5);
+}
+
+console.log('\nWhy an hour can be worth more than its length');
+{
+  s().reset();
+  const lecture = s().items.find((i) => i.moduleId === 'os' && i.sessionKind === 'lecture');
+  check('the OS lecture is marked as giving tips', lecture.flags.includes('tips'), true);
+  check('so the app will not move it', isProtectedClass(lecture), true);
+
+  // It is listed in the rebalance sheet, locked - refusing visibly, not silently.
+  const trades = buildTrades(itemsInWeek(s().items, s().today));
+  const guard = trades.find((t) => t.id.startsWith('class-'));
+  check('and the rebalancer says so out loud', !!guard, true);
+  check('locked, like a hard deadline', guard.locked, true);
+  check('and worth nothing to skip', guard.saves, 0);
+
+  const plain = s().items.find((i) => i.moduleId === 'alg' && i.sessionKind === 'tutorial');
+  check('an unflagged class is not protected', isProtectedClass(plain), false);
+  s().toggleClassFlag(plain.id, 'tips');
+  check('until you mark it', isProtectedClass(s().items.find((i) => i.id === plain.id)), true);
+  s().toggleClassFlag(plain.id, 'tips');
+  check('and tapping again clears it', isProtectedClass(s().items.find((i) => i.id === plain.id)), false);
+}
+
+console.log('\nAttendance, when somebody is counting');
+{
+  s().reset();
+  check('algorithms sits at 78%', attendanceRate(s().modules.find((m) => m.id === 'alg')), 78);
+  check('which is below the 80% expected', attendanceStatus(s().modules.find((m) => m.id === 'alg')), 'below');
+  check('networks is fine at 92%', attendanceStatus(s().modules.find((m) => m.id === 'net')), 'fine');
+  check('and nothing is claimed where nobody counts', attendanceStatus(s().modules.find((m) => m.id === 'ds')), 'untracked');
+  s().markAttendance('alg', true);
+  check('turning up moves it', attendanceRate(s().modules.find((m) => m.id === 'alg')), 80);
+  s().markAttendance('alg', false);
+  check('and missing one moves it back', attendanceRate(s().modules.find((m) => m.id === 'alg')) < 80, true);
+}
+
+console.log('\nImporting a pasted timetable');
+{
+  s().reset();
+  const pasted = [
+    'Mon 09:00-11:00 CS2040 Operating Systems Lecture Kilburn LT1',
+    'Tue 14:00-16:00 CS2011 Algorithms Lab in Lab A',
+    'Thu 8-10am CS2035 Networks Lecture',
+    'this line is not a class at all',
+  ].join('\n');
+  const read = parseTimetable(pasted);
+  check('it reads three of the four lines', read.classes.length, 3);
+  check('and hands the fourth back rather than dropping it', read.skipped.length, 1);
+
+  const [first] = read.classes;
+  check('Monday', first.day, 0);
+  check('nine until eleven', [first.startHour, first.hours], [9, 2]);
+  check('the module code', first.code, 'CS2040');
+  check('the kind', first.kind, 'lecture');
+  check('and the room', first.room, 'Kilburn LT1');
+  check('12-hour times work too', read.classes[2].startHour, 8);
+  check('as does "in Lab A"', read.classes[1].room, 'Lab A');
+
+  const built = toItems(read.classes, s().today, 2);
+  check('they become real items on the right days', built.map((i) => i.date), [addDaysISO(s().today, 0), addDaysISO(s().today, 1), addDaysISO(s().today, 3)]);
+  s().importTimetable(built, []);
+  check('importing replaces rather than appends', s().items.filter((i) => i.moduleId).length, 3);
+  check('and leaves the rest of the week alone', !!s().items.find((i) => i.id === 'os-2'), true);
+}
+
 console.log('\nOne list for everything you just do');
 {
   s().reset();
@@ -526,7 +621,7 @@ console.log('\nA stale save does not carry a fixed bug forward');
   check('including the stacked walks', JSON.stringify(migrated).includes('Take a walk'), false);
   check('and the sleep block that should never have existed', JSON.stringify(migrated).includes('Sleep tonight'), false);
   check('but the intro stays done', migrated.onboarded, true);
-  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, 8).sleepHours, 8);
+  check('a current save is left alone', migrateSaved({ onboarded: true, sleepHours: 8 }, SCHEMA_VERSION).sleepHours, 8);
 }
 
 console.log('\nThings happen at a sensible hour');
@@ -543,7 +638,8 @@ console.log('\nThings happen at a sensible hour');
   // With the whole window taken, fall back to the nearest hour, not 7am.
   s().addItem({ title: 'Blocker', bucket: 'mental', hours: 7, dread: 1, commitment: 'soft', date: s().today, startHour: 12 });
   const squeezed = placeIn(s().items, s().today, 1, [12, 19]);
-  check('a full window falls back to the nearest hour', squeezed, 11);
+  // 11am is now a networks tutorial, so the nearest free start is 8.
+  check('a full window falls back to the nearest hour', squeezed, 8);
   check('rather than the earliest of the day', squeezed !== 7, true);
 
   check('sleep is marked as never placeable', ACTIONS.find((a) => a.id === 'sleep').logOnly, true);
@@ -691,6 +787,54 @@ console.log('\nThe battery can go up, not only down');
   check('a genuinely varied day is worth more per tap', varied / 4 > spam / 20, true);
   check('but a good day is no longer capped', spam > 12, true);
   check('base week unchanged by any of it', base, 13);
+}
+
+console.log('\nOne thing, five areas — the mix');
+{
+  s().reset();
+  const one = (mix) => [{ id: 'x', title: 'Group presentation', bucket: 'mental', hours: 4, dread: 3, commitment: 'soft', date: s().today, mix }];
+
+  // The arithmetic. Total is untouched; only where it lands changes.
+  check('no mix behaves exactly as before', loadByBucket(one(undefined)), { mental: 12, time: 0, errands: 0, social: 0, physical: 0 });
+  check('an even three-way split still totals 12', Object.values(loadByBucket(one({ mental: 2, time: 2, social: 2 }))).reduce((a, b) => a + b, 0), 12);
+  check('and lands 4 in each of the three named', loadByBucket(one({ mental: 2, time: 2, social: 2 })), { mental: 4, time: 4, errands: 0, social: 4, physical: 0 });
+  check('weights are proportions, not points', loadByBucket(one({ mental: 4, social: 2 })), { mental: 8, time: 0, errands: 0, social: 4, physical: 0 });
+  check('an all-zero mix falls back to the bucket', loadByBucket(one({ mental: 0, social: 0 })), { mental: 12, time: 0, errands: 0, social: 0, physical: 0 });
+
+  // Dread is read off the worst area, not summed.
+  check('dread is the worst area', dreadFromMix({ mental: 4, time: 2, social: 1 }), 4);
+  check('three areas at 4 is still dread 4, not 12', dreadFromMix({ mental: 4, time: 4, social: 4 }), 4);
+  check('nothing set still costs something', dreadFromMix({}), 1);
+  check('the scale tops out at the model max', dreadFromMix({ mental: 99 }), MIX_MAX);
+  check('the loudest area keeps the icon', dominantArea({ mental: 1, social: 4 }, 'mental'), 'social');
+  check('and is said in words', describeMix({ mental: 4, social: 2 }, 'mental'), 'Mostly mental, some social');
+  check('one area reads as just that area', describeMix({ social: 3 }, 'mental'), 'Social');
+
+  // Shape beats total. Held at equal ceilings first, so the property is the
+  // model's and not an artefact of one student's calibration.
+  const flat = { mental: 100, time: 100, errands: 100, social: 100, physical: 100 };
+  const concentrated = overallPercent(percentByBucket(one({ mental: 3 }), flat));
+  const spread = overallPercent(percentByBucket(one({ mental: 2, time: 2, social: 2 }), flat));
+  check('at equal ceilings, spreading the same load reads lower', spread < concentrated, true);
+  // And then the thing that makes per-area ceilings worth having: spreading into
+  // a SMALL ceiling is worse, not better. Four load of social is a quarter of
+  // Amira's social ceiling and a twenty-fifth of her mental one.
+  const ceil = s().ceilings;
+  const intoSocial = overallPercent(percentByBucket(one({ mental: 2, social: 2 }), ceil));
+  const allMental = overallPercent(percentByBucket(one({ mental: 3 }), ceil));
+  check('but spreading into a smaller ceiling reads higher, correctly', intoSocial > allMental, true);
+
+  // And it reaches the battery through the real store action.
+  const before = charge();
+  s().addErrand('Group presentation', 'Academic', 4, 3, { date: s().today }, 'mental', { mental: 3, social: 3 });
+  const added = s().errands[0];
+  check('the split is stored with the thing', added.mix, { mental: 3, social: 3 });
+  const rows = logItems({ today: s().today, sleepHours: s().sleepHours, meals: s().meals, moods: s().moods, errands: s().errands, moments: s().moments });
+  const row = rows.find((r) => r.title === 'Group presentation');
+  check('and survives becoming a row on the day', row.mix, { mental: 3, social: 3 });
+  check('it moves the battery', charge() < before, true);
+  check('the seeded week still reads as the study states', before, 13);
+  check('social carries half of it', mixShares(row.mix).social, 0.5);
 }
 
 console.log('\nInviting people');

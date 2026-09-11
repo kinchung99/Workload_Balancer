@@ -36,6 +36,22 @@ export const color = {
     social:   { ink: '#A63A8C', wash: '#FAE9F5' },
     errands:  { ink: '#5A5560', wash: '#F1F0F3' },
   },
+  /**
+   * Decoration only.
+   *
+   * Stickers, confetti, the blob behind a heading. Nothing is ever *read* off
+   * one of these. They are a separate group so the "colour means band" rule
+   * stays checkable: a decor hue on a bar, a number or a meter is a bug.
+   */
+  decor: {
+    blush: '#FF8FAB',
+    candy: '#FFB3D1',
+    lemon: '#FFD37A',
+    mint:  '#8FE0C2',
+    sky:   '#9CCDF5',
+    lilac: '#C4A9F0',
+    cream: '#FFF7EC',
+  },
   surface: {
     page:    '#FFFFFF',
     raised:  '#FFFFFF',

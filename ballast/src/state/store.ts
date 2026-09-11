@@ -10,7 +10,8 @@ import { persist } from 'zustand/middleware';
 import { SCHEMA_VERSION, STORAGE_KEY, migrateSaved, storage } from './storage';
 import type {
   BucketKey, Contact, ContributionTag, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
-  MoodQuadrant, ErrandCategory, Invite, Moment, Prescription, RecoveryEntry, SimAction, Trade,
+  MoodQuadrant, ClassFlag, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
+  RecoveryEntry, SimAction, Trade, Mix,
 } from '@/lib/types';
 import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
@@ -19,7 +20,7 @@ import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
   CEILINGS, OVERALL_CEILING, TODAY, contacts as seedContacts, errands as seedErrands,
-  meals as seedMeals, moodHistory, recoveryLedger, seedItems,
+  meals as seedMeals, modules as seedModules, moodHistory, recoveryLedger, seedItems,
 } from '@/data/seed';
 
 interface State {
@@ -60,6 +61,8 @@ interface State {
   offHour: number;
   /** Activities the student added themselves - badminton, a night run. */
   customActions: SimAction[];
+  /** The courses behind the timetable. Dread lives here, not on each class. */
+  modules: Module[];
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
@@ -93,6 +96,11 @@ interface State {
   addCustomAction: (action: SimAction) => void;
   removeCustomAction: (id: string) => void;
   pushSittings: (parentId: string, from: string, to: string) => void;
+  setModuleDread: (moduleId: string, dread: DreadLevel) => void;
+  setModuleImportance: (moduleId: string, importance: 1 | 2 | 3) => void;
+  toggleClassFlag: (itemId: string, flag: ClassFlag) => void;
+  markAttendance: (moduleId: string, attended: boolean) => void;
+  importTimetable: (items: Item[], modules: Module[]) => void;
   reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number) => void;
   logMood: (quadrant: MoodQuadrant, tags: ContributionTag[]) => void;
   setMealStatus: (id: string, status: MealStatus) => void;
@@ -104,6 +112,7 @@ interface State {
     effort: 1 | 2 | 3,
     when: { date: string; startHour?: number },
     bucket?: BucketKey,
+    mix?: Mix,
   ) => void;
   scheduleItem: (id: string, startHour: number | undefined) => void;
   cycleContact: (id: string) => void;
@@ -132,6 +141,7 @@ export const useStore = create<State>()(
   moments: [],
   offHour: 17,
   customActions: [],
+  modules: seedModules,
 
   addItem: (item) =>
     set((state) => {
@@ -265,6 +275,54 @@ export const useStore = create<State>()(
 
   setOffHour: (hour) => set({ offHour: hour }),
 
+  /**
+   * You do not dread Tuesday, you dread networks.
+   *
+   * Dread belongs to the module, so setting it here re-prices every class in it
+   * at once - which is the only way the number stays honest without asking for a
+   * rating on all fourteen contact hours.
+   */
+  setModuleDread: (moduleId, dread) =>
+    set((state) => ({
+      modules: state.modules.map((m) => (m.id === moduleId ? { ...m, dread } : m)),
+      items: state.items.map((item) => (item.moduleId === moduleId ? { ...item, dread } : item)),
+    })),
+
+  setModuleImportance: (moduleId, importance) =>
+    set((state) => ({
+      modules: state.modules.map((m) => (m.id === moduleId ? { ...m, importance } : m)),
+    })),
+
+  /**
+   * Mark why an hour is worth more than its length.
+   *
+   * A flagged class is never proposed for moving: the lecture where the hints
+   * get given is the one a stressed student is most likely to skip and least
+   * able to afford to.
+   */
+  toggleClassFlag: (itemId, flag) =>
+    set((state) => ({
+      items: state.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const flags = item.flags ?? [];
+        return { ...item, flags: flags.includes(flag) ? flags.filter((f) => f !== flag) : [...flags, flag] };
+      }),
+    })),
+
+  markAttendance: (moduleId, attended) =>
+    set((state) => ({
+      modules: state.modules.map((m) =>
+        m.id === moduleId ? { ...m, held: m.held + 1, attended: m.attended + (attended ? 1 : 0) } : m,
+      ),
+    })),
+
+  /** Replace the timetable wholesale. A paste is an import, not an append. */
+  importTimetable: (items, modules) =>
+    set((state) => ({
+      items: [...state.items.filter((item) => !item.moduleId), ...items],
+      modules,
+    })),
+
   addCustomAction: (action) =>
     set((state) => ({
       customActions: [...state.customActions.filter((a) => a.id !== action.id), action],
@@ -357,6 +415,8 @@ export const useStore = create<State>()(
             startHour: session.startHour,
             parentId,
             note: session.note,
+            // A sitting costs what the whole piece costs, in the same places.
+            mix: parent.mix,
           })),
         ],
       };
@@ -474,10 +534,10 @@ export const useStore = create<State>()(
    * place - so it shows up on its day *and* in the list, rather than one or the
    * other depending on where it was typed.
    */
-  addErrand: (title, category, hours, effort, when, bucket) =>
+  addErrand: (title, category, hours, effort, when, bucket, mix) =>
     set((state) => ({
       errands: [
-        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, bucket, ...when },
+        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, bucket, mix, ...when },
         ...state.errands,
       ],
     })),
@@ -510,7 +570,12 @@ export const useStore = create<State>()(
       items: seedItems, showEverythingAnyway: false, minimumViableWeek: false,
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
-      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: [],
+      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: [], modules: seedModules,
+      // Ceilings too. They move when you report a hard day below your line, and
+      // reset clears the day reports that moved them - leaving the lowered line
+      // in place with the evidence for it gone made every later reading read
+      // worse than the seeded semester it claims to restore.
+      ceilings: CEILINGS, overallCeiling: OVERALL_CEILING,
     }),
     }),
     {

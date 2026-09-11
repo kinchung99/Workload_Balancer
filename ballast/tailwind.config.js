@@ -53,6 +53,7 @@ module.exports = {
       heavy: colors.band.heavy,
       recovery: colors.band.recovery,
       area: colors.area,
+      decor: colors.decor,
       ink: colors.ink,
       line: colors.line,
       control: colors.control,

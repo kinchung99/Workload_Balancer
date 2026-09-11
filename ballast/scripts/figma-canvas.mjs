@@ -12,7 +12,7 @@
  * a frame with the padding and gap it had in code.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,8 +35,17 @@ execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', out]
 const cssDir = join(out, '_expo/static/css');
 const css = readdirSync(cssDir).filter((f) => f.endsWith('.css')).map((f) => readFileSync(join(cssDir, f), 'utf8')).join('\n');
 
-/** Static export writes "/plan" as plan.html and "/" as index.html. */
-const fileFor = (route) => join(out, route === '/' ? 'index.html' : `${route.replace(/^\//, '')}.html`);
+/**
+ * Static export writes "/plan" as plan.html and "/" as index.html. A route that
+ * also has children of its own - "/add", which has /add/size and the rest -
+ * becomes a directory with an index.html in it instead.
+ */
+const fileFor = (route) => {
+  if (route === '/') return join(out, 'index.html');
+  const bare = route.replace(/^\//, '');
+  const flat = join(out, `${bare}.html`);
+  return existsSync(flat) ? flat : join(out, bare, 'index.html');
+};
 
 const sections = frames.map(({ route, frame, page, note }) => {
   let html;
