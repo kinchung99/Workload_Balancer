@@ -55,21 +55,22 @@ if (!CHROME) {
 const SHOTS = [
   ['/',                       'home',       1560],
   ['/add',                    'add-what',    880],
-  ['/add/takes',              'add-takes',  1120],
+  ['/add/takes',              'add-takes',  1120, 750, 230],
   ['/add/when',               'add-when',   1080],
-  ['/priority',               'priority',   1500],
+  ['/priority',               'priority',   1500, 850, 1],
   ['/priority',               'priority-move', 2900, 750, 1410],
   ['/plan',                   'plan',       1000],
-  ['/plan',                   'plan-day',   1700],
+  ['/plan',                   'day-bands',  1700, 700, 450],
+  ['/plan',                   'owing-card', 1700, 430, 1125],
   ['/rebalance',              'rebalance',  1160],
   ['/actions',                'tonight',     880],
   ['/tonight/what',           'tonight-what', 1180],
   ['/tonight/book',           'tonight-book', 940],
-  ['/timetable',              'timetable',  1040],
-  ['/timetable/modules',      'modules',     980],
+  ['/timetable',              'timetable',  1040, 720, 1],
+  ['/timetable/modules',      'modules',     980, 650, 260],
   ['/timetable/import',       'import',      880],
   ['/areas',                  'areas',       940],
-  ['/areas/social',           'social',     1280],
+  ['/areas/social',           'social',     1280, 660, 440],
   ['/areas/mental',           'mental',     1060],
   ['/areas/errands',          'errands',     980],
   ['/areas/physical',         'physical',    980],
@@ -78,7 +79,6 @@ const SHOTS = [
   ['/recover',                'recover',    1040],
   ['/decline/w11-birthday',   'decline',    1040],
   ['/welcome',                'welcome',    1000],
-  ['/foundations',            'foundations', 1000],
   ['/calm',                   'calm',        880],
   ['/widget',                 'widget',      880],
 ];
@@ -143,10 +143,13 @@ createServer((req, res) => {
     ], { stdio: 'pipe' });
     const keep = cropHeight ?? height;
     const crop = ['-c', String(keep * SCALE), String(FRAME * SCALE)];
-    // sips takes the offset as (y, x) and defaults x to zero, which lands on the
-    // blank margin rather than the artboard. Centre it by hand.
+    // Two sips quirks. The offset is (y, x) and x defaults to zero, which lands
+    // on the blank margin rather than the artboard - so centre x by hand. And an
+    // offset of exactly zero is read as "no offset given" and centres the crop
+    // vertically too, which silently photographs the middle of a screen when you
+    // asked for the top. One point from the top is close enough and unambiguous.
     if (cropOffset !== undefined) {
-      crop.push('--cropOffset', String(cropOffset * SCALE), String(((WIDE - FRAME) / 2) * SCALE));
+      crop.push('--cropOffset', String(Math.max(1, cropOffset) * SCALE), String(((WIDE - FRAME) / 2) * SCALE));
     }
     execFileSync('sips', [...crop, file, '--out', file], { stdio: 'pipe' });
     console.log(`  ${name}.png  ${FRAME}x${keep}`);

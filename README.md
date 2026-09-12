@@ -51,19 +51,46 @@ could put down — including writing the awkward message for you.
 
 ## 2. Ideation & Process
 
-### 2.1 🧠 Eight ideas, four survived
+### 2.1 🧭 The shape of the process
+
+![How we got from a brief to this app](docs/process.svg)
+
+We ran it in five stages, and each one ended with a decision rather than a document.
+
+**🔎 Discover.** We started from the symptom everyone recognises — *"I'm exhausted and I don't know why"* —
+and worked down to what causes it. Six root causes, and one insight that shaped everything after it:
+**burnout is never one big thing, and nobody is counting the small ones.**
+
+**🧠 Diverge.** Everything on the board before anything was judged: timers, journals, streaks, an
+AI planner, a battery metaphor, a dread multiplier.
+
+**✂️ Decide.** We wrote the kill criteria *first*, then applied them:
+
+| Rule | What it killed |
+|---|---|
+| Must work **offline** | The LLM-planned schedule |
+| Must **change** the week, not describe it | The mood journal as a product |
+| Must **never punish a bad week** | Streaks, badges, leaderboards |
+| Must solve **overcommitment**, not distraction | The Pomodoro timer |
+
+**🛠️ Build.** The load model first, because if `time × dread` wasn't convincing, nothing built on top of
+it would matter. Then capture, then the forecast, then everything that acts on it.
+
+**🔁 Iterate.** Then we used it — and replaced eight things (§2.4).
+
+### 2.2 🧠 Eight ideas, four survived
 
 Four are in the app. We killed four on purpose, and the reasons mattered more than the ideas did.
 
 ![What we explored and what survived](docs/mindmap.svg)
 
-### 2.2 ✨ Where each headline feature came from
+### 2.3 ✨ Where each headline feature came from
 
 We didn't start from a feature list. Each one came from a specific moment we'd all had.
 
 ![Five features, and the moment each came from](docs/features.svg)
 
-### 2.3 🔁 What we changed *after* building it
+### 2.4 🔁 What we changed *after* building it
 
 The honest half of the process. Every row below is something we shipped, used, and then replaced.
 
@@ -78,11 +105,14 @@ The honest half of the process. Every row below is something we shipped, used, a
 | 7 | Two illustration styles | **One sticker set** | Two visual voices on one app reads as an accident. |
 | 8 | A battery pinned at 13% | **An ordinary week reads 47%** | There's no advice at 13% that differs from the advice at 4%. |
 
-### 2.4 🔄 How it's meant to be used
+### 2.5 🔄 How it is actually used
 
-![The loop that stops a bad week](docs/user-flow.svg)
+Set up once, a small loop every day, and a bigger loop only when a bad week is on the way. Every box is a
+screen you can open in the prototype right now.
 
-### 2.5 👤 Mentor consultation
+![How Ballast is actually used](docs/user-flow.svg)
+
+### 2.6 👤 Mentor consultation
 
 | Date | Mentor | Feedback received | What we changed |
 |---|---|---|---|
@@ -104,7 +134,7 @@ change a task and the forecast changes with it.
 
 ### 3.1 ✍️ Add anything — five dials, four short pages
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/add-takes.png" alt="Five area dials with faces on the knobs">
 </td><td>
 
@@ -132,8 +162,8 @@ exist; the battery updates to what your week *will* read. Nothing saves until yo
 
 ### 3.2 📄 Owing — assignments that stop hiding until the night before
 
-<table><tr><td width="36%">
-<img src="docs/shots/plan-day.png" alt="A day split into Scheduled, Owing and This day">
+<table><tr><td width="44%">
+<img src="docs/shots/day-bands.png" alt="A day split into Scheduled, Owing and This day">
 </td><td>
 
 A deadline is not a task. An assignment due Thursday is nine hours spread across the days *before* it —
@@ -156,6 +186,14 @@ Each Owing card carries a **three-state bar**: hours done · hours booked · hou
 - 🚨 **It warns before it's too late:** *"Not enough free time left. Something has to move."*
 - ⏭️ **Push today's sitting to tomorrow** in one tap. The work moves; **the deadline never does.**
 
+</td></tr><tr><td>
+<img src="docs/shots/owing-card.png" alt="Two Owing cards with their done, booked and loose bars">
+</td><td>
+
+**The bar, up close.** Green is done, blue is booked into a day, grey is still loose — and booking a
+sitting moves work out of grey **before** any of it is finished, because a plan genuinely is progress.
+Give the sitting back and it returns to grey.
+
 </td></tr></table>
 
 > ### 📌 "Book my sittings for me"
@@ -174,7 +212,7 @@ Each Owing card carries a **three-state bar**: hours done · hours booked · hou
 
 ### 3.3 ⭐ What to do first — the question a list never answers
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/priority.png" alt="A ranked list of what to do first, with reasons">
 </td><td>
 
@@ -211,7 +249,7 @@ it. 🔒 **Hard deadlines never appear here**, nor the lecture you flagged for e
 
 ### 3.4 🌙 Tonight — an evening built around what *you* actually do
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/tonight-what.png" alt="Sliders for sleep, walking, seeing people, studying and screen time">
 </td><td>
 
@@ -232,7 +270,7 @@ Every other screen reports what happened. This is the day you haven't lived yet.
 
 ### 3.5 🎓 Timetable — paste it, then mark the lectures that matter more
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/timetable.png" alt="A week of classes with rooms and flags">
 </td><td>
 
@@ -266,7 +304,7 @@ attended.*
 
 ### 3.6 👥 Friends — see who has room before you ask
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/social.png" alt="Friends with battery bands, and a planner that finds shared free time">
 </td><td>
 
@@ -286,7 +324,7 @@ assuming everyone else is busier.
 
 ### 3.7 🔋 The battery, and the five areas under it
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/areas.png" alt="Five areas, emptiest first, each with its own battery">
 </td><td>
 
@@ -306,7 +344,7 @@ made of.
 
 ### 3.8 ⚖️ Plan · Rebalance · Saying no — the part that prevents something
 
-<table><tr><td width="36%">
+<table><tr><td width="44%">
 <img src="docs/shots/rebalance.png" alt="Priced trades with a live battery">
 </td><td>
 
@@ -331,22 +369,8 @@ is why it waits four days. So the app writes it, in three tones, and you edit it
 
 ---
 
-### 3.9 ♿ Built for the worst day, not the demo day
 
-<table><tr><td width="36%">
-<img src="docs/shots/foundations.png" alt="The design system: bands, patterns, stickers and the dial">
-</td><td>
-
-- 🧘 **On the worst weeks the app gets *simpler*.** One number, one sentence, one button. Most apps add
-  urgency when things get bad. That's backwards.
-- 🎨 **Colour is never the only signal.** Every band is a colour **and** a word **and** a fill pattern.
-- 🔊 **Every chart can be spoken.** Screen readers get a sentence, not a label.
-- 👆 **44pt targets · 200% dynamic type · reduced motion.** Nothing truncates; rows reflow.
-- 🚫 **No streaks, no scores, no leaderboards.** They punish the exact weeks this app exists for.
-
-</td></tr></table>
-
-### 3.10 The rest of it
+### 3.9 The rest of it
 
 <p align="center">
   <img src="docs/shots/welcome.png" width="150" alt="The intro: two tasks, two dread dials">
@@ -364,9 +388,6 @@ is why it waits four days. So the app writes it, in three tones, and you edit it
 </p>
 <p align="center"><i>Intro · recovery ledger · matched rest · mood · body · errands · timetable import · booking a night · calm mode · lock screen</i></p>
 
-All **28 screens** export to Figma in one import — `npm run figma:canvas` builds a page of 390×844
-artboards, and `figma/tokens.json` imports as Figma variables.
-
 ---
 
 ## 4. What Makes It Different
@@ -382,8 +403,9 @@ artboards, and `figma/tokens.json` imports as Figma variables.
 | 7 | 🌿 **Recovery in the same units as work** | Rest is a credit you're owed, in hours, carried forward. Booking it writes protected time in a gap that really exists. |
 | 8 | 👥 **Your friends' *capacity*, not their calendar** | A band, never a number — and the evening that suits everyone. Nothing else tells you who has room before you ask. |
 | 9 | 💡 **Classes marked for *why* they matter** | A lecture is just an hour until it's the one giving exam hints. Flag it and the rebalancer refuses to move it, visibly. |
-| 10 | 🧘 **The interface gets simpler as the week gets worse** | Past the calm line it collapses to one number, one sentence, one button. |
+| 10 | 🧘 **The interface gets simpler as the week gets worse** | Past the calm line it collapses to one number, one sentence, one button. Most apps add urgency when things get bad — that's backwards. |
 | 11 | 🎮 **Game feel without game pressure** | A character, a drawing on every screen, a face on every dial — and no streak, no score, no leaderboard. |
+| 12 | ♿ **Built for the worst day, not the demo day** | Every band is a colour **and** a word **and** a fill pattern, so nothing depends on colour alone. Every chart has a spoken sentence. 44pt targets, 200% dynamic type, reduced motion — nothing truncates. |
 
 ---
 
@@ -398,9 +420,9 @@ A complete, working front end. No screen is a mock-up; every figure is computed.
 | **App** | Expo SDK 57 · React Native 0.86 · React 19.2 | One codebase for iOS, Android and web. Opens from a QR code or a link. |
 | **Language** | TypeScript 6, `strict` | Area, dread and commitment are union types — an impossible week doesn't compile. |
 | **Routing** | Expo Router 57 | File-based, so the route tree *is* the screen list. Broken links fail at compile time. |
-| **Styling** | NativeWind 4 + Tailwind 3.4 | The theme is generated from `figma/tokens.json` — a class name and a Figma variable are one decision. |
+| **Styling** | NativeWind 4 + Tailwind 3.4 | Tailwind classes in React Native. The theme is generated from one design-token file, so a colour is defined once and used everywhere. |
 | **State** | Zustand 5 | Small, local, synchronous. No provider tree, no cache layer. |
-| **Charts** | Hand-built on `react-native-svg` | **Deliberately not a chart library.** Ours are real shapes carrying a fill pattern for colour-blind users and a spoken sentence for screen readers — and they paste into Figma as vectors. |
+| **Charts** | Hand-built on `react-native-svg` | **Deliberately not a chart library.** Ours are real shapes carrying a fill pattern for colour-blind users and a spoken sentence for screen readers. |
 | **Storage** | AsyncStorage, on device | Works in a basement lecture theatre. *Trade-off: no sync yet — §5.2.* |
 | **Hosting** | EAS Hosting | `npm run deploy` runs the full check suite first and refuses to publish on a failure. |
 
@@ -411,35 +433,34 @@ a synchroniser — never a dependency.**
 
 | Layer | Choice for v1 | What it's for |
 |---|---|---|
-| **Backend** | **Supabase** — managed Postgres, Auth, Realtime, Storage, Edge Functions | One service covers database, auth, realtime and cron. A three-person student team can run it. |
-| **Database** | **PostgreSQL** | `users` · `items` · `modules` · `sessions` · `recovery` · `logs` · `friendships` · `invites` · `ceilings`. Every row carries `user_id` + `updated_at`. |
-| **Access control** | **Row-Level Security** on every table | You can only touch rows where `user_id = auth.uid()`. Friend visibility is a separate, thin view. |
-| **API** | **PostgREST** + Realtime channels | No hand-written CRUD. Real logic — clustering, invite fan-out, push scheduling — becomes a typed **Edge Function**, so rules aren't only in the client. |
-| **Sync** | Local-first queue · last-write-wins per row | Writes land locally at once, drain when there's signal. Per-row, so two devices editing different tasks never collide. |
-| **Auth** | Magic link (university email) + Apple and Google | No passwords to store. Apple sign-in is required for App Store release anyway. |
-| **Friends** | A `friend_view` exposing **band only** + coarse free windows | Never your numbers, tasks or calendar. Per-friend, revocable, enforced in the database. |
-| **Notifications** | **Expo Push** + a nightly clustering Edge Function | One message, eight days out, only for a genuine collision. Nothing at 11pm. |
-| **Timetable** | **ICS subscription** → Google Calendar API / Apple EventKit | Most portals already publish an ICS URL, so it updates itself. **Paste stays as the fallback that always works.** |
-| **Health** | **HealthKit** / **Health Connect**, behind a flag | Sleep and steps stop being seeded. Read-only, on-device; only the derived load syncs. |
-| **Optional AI** | **Claude API**, two narrow jobs | Rewriting a decline message, and parsing messy free text. **Opt-in, server-side, never on the critical path.** |
-| **Monitoring** | Sentry + PostHog (self-hostable) | No personal data, no task text, no ad SDKs. |
-| **CI/CD** | GitHub Actions → EAS Build → TestFlight / Play internal | The four checks in §5.5 gate every merge. |
+| **API** | **Node.js + Express**, in TypeScript | The same language as the app, so the load model is written once and shared. A REST API every developer can read. |
+| **Database** | **PostgreSQL** + **Prisma** | Relational, because a week genuinely is relational. Prisma gives typed queries and versioned migrations. |
+| **Auth** | **Firebase Authentication** | Google, Apple and email sign-in out of the box. No passwords to store, and Apple sign-in is required for the App Store anyway. |
+| **Notifications** | **Firebase Cloud Messaging** | One message, eight days out, only for a genuine collision. Nothing at 11pm. |
+| **Jobs & cache** | **Redis** + a nightly cron worker | Runs the clustering detector server-side once a day, and rate-limits push. |
+| **Sync** | Local-first queue · last-write-wins per row | Writes land on the phone immediately and drain when there's signal. Per-row, so two devices editing different tasks never collide. |
+| **Friends** | A read-only `friend_view` — **band only** | Steady / busy / heavy, plus coarse free windows. Never your numbers, tasks or calendar. Per-friend and revocable. |
+| **Timetable** | **Google Calendar API** + **ICS** subscription | Most portals publish an ICS URL, so the timetable updates itself. **Paste stays as the fallback that always works.** |
+| **Health** | **Apple HealthKit** / **Google Health Connect** | Sleep and steps stop being seeded. Read-only, on device; only the derived load ever syncs. |
+| **Optional AI** | **OpenAI API** (or Claude), two narrow jobs | Rewriting a decline message, and reading a messy sentence typed at 1am. **Opt-in, server-side, never on the critical path.** |
+| **Hosting** | **Docker** on **AWS** — ECS for the API, RDS for Postgres, S3 for files | Standard, well-documented, and cheap at this size. **Railway** or **Render** for the first month if we want to move faster. |
+| **CI/CD** | **GitHub Actions** → **Expo EAS Build** → TestFlight / Play internal | The four checks in §5.5 gate every merge. |
+| **Monitoring** | **Sentry** (crashes) + **Google Analytics for Firebase** | No personal data, no task text, no ad SDKs. |
 | **Compliance** | GDPR export + delete, data minimisation | A **workload tool, not a clinical one**. No diagnosis, no score — and we say so on screen. |
 
 ```
-┌──────────────── phone ───────────────┐        ┌──────────── Supabase ────────────┐
-│  Expo app (iOS · Android · Web)      │        │  Postgres + Row-Level Security   │
-│  ├─ Zustand  ← source of truth       │  sync  │  ├─ PostgREST (auto REST)        │
-│  ├─ AsyncStorage (offline)           │ ◀────▶ │  ├─ Realtime (friends, invites)  │
-│  ├─ load model + scheduler (local)   │  queue │  ├─ Edge Functions (Deno)        │
-│  └─ HealthKit / Health Connect       │        │  │   · nightly collision check   │
-└──────────────────────────────────────┘        │  │   · push fan-out              │
-        │                                       │  │   · optional Claude calls     │
-        │ ICS subscribe                         │  └─ Storage                      │
-        ▼                                       └──────────────────────────────────┘
-  University timetable feed                               │  Expo Push
-                                                          ▼
-                                                   one message, 8 days out
+┌──────────────── phone ───────────────┐        ┌───────── Node.js + Express API ─────────┐
+│  Expo app (iOS · Android · Web)      │  REST  │  ├─ Prisma → PostgreSQL (AWS RDS)       │
+│  ├─ Zustand  ← source of truth       │ ◀────▶ │  ├─ Redis — cache + job queue           │
+│  ├─ AsyncStorage (offline)           │  sync  │  └─ nightly cron: clustering detector   │
+│  ├─ load model + scheduler (local)   │  queue └─────────────────────────────────────────┘
+│  └─ HealthKit / Health Connect       │              │                    │
+└──────────────────────────────────────┘              ▼                    ▼
+        │                                    Firebase Auth        Firebase Cloud
+        │ Google Calendar / ICS              (Google · Apple)        Messaging
+        ▼                                                                │
+  University timetable feed                                              ▼
+                                                            one push, 8 days out
 ```
 
 > **The rule we won't break:** capture, the load model, the forecast, rebalancing, recovery and the planner
@@ -448,16 +469,17 @@ a synchroniser — never a dependency.**
 
 ### 5.3 📅 Build plan
 
-Phase 0 is finished and live. The rest is scoped for three people working part-time alongside study.
+Phase 0 is finished and live. The rest is four months of two-week sprints for a three-person team working
+part-time alongside study.
 
 | Phase | Weeks | Ships | Done when |
 |---|---|---|---|
 | **0 · Prototype** ✅ | — | The full front end — load model, capture, forecast, rebalance, drafter, recovery, Tonight, five areas, timetable, owing work, priority, accessibility | **Live now.** 351 render + 313 behaviour assertions pass on every deploy |
-| **1 · Accounts & sync** | 1–3 | Supabase project, schema + RLS, magic-link and Apple sign-in, sync queue, GDPR export/delete | A task added offline appears on the web after reconnecting — and on no other account |
-| **2 · Timetable & alerts** | 4–6 | ICS subscription, nightly collision function, Expo Push, attendance warnings | A real timetable imports itself; a genuine wall produces **exactly one** push, eight days out |
-| **3 · Friends** | 7–9 | Friend requests, band-only view, shared-window finder on real data, invites | Two real accounts find an evening that suits both — and neither sees the other's numbers |
-| **4 · Health & pilot** | 10–12 | HealthKit / Health Connect behind a flag, onboarding for real ceilings, **pilot: 20–30 students, four weeks** | Weekly retention, and one survey question: *did it stop a bad week?* |
-| **5 · Iterate** | 13–16 | Act on pilot findings. Optional Claude parsing, opt-in. Store release | Public TestFlight and Play internal, crash-free above 99.5% |
+| **1 · MVP backend** | 1–4 | Express API + Postgres schema, Firebase Auth (Google / Apple / email), local-first sync, GDPR export & delete | A task added offline appears on the web after reconnecting — and on no other account |
+| **2 · Calendar & alerts** | 5–8 | Google Calendar and ICS import, nightly clustering job, push notifications, attendance warnings | A real timetable imports itself; a genuine wall produces **exactly one** push, eight days out |
+| **3 · Social** | 9–12 | Friend requests, band-only sharing, shared-window finder on real data, invites with accept / decline | Two real accounts find an evening that suits both — and neither sees the other's numbers |
+| **4 · Closed beta** | 13–16 | HealthKit / Health Connect, onboarding that sets real ceilings, **pilot: 20–30 students over four weeks** | Weekly retention, and one survey question: *did it stop a bad week?* |
+| **5 · Launch** | 17–20 | Act on beta findings. Optional AI rewriting, opt-in. App Store and Play submission | Public TestFlight and Play internal testing, crash-free sessions above 99.5% |
 
 **Risks we already know about**
 
@@ -492,11 +514,11 @@ of them fail.
 | `model:check` | **20** figures — the study's loads, and the calibration we set |
 | `behaviour:check` | **313** state changes — every button moves the state it claims to |
 | `render:check` | **351** strings across **27 pages**, and every screen has a way out |
-| `tokens:check` | **90** design tokens identical between the code and the Figma source |
+| `tokens:check` | **90** design tokens consistent across the whole app |
 
 ---
 
 <p align="center">
   <b><a href="ballast/README.md">Technical documentation →</a></b><br>
-  architecture · the load model · accessibility · the Figma conversion path
+  architecture · the load model · accessibility · how every figure is verified
 </p>
