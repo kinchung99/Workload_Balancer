@@ -32,18 +32,19 @@ const textOf = (route) =>
 const EXPECTATIONS = [
   ['index.html', 'Home', [
     'WEEK 10',
-    '13%', 'Nearly empty',                    // the hero: a face, a number, a word
-    '13 percent left. Nearly empty. Made of Mental 0%',      // spoken, with its parts
+    '47%', 'Doing fine',                      // the hero: a face, a number, a word
+    '47 percent left. Doing fine. Made of Mental 35%',       // spoken, with its parts
     'WHAT THIS NUMBER IS',                    // the explanation, behind a tap
-    'Mental, 0% left', 'Physical, 69% left',  // areas as icons plus a number
+    'Mental, 35% left', 'Physical, 83% left', // areas as icons plus a number
     'M 10 13.3h', 'S 16 13h',                 // the week, with real class hours in it
     'Tuesday to Thursday next week is a wall',
-    'Mental 104%',                            // what is pulling you down, as chips
+    'Mental 65%',                             // what is pulling you down, as chips
     '11h rest owed',
     'TODAY \u00b7 MON 10 NOV', '1pm', '5pm', '11pm',
     'Operating Systems lecture', 'Kilburn LT1',   // the timetable, on the timeline
     'Tips', 'Register',                       // and why that hour matters more
     'Scheduled', 'Owing', 'This day',         // three sections, three drawings, three questions
+    'Book 3 sittings for me',                 // the planner, offered before you ask
     '3 \u00b7 13h to go', 'no time yet',        // and what each band adds up to, not just its name
     'NOT ON THE CLOCK',                       // the line between a timeline and a list
     'takes 20m',                              // a duration, said as one, out of the clock column
@@ -52,6 +53,7 @@ const EXPECTATIONS = [
     'Give it a time', 'Move', 'Unschedule',
     'WOULD HELP', 'Walk the river loop',      // one suggestion, not a paragraph
     'Good ',                                  // the header greets you, under a drawing
+    'WHAT TO DO FIRST', 'you could move',     // the ranked list, named before you tap
   ]],
   ['welcome.html', 'Intro', [
     'THE WHOLE IDEA',
@@ -65,7 +67,7 @@ const EXPECTATIONS = [
   ['areas.html', 'Areas', [
     'One number hides which part of you is empty.',   // every screen opens the same way
     'Your areas', 'EMPTIEST FIRST',
-    'Mental, heavy, 104% of ceiling',        // the whole chart, spoken
+    'Mental, 35% left, running on empty',        // the whole chart, spoken
     'Mental', 'Mood check-ins and what is contributing',
     'Physical', 'Meals, movement and sleep',
     'Errands', 'Batched into trips you can actually do',
@@ -137,7 +139,7 @@ const EXPECTATIONS = [
   ]],
   ['plan.html', 'Plan', [
     'Tap any day to open it hour by hour.',
-    'Next week, 4%',           // 100 - 96, the same number the other way up
+    'Next week, 41%',           // 100 - 96, the same number the other way up
     'Tap a day.',
     'THE COLLISION', '72 hours', '4 things',  // the pile-up as a shape, not a list
     'Hard', 'Movable',                        // the legend, trimmed to the words
@@ -152,7 +154,7 @@ const EXPECTATIONS = [
   ]],
   ['rebalance.html', 'Rebalance', [
     'Something has to come off', 'Toggle a trade and watch the battery move.',
-    '4%', '16%',              // charge before and after the four trades
+    '41%', '50%',             // charge before and after the four trades
     '4 changes selected, saving 34 load',
     'NEXT WEEK, IF YOU APPLY',                // which days get lighter, before you commit
     'WHAT YOU COULD PUT DOWN',
@@ -192,7 +194,7 @@ const EXPECTATIONS = [
     'Anytime that day',                       // "no time" stays a real answer
     'Can it move?', 'Hard deadline',
     'YOUR WEEK RIGHT NOW', 'Before you add anything',   // the battery, before you commit
-    '13%', 'Heavy week',                      // and it is the real reading, not a mock
+    '47%', 'Busy week',                       // and it is the real reading, not a mock
   ]],
   ['recover.html', 'Recover', [
     'Rest is a credit you are owed, not an absence.',
@@ -219,7 +221,7 @@ const EXPECTATIONS = [
     'Book Today at 12pm',                     // defaults into the window a walk belongs in
   ]],
   ['decline/w11-birthday.html', 'Drafter', ['The app writes it. It never sends it.',"Aisyah's birthday dinner", 'Warm', 'Brief', 'Fully honest', "Actually, I'm going", 'Open in WhatsApp']],
-  ['widget.html', 'Widget', ['Ballast', 'week 10', 'One thing today. The networks lab report', 'How was today?', '13%', 'Running on empty', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
+  ['widget.html', 'Widget', ['Ballast', 'week 10', 'One thing today. The networks lab report', 'How was today?', '47%', 'Draining', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
   ['timetable.html', 'Timetable · week', [
     'Week', 'Modules', 'Import',              // three views of one screen, not a sequence
     'TIMETABLE', 'This week',
@@ -237,6 +239,18 @@ const EXPECTATIONS = [
     'Paste it. Nothing is scanned or uploaded.',
     'Paste it from your portal', 'One class per line',
     'Back to the week',
+  ]],
+  ['priority.html', 'Priority', [
+    'WHAT TO DO FIRST', 'Start with this',
+    'Ranked by deadline, who you promised, and what is left.',
+    'Start here', 'of 24 \u00b7 next 7 days',   // six shown, the rest behind a tap
+    'Show the other 18',
+    'Operating systems, part 2', 'Due today', 'Hard deadline',   // the reasons, as chips
+    'Algorithms problem set', '3h to go', 'Plan the sittings',
+    'Could move', 'back',                     // the half no planner asks about
+    'Write the message', 'Move it',
+    'BEFORE ANY OF IT',                       // at 13%, rest stops being a reward
+    'How this order is worked out',
   ]],
   ['foundations.html', 'Foundations', [
     'Colour is never the only signal', 'flat fill', 'diagonal hatch', 'cross hatch', 'vertical rule',
@@ -274,6 +288,7 @@ const EXITS = [
   ['decline/w11-birthday.html', 'Plan'],
   ['widget.html', 'Back'],
   ['calm.html', 'Home'],
+  ['priority.html', 'Home'],
   ['timetable.html', 'Time'],
   ['timetable/week.html', 'Time'],
   ['timetable/modules.html', 'Time'],

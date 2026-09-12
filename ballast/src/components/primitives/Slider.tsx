@@ -38,6 +38,12 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
   };
 
   const lastRef = useRef(value);
+  // Same trap as the area dial: the gesture is created once, so it must read
+  // the current props through a ref rather than closing over the first ones.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
   /** Ticks once per notch crossed, not once per pixel of drag. */
   const emit = (next: number) => {
     if (next !== lastRef.current) {
@@ -48,7 +54,7 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
   };
 
   const fromX = (x: number) => {
-    if (widthRef.current <= 0) return value;
+    if (widthRef.current <= 0) return valueRef.current;
     return emit(quantise(min + (x / widthRef.current) * (max - min)));
   };
 
@@ -56,8 +62,8 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => onChange(fromX(event.nativeEvent.locationX)),
-      onPanResponderMove: (event) => onChange(fromX(event.nativeEvent.locationX)),
+      onPanResponderGrant: (event) => onChangeRef.current(fromX(event.nativeEvent.locationX)),
+      onPanResponderMove: (event) => onChangeRef.current(fromX(event.nativeEvent.locationX)),
     }),
   ).current;
 

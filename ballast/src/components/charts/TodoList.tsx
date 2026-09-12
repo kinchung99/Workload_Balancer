@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import {
   committedOnDay, composition, daysLeft, isAtRisk, percentUndone, percentUnplanned, planSessions,
-  remaining, scheduledHours, unplanned, unplaced,
+  remaining, scheduledHours, sittingsOf, unplanned, unplaced,
 } from '@/lib/prep';
 import { formatHour, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
@@ -26,7 +26,7 @@ import { Sticker } from '../primitives/Sticker';
 import { Stack } from '../primitives/Stack';
 import { Text } from '../primitives/Text';
 
-const PERCENTS = [0, 10, 25, 50, 75, 90, 100];
+const UNBOOKED = [0.5, 1, 2];
 
 export interface TodoListProps {
   todo: Item[];
@@ -37,17 +37,20 @@ export interface TodoListProps {
   onPlan: (item: Item, sessions: Array<{ date: string; startHour: number; hours: number }>) => void;
   /** Move this day's sittings to another day. The deadline itself never moves. */
   onDefer: (item: Item, date: string) => void;
-  onSetPercent: (item: Item, percent: number) => void;
+  /** Tick a booked sitting off. Its hours become progress on the parent. */
+  onDone: (sessionId: string) => void;
+  /** Hours done without booking a sitting first, which happens. */
+  onUnbooked: (item: Item, hours: number) => void;
   onUnschedule: (sessionId: string) => void;
   onNote: (sessionId: string, note: string) => void;
 }
 
 export function TodoList({
-  todo, items, today, date, onSchedule, onPlan, onDefer, onSetPercent, onUnschedule, onNote,
+  todo, items, today, date, onSchedule, onPlan, onDefer, onDone, onUnbooked, onUnschedule, onNote,
 }: TodoListProps) {
   // Two panels, opened separately: planning is a different job from recording
   // progress, and stacking them made one very long sheet nobody scrolled.
-  const [open, setOpen] = useState<{ id: string; panel: 'plan' | 'progress' } | null>(null);
+  const [open, setOpen] = useState<{ id: string; panel: 'plan' | 'sittings' } | null>(null);
   const [manual, setManual] = useState(false);
   const [draftNote, setDraftNote] = useState('');
   const [draftHours, setDraftHours] = useState(2);
@@ -64,11 +67,10 @@ export function TodoList({
         const due = daysLeft(item, date);
         const risk = isAtRisk(item, items, date);
         const planning = open?.id === item.id && open.panel === 'plan';
-        const tracking = open?.id === item.id && open.panel === 'progress';
+        const tracking = open?.id === item.id && open.panel === 'sittings';
         const sittingsToday = items.filter((i) => i.parentId === item.id && i.date === date);
-        const sessions = items
-          .filter((i) => i.parentId === item.id)
-          .sort((a, b) => a.date.localeCompare(b.date) || (a.startHour ?? 0) - (b.startHour ?? 0));
+        const sessions = sittingsOf(item, items);
+        const ticked = sessions.filter((session) => session.sessionDone).length;
         const slots = startOptions(items, date, Math.min(draftHours, Math.max(loose, 0.5)), 6);
         const plan = planSessions(item, items, date);
         const short = unplaced(item, plan);
@@ -143,12 +145,17 @@ export function TodoList({
                   setDraftNote('');
                 }}
               />
-              {/* Progress is its own control, not buried inside planning. */}
-              <Chip
-                label={tracking ? 'Close' : `Progress · ${100 - percentUndone(item)}%`}
-                tone={tracking ? 'selected' : 'plain'}
-                onPress={() => { tapFeedback(); setOpen(tracking ? null : { id: item.id, panel: 'progress' }); }}
-              />
+              {/* Sittings are folded away by default. Three pieces of work with
+                  four sittings each is twelve open rows on one screen, which is
+                  what the day list looked like before. */}
+              {sessions.length ? (
+                <Chip
+                  label={tracking ? 'Close' : `Sittings · ${ticked}/${sessions.length} done`}
+                  tone={tracking ? 'selected' : ticked === sessions.length ? 'steady' : 'recovery'}
+                  onPress={() => { tapFeedback(); setOpen(tracking ? null : { id: item.id, panel: 'sittings' }); }}
+                  accessibilityHint="Show the sittings you booked, and tick them off"
+                />
+              ) : null}
               {plan.length ? (
                 <Chip
                   label={`Book ${plan.length} sitting${plan.length === 1 ? '' : 's'} for me`}
@@ -164,54 +171,84 @@ export function TodoList({
               ) : null}
             </Stack>
 
-            {/* Sittings already booked, each with what it is for. */}
-            {sessions.length ? (
-              <Stack gap={2}>
-                <Stack direction="row" gap={2} align="center">
-                  <Sticker name="calendar" size={18} />
-                  <Text variant="micro" tone="subtle">BOOKED SITTINGS</Text>
-                </Stack>
-                {sessions.map((session) => (
-                  <Stack key={session.id} gap={2} className="rounded-md bg-recovery-wash px-3 py-3">
-                    <Stack direction="row" gap={3} justify="between" align="center">
-                      <Text variant="footnote" weight="semibold" tone="recovery">
-                        {formatShort(session.date)} · {formatHour(session.startHour ?? 0)}–
-                        {formatHour((session.startHour ?? 0) + session.hours)}
-                      </Text>
-                      <Chip label="Give it back" onPress={() => onUnschedule(session.id)} />
-                    </Stack>
-                    <TextInput
-                      defaultValue={session.note}
-                      onEndEditing={(event) => onNote(session.id, event.nativeEvent.text)}
-                      placeholder="What are you aiming to get through?"
-                      placeholderTextColor={color.ink.subtle}
-                      accessibilityLabel={`Note for the sitting on ${formatShort(session.date)}`}
-                      className="min-h-min rounded-sm border border-line-hairline bg-page px-3 py-2 text-footnote text-ink-default"
-                    />
-                  </Stack>
-                ))}
-              </Stack>
-            ) : null}
-
+            {/* The sittings, and the only way progress moves. */}
             {tracking ? (
               <Stack gap={3} className="rounded-md bg-decor-cream px-4 py-4">
                 <Stack direction="row" gap={2} align="center">
-                  <Sticker name="star" size={20} />
-                  <Text variant="micro" tone="subtle">HOW FAR THROUGH ARE YOU?</Text>
+                  <Sticker name="calendar" size={20} />
+                  <Text variant="micro" tone="subtle">
+                    YOUR SITTINGS · {100 - percentUndone(item)}% DONE
+                  </Text>
                 </Stack>
-                <Stack direction="row" gap={2} wrap>
-                  {PERCENTS.map((percent) => (
-                    <Chip
-                      key={percent}
-                      label={`${percent}%`}
-                      tone={100 - percentUndone(item) === percent ? 'selected' : 'plain'}
-                      onPress={() => onSetPercent(item, percent)}
-                    />
-                  ))}
+
+                {sessions.map((session) => (
+                  <Stack
+                    key={session.id}
+                    gap={3}
+                    className={`rounded-md px-3 py-3 ${session.sessionDone ? 'bg-steady-wash' : 'bg-page'}`}
+                  >
+                    <Stack direction="row" gap={3} justify="between" align="center">
+                      <Stack direction="row" gap={3} align="center" grow>
+                        {session.sessionDone ? <Sticker name="star" size={22} /> : null}
+                        <Text
+                          variant="footnote"
+                          weight="semibold"
+                          tone={session.sessionDone ? 'steady' : 'recovery'}
+                        >
+                          {formatShort(session.date)} · {formatHour(session.startHour ?? 0)}–
+                          {formatHour((session.startHour ?? 0) + session.hours)}
+                        </Text>
+                      </Stack>
+                      <Text variant="micro" tone="subtle">{session.hours}h</Text>
+                    </Stack>
+
+                    {session.note && session.sessionDone ? (
+                      <Text variant="micro" tone="subtle">{session.note}</Text>
+                    ) : null}
+
+                    {session.sessionDone ? (
+                      <Text variant="micro" tone="steady">
+                        Done — {session.hours}h went onto the bar.
+                      </Text>
+                    ) : (
+                      <>
+                        <TextInput
+                          defaultValue={session.note}
+                          onEndEditing={(event) => onNote(session.id, event.nativeEvent.text)}
+                          placeholder="What are you aiming to get through?"
+                          placeholderTextColor={color.ink.subtle}
+                          accessibilityLabel={`Note for the sitting on ${formatShort(session.date)}`}
+                          className="min-h-min rounded-sm border border-line-hairline bg-page px-3 py-2 text-footnote text-ink-default"
+                        />
+                        <Stack direction="row" gap={2} wrap>
+                          <Chip
+                            label={`Done · +${session.hours}h`}
+                            tone="steady"
+                            onPress={() => onDone(session.id)}
+                            accessibilityHint={`Marks the ${formatShort(session.date)} sitting finished and moves the bar`}
+                          />
+                          <Chip label="Give it back" onPress={() => onUnschedule(session.id)} />
+                        </Stack>
+                      </>
+                    )}
+                  </Stack>
+                ))}
+
+                <Text variant="micro" tone="subtle">{left}h of {item.prepHours}h still to do.</Text>
+
+                {/* Work happens without being booked, and it should still count. */}
+                <Stack gap={2}>
+                  <Text variant="micro" tone="subtle">DID SOME WITHOUT BOOKING IT?</Text>
+                  <Stack direction="row" gap={2} wrap>
+                    {UNBOOKED.filter((hours) => hours <= left).map((hours) => (
+                      <Chip
+                        key={hours}
+                        label={`+${hours < 1 ? `${hours * 60}m` : `${hours}h`}`}
+                        onPress={() => onUnbooked(item, hours)}
+                      />
+                    ))}
+                  </Stack>
                 </Stack>
-                <Text variant="micro" tone="subtle">
-                  {100 - percentUndone(item)}% done — {left}h of {item.prepHours}h still to do.
-                </Text>
               </Stack>
             ) : null}
 

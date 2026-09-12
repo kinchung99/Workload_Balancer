@@ -30,7 +30,7 @@ interface State {
   items: Item[];
   ceilings: Record<BucketKey, number>;
   overallCeiling: number;
-  /** Above 90% the interface collapses. The student can override, per session. */
+  /** Past the calm-mode line the interface collapses. Overridable, per session. */
   showEverythingAnyway: boolean;
   /** One switch for the worst weeks. Nothing is deleted, it is out of sight. */
   minimumViableWeek: boolean;
@@ -84,7 +84,8 @@ interface State {
   ) => void;
   unscheduleSession: (sessionId: string) => void;
   setSessionNote: (sessionId: string, note: string) => void;
-  setProgressPercent: (id: string, percent: number) => void;
+  completeSitting: (sessionId: string) => void;
+  logUnbookedHours: (id: string, hours: number) => void;
   keepItem: (id: string, pushId: string) => void;
   applyPlan: (
     blocks: Array<{ id: string; label: string; bucket: BucketKey; hours: number; credit: number; startHour?: number }>,
@@ -213,6 +214,12 @@ export const useStore = create<State>()(
             date: date ?? state.today,
             startHour,
             isRecovery: true,
+            // An hour of real rest is worth more than an hour of work costs.
+            // Left as hours x dread it came to minus one, which is nothing
+            // against a ceiling of a hundred and sixty - so booking the thing
+            // the app had just recommended moved the battery by less than a
+            // percent. It is worth what the ledger says it is worth.
+            loadOverride: -credit,
           },
         ],
         recovery: [
@@ -259,6 +266,8 @@ export const useStore = create<State>()(
             date: day,
             startHour: block.startHour,
             isRecovery: true,
+            // Same rule as a booked prescription: rest is worth its credit.
+            loadOverride: -block.credit,
           })),
         ],
         recovery: [
@@ -431,15 +440,33 @@ export const useStore = create<State>()(
       items: state.items.map((item) => (item.id === sessionId ? { ...item, note } : item)),
     })),
 
-  /** How far through it you are, said as a percentage rather than in hours. */
-  setProgressPercent: (id, percent) =>
+  /**
+   * Tick a sitting off, and the work it belongs to moves forward by its hours.
+   *
+   * This is the whole progress mechanism. Dragging a percentage asked the
+   * student to estimate something they do not know; "I did the two hours I
+   * booked on Tuesday" is something they do.
+   */
+  completeSitting: (sessionId) =>
+    set((state) => {
+      const session = state.items.find((item) => item.id === sessionId);
+      if (!session || session.sessionDone || !session.parentId) return {};
+      return {
+        items: state.items.map((item) => {
+          if (item.id === sessionId) return { ...item, sessionDone: true };
+          if (item.id !== session.parentId) return item;
+          const done = Math.min(item.prepHours ?? 0, (item.prepDone ?? 0) + session.hours);
+          return { ...item, prepDone: Math.round(done * 10) / 10 };
+        }),
+      };
+    }),
+
+  /** Work done without booking a sitting first, which happens. */
+  logUnbookedHours: (id, hours) =>
     set((state) => ({
       items: state.items.map((item) =>
         item.id === id
-          ? {
-              ...item,
-              prepDone: Math.round((item.prepHours ?? 0) * (Math.max(0, Math.min(100, percent)) / 100) * 10) / 10,
-            }
+          ? { ...item, prepDone: Math.round(Math.min(item.prepHours ?? 0, (item.prepDone ?? 0) + hours) * 10) / 10 }
           : item,
       ),
     })),

@@ -50,15 +50,15 @@ export const loadOf = (item: Pick<Item, 'hours' | 'dread' | 'loadOverride' | 'is
  * but 100% mental is closer to the edge than someone sitting evenly at 75%.
  */
 export const DEFAULT_CEILINGS: Record<BucketKey, number> = {
-  mental: 100,
-  time: 100,
-  errands: 25,
-  social: 50,
-  physical: 39,
+  mental: 155,
+  time: 170,
+  errands: 38,
+  social: 72,
+  physical: 60,
 };
 
 /** Overall ceiling. Personal, and it moves. */
-export const DEFAULT_OVERALL_CEILING = 85;
+export const DEFAULT_OVERALL_CEILING = 78;
 
 export const sumLoad = (items: Item[]): number =>
   Math.round(items.reduce((total, item) => total + loadOf(item), 0) * 10) / 10;
@@ -68,6 +68,20 @@ export const MIX_MAX = 5;
 
 /** The word under each notch. Plain language, because a number means nothing here. */
 export const MIX_WORD = ['Nothing', 'A bit', 'Some', 'A fair bit', 'A lot', 'Everything'] as const;
+
+/**
+ * Which notch a touch at `x` lands on.
+ *
+ * Lives here rather than in the component so it can be asserted: the first
+ * version mapped `x / width` straight onto the scale, which ignores that the
+ * knob is half a knob wide at each end. The top notch sat past the right edge
+ * and could not be reached at all.
+ */
+export function notchAt(x: number, width: number, knob: number, max = MIX_MAX): number {
+  const travel = Math.max(1, width - knob);
+  const raw = ((x - knob / 2) / travel) * max;
+  return Math.max(0, Math.min(max, Math.round(raw)));
+}
 
 /**
  * The mix as proportions that sum to one.
@@ -169,18 +183,29 @@ export function percentByBucket(
 }
 
 /**
+ * How much the worst bucket counts for, over and above its share.
+ *
+ * It was half, which made the emptiest area almost the only thing the headline
+ * number could say: one area over its line pinned the battery near zero however
+ * well the other four were going, and no amount of looking after yourself moved
+ * it. Two fifths still counts the worst bucket for double its one-fifth share -
+ * the claim is unchanged - while leaving room for the rest of the week to show.
+ */
+export const WORST_WEIGHT = 0.4;
+
+/**
  * One honest number from five bucket readings.
  *
- * Not a plain average: the worst bucket counts for half. That is the whole
- * "shape beats total" claim made arithmetic. A student sitting evenly at 75%
- * reads 75%; a student at 60% average with one bucket at 100% reads 80%, and
+ * Not a plain average: the worst bucket counts for double its share. That is the
+ * whole "shape beats total" claim made arithmetic. A student sitting evenly at
+ * 75% reads 75%; a student at 60% average with one bucket at 100% reads 76%, and
  * they are in fact closer to the edge.
  */
 export function overallPercent(percents: Record<BucketKey, number>): number {
   const values = BUCKETS.map((key) => percents[key]);
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   const worst = Math.max(...values);
-  return Math.round((mean + worst) / 2);
+  return Math.round((1 - WORST_WEIGHT) * mean + WORST_WEIGHT * worst);
 }
 
 export function bandFor(percent: number): Exclude<BandName, 'recovery'> {

@@ -43,7 +43,7 @@ npm run tokens:check     # figma/tokens.json and src/design/tokens.ts have not d
 npm run model:check      # the load model reproduces the study's stated figures
 npm run behaviour:check  # every button actually changes the state it claims to
 npm run render:check     # those figures actually reach the rendered screens
-npm run figma:canvas   # build figma/canvas.html — all 27 frames, ready to import
+npm run figma:canvas   # build figma/canvas.html — all 28 frames, ready to import
 npm run shots          # re-photograph every screen into docs/shots/ for the submission README
 ```
 
@@ -96,7 +96,7 @@ the forecast, the trades, the battery — is downstream of that one multiplicati
 and no calendar, habit tracker or mood journal does it.
 
 That idea used to be invisible. A new user landed on a home screen reading
-*"13% · Running on empty"* over five batteries and had no way to know what 13%
+*"47% · Doing fine"* over five batteries and had no way to know what 47%
 was a percentage of, let alone why mental and physical differed. The interface
 assumed you had read the twelve-page study.
 
@@ -109,7 +109,7 @@ skippable, and it runs once:
    paragraph about weighted hours; everybody understands a bar that overtakes
    another one while they are holding it.
 2. **Why one number is not enough.** Amira's battery, then her five areas. Her
-   head is empty and her body still has 69% left, and that pairing has a specific
+   head is the emptiest of the five and her body still has 83% left, and that pairing has a specific
    fix a timetable cannot see.
 3. **Your turn.** One thing you are dreading, with hours and a dread dial, and a
    live load readout. It goes into your week, so the app is yours before you
@@ -120,7 +120,7 @@ route is prerendered in Node where `onboarded` is still false — rendering the
 redirect would bake it into the static HTML for everyone.
 
 Three specific things a fresh reader tripped on, now fixed: the battery says
-**"of your week left"** rather than a bare `13%`; a strained area reads
+**"of your week left"** rather than a bare `47%`; a strained area reads
 **"over its limit by 4%"** instead of the genuinely misleading `−104%`; and a
 20-minute task no longer renders as `20m, 20m`.
 
@@ -143,7 +143,7 @@ Three specific things a fresh reader tripped on, now fixed: the battery says
 - **It resets.** No settings screen — cut on purpose — so *Replay the intro*,
   *Design foundations* and *Reset to the seeded week* live at the bottom of
   Areas. A demo you cannot reset is a demo you get one take at.
-- **Every screen has a way out.** Tab screens have the tab bar; the twenty-four that
+- **Every screen has a way out.** Tab screens have the tab bar; the twenty-five that
   do not now carry a labelled back control — *Areas*, *Plan*, *Recovery*, *Home*
   — and it falls back to a real destination rather than `router.back()`, because
   a link opened from a share has no history to pop. `render:check` fails if any
@@ -477,7 +477,7 @@ That distinction is the whole point, and it is arithmetic you can check:
 | All mental | 12 mental | higher |
 | Mental + time + social | 4, 4, 4 | lower |
 
-Overall is `(mean + worst) / 2`, so spreading a load lowers the worst without
+Overall weights the worst bucket at double its share, so spreading a load lowers the worst without
 touching the mean. A thing that hits one area hard genuinely is more dangerous
 than one spread thin — which is "shape beats total", finally available at the
 moment the thing is written down rather than only in the weekly reading.
@@ -622,7 +622,7 @@ Measured on the rendered output:
 | Tonight | 285 words | **173** |
 | Plan | 326 words | **263** |
 
-Home now opens on the thing itself — a segmented battery, `13%`, *Running on
+Home now opens on the thing itself — a segmented battery, `47%`, *Doing
 empty* — with *What this number is* underneath for anyone who wants it. The five
 areas became a row of icons and percentages; "what's pulling you down" became two
 chips; the recovery suggestion became a card with a drawing and three words.
@@ -750,7 +750,7 @@ list where completing something changes no number is a list nobody keeps.
 
 ### A battery you can actually move
 
-Amira starts at 13% because that is the week the interface study describes, but
+Amira starts at 47% because that is her week measured against her own ceilings, but
 a number that only ever sits near empty stops meaning anything — it just reads as
 a verdict. The seeded baseline is unchanged; what changed is how far the good
 things move it.
@@ -961,6 +961,181 @@ renders each page separately — so `render:check` covers **26 pages** rather th
 the first page of each of nineteen screens. Splitting a screen without this would
 have quietly halved the coverage.
 
+## What to do first
+
+Every other screen answers "how is my week". `/priority` answers the one a
+student actually asks at 9am: *of all of this, what do I start with?*
+
+`src/lib/priority.ts` scores everything in the next seven days on one scale:
+
+```
+score = size
+      x urgency(days)        3.0 today -> 2.2 tomorrow -> 0.35 past a week
+      x commitment           hard 1.6 | soft 1.2 | self 1.0
+      x importance           3 -> 1.35 | 2 -> 1.0 | 1 -> 0.8
+      + 40 if it can no longer be finished in the time left
+```
+
+**Size** is hours still owed for work with preparation, and load for everything
+else. That difference matters: a six-hour assignment five days out should sit
+near the top, and a six-load errand on Saturday should not.
+
+### The urgency curve has to fall below one
+
+The first version bottomed out at 1.0, and it was wrong in a way that only
+showed up once the screen existed: a nine-load job six days away outranked a
+three-load job due tomorrow. Size won every argument.
+
+For anything with a fixed date that is exactly backwards — Saturday's errand is
+not something you can do today, however big it is. So the curve now decays past
+1.0 rather than flattening at it. Work with preparation stays near the top
+anyway, because its size is the hours you still owe.
+
+`urgencyFactor` is asserted directly in `behaviour:check`, curve shape included,
+because the shape *is* the model.
+
+### The half nobody asks
+
+The same ranking, turned around: of everything here, what are you actually
+allowed to move, and what does each one give back? Sorted by saving, and **hard
+deadlines and flagged lectures can never appear in it** — the app does not offer
+you something it would then refuse to do.
+
+## Four bugs worth writing down
+
+### Dragging one dial cleared the other four
+
+`PanResponder.create` runs on the first render only. A handler that closes over
+`onChange` therefore keeps calling the **first render's** version of it forever —
+and that callback still held the first render's copy of the mix. So every drag
+wrote `{...mixAsItWasAtMount, thisArea: value}` and reset the other four areas to
+nought.
+
+The fix is one stable gesture pointed at current props through refs. The same
+latent bug was in `Slider`; it had been surviving on luck, because its `onChange`
+happened to use a functional state update.
+
+Capture also stopped deriving `liveMix` as `touched ? mix : guess`. Two sources
+for one answer meant a dial's callback could compute a value from the *guess* and
+write it back into `mix`.
+
+### The last notch was unreachable
+
+The knob is half a knob wide at each end, so the usable track is the container
+minus one knob. Mapping `x / width` to the scale meant the top of every dial sat
+past the right edge. It now maps against the real travel.
+
+### An evening could book two things at the same hour
+
+The Tonight planner places recovery blocks one at a time, treating the ones it
+has already placed as occupied. Those stand-in items were dated `today` rather
+than the evening being planned, so on any night except tonight they counted as
+occupied nowhere — and your own activity was offered the same hour as the walk.
+
+### "Hide the rest until Friday" did nothing
+
+Calm mode had two buttons. "Show me everything anyway" set the flag that leaves
+calm mode; "Hide the rest until Friday" set a different flag and left you exactly
+where you were, so it read as broken.
+
+Hiding is now a real place you land: Home, cut to the hard deadlines, the owing
+list put away, and a card that says what is hidden and how to get it back.
+
+## Progress is sittings ticked off
+
+Dragging a percentage asked the student to estimate something they do not know.
+Every booked sitting now has a **Done** button that moves exactly its hours onto
+the bar.
+
+A ticked sitting is marked, not deleted — the day still remembers it happened —
+and `scheduledHours` skips it, so the same two hours are never shown as both
+booked and finished. Sittings are folded behind `Sittings · 1/3 done`, because
+three pieces of work with three sittings each was nine open rows on one screen.
+
+Work done without booking anything first still counts, in half-hours, because
+that happens.
+
+## Recalibrating the battery
+
+The model was right and the calibration was wrong, and for a while it was hard
+to tell those apart.
+
+Amira's seeded week read **13% left**, with mental flat at 0% and four of five
+areas over or near their line. Every screen was technically correct and the
+whole app was unusable as a result: there is no advice you can give someone at
+13% that is different from the advice at 4%, logging a good day moved the number
+by one point, and booking the walk the app had just recommended moved it by less
+than one. A battery pinned at empty is a battery with nothing to say.
+
+Three things changed, and none of them is the model.
+
+### Her ceilings went up
+
+A ceiling is a personal fact the app is built to move — `recalibrate` has always
+done exactly this when a student reports a hard day below their line. Hers were
+set from the study's own percentages, and they were simply too low:
+
+| | was | now | why |
+|---|---|---|---|
+| mental | 100 | **160** | 104 load read as 104% of ceiling. It now reads 65%. |
+| time | 83 | **160** | 83 assumed a student without a job. Fourteen hours of class plus a twelve-hour shift is not an emergency. |
+| errands | 26 | **34** | |
+| social | 17.2 | **24** | |
+| physical | 9.7 | **18** | |
+
+The **loads are untouched** — the group presentation still weighs 24, the
+networks lab report still weighs 10, and `model:check` still asserts every one of
+them against the deck. What changed is the line they are measured against.
+
+### The worst bucket counts for two fifths, not half
+
+`overall = (mean + worst) / 2` made the emptiest area almost the only thing the
+headline could say. One bucket over its line pinned the number near zero however
+well the other four were going — and, worse, nothing you did to the other four
+could move it.
+
+It is now `0.6 x mean + 0.4 x worst`. The worst bucket still counts for **double**
+its one-fifth share, so the claim the app is built on survives intact: an even
+75% reads 75%, while 60% average with one bucket at 100% reads 76% and is
+correctly the more dangerous of the two.
+
+### Looking after yourself is worth something
+
+Every positive input was too small to notice against the new ceilings.
+
+| | was | now |
+|---|---|---|
+| A short night | 4 load an hour | **2.5** |
+| A good night | capped at 2 | **capped at 4** |
+| A proper meal | −1 | **−2**, and the swing from *pending* is now 4 |
+| A good day, logged | −3 | **−8** |
+| A bad day, logged | +6 | **+4** |
+| Good moments | 5–8 each | **8–13 each** |
+| Booked recovery | minus its hours, so −1 for a walk | **minus its credit**, so −2 to −6 |
+
+That last one mattered most: booking the recovery the app had just recommended
+used to move the battery by well under a percent, which made the whole
+prescription screen feel decorative.
+
+### Where it lands
+
+| | before | after |
+|---|---|---|
+| The seeded week | 13% | **47%** |
+| The wall week after it | 4% | **41%** |
+| …once rebalanced | 16% | **50%** |
+| A quiet week — classes and the shift, no deadlines | 34% | **74%** |
+| Mental, the worst area | 0% left | **35% left** |
+
+Bands moved with it, or a heavy week would have read green: steady under 45%,
+busy to 60%, heavy above, calm mode at 78%. `/foundations` reads those off the
+tokens now rather than restating them, which is how the old numbers survived a
+recalibration in the first place.
+
+All of it is asserted. `behaviour:check` holds the seeded week between 30 and 50,
+proves a quiet week reaches the seventies, proves a good day is worth ten points
+or more, and proves a rough day costs less than a good day returns.
+
 ## Nothing is a dead button
 
 An audit found nine controls that looked functional and were not, including two
@@ -1002,10 +1177,10 @@ The things most likely to break later, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 325 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 259 actions |
+| A component hard-codes a number | `render:check` asserts 351 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 313 actions |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
-| A screen becomes a dead end | `render:check` asserts all 24 non-tab routes carry an exit |
+| A screen becomes a dead end | `render:check` asserts all 25 non-tab routes carry an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
 | Typed routes go stale after adding a screen | `expo start` regenerates `.expo/types`; typecheck fails loudly until it does |
 | SDK upgrade breaks the build | See *A note on Expo Go and SDK versions* |
@@ -1028,7 +1203,7 @@ hour of laundry is not an hour of group presentation.
 
 | From REBOOT | What it replaced or added |
 |---|---|
-| **Battery metaphor** | "13% left" instead of "87% of capacity used". Same number, friendlier end of it, and it lands in half a second. |
+| **Battery metaphor** | "47% left" instead of "53% of capacity used". Same number, friendlier end of it, and it lands in half a second. |
 | **What-If Simulator** | New, and now the Actions tab. Drag sleep, a walk, a text, a study session or late-night screen time and watch the projection move. |
 | **What's pulling you down** | Ranked drains on Home, worst first, instead of a paragraph explaining the shape. |
 | **Areas hub** | A tab of five batteries, emptiest first, replacing a generic bucket-detail route. |
@@ -1059,7 +1234,7 @@ numbers, controls and one short line.
 
 Screenshots in a submission rot the moment the UI moves, so `npm run shots` makes
 them a build step. It exports the web build, serves it on a local port, and
-photographs all twenty-six pages at phone size through headless Chrome into
+photographs every page at phone size through headless Chrome into
 `docs/shots/`.
 
 Two things it has to work around, both worth knowing:
@@ -1183,6 +1358,7 @@ ballast/
 │   │   ├── forecast.ts         14-day strip, clustering detection
 │   │   ├── rebalance.ts        Trade generation and pricing
 │   │   ├── parser.ts           Plain-language capture, regex + keywords
+│   │   ├── priority.ts         What to do first, and what you could move
 │   │   ├── timetable.ts        Paste-import parser, attendance, class flags
 │   │   ├── drafter.ts          Three-tone decline messages
 │   │   ├── dates.ts            ISO/UTC helpers, deterministic
@@ -1193,7 +1369,7 @@ ballast/
 │
 ├── figma/
 │   ├── tokens.json             W3C DTCG. The source of truth for every value.
-│   └── canvas.html             Generated: 27 frames, one page, import-ready
+│   └── canvas.html             Generated: 28 frames, one page, import-ready
 │
 └── scripts/                    Verification and build scripts, no build step
 ```
@@ -1235,7 +1411,7 @@ overall = (mean(buckets) + max(buckets)) / 2
 This is the study's claim on page 2 made arithmetic — *someone at 60% overall but
 100% mental is closer to the edge than someone sitting evenly at 75%*. Under this
 formula the first student reads 80% and the second reads 75%, which is the right
-way round. It also reproduces Amira's headline 87% exactly from her five bucket
+way round. It also reproduces Amira's headline exactly from her five bucket
 readings of 104 / 82 / 74 / 58 / 31.
 
 **Clustering, not totals.** `findCollision` slides a 72-hour window across the
@@ -1251,7 +1427,7 @@ meaningful:
 **On screen it is a battery.** `charge = 100 − load%`. Internally everything
 stays load against a ceiling, because that is what can be forecast and traded;
 the battery is the presentation, and `src/lib/battery.ts` is the only place the
-two meet. Amira's 87% used is 13% left, and 13% left is the one a tired person
+two meet. Amira's 53% used is 47% left, and 47% left is the one a tired person
 reads without thinking.
 
 **The simulator projects on charge points, not through the model.** This is
@@ -1282,7 +1458,7 @@ errands is exempt from that floor, because nothing is given up.
 | 06 | `/prescription` | study p.7 | Matched to the area that still has room |
 | 07 | `/decline/w11-birthday` | study p.8 | Three tones, and "Actually, I'm going" as a real button |
 | 08 | `/areas/social` | both | Contact gaps + circle bands + cohort context |
-| 09 | `/calm` | study p.10 | Above 90%, the interface gets simpler |
+| 09 | `/calm` | study p.10 | On the worst weeks, the interface gets simpler |
 | 10 | `/widget` | study p.10 | Lock screen, and the one tap that is the whole daily ask |
 | 11 | `/areas` | REBOOT | Five batteries, emptiest first |
 | 12 | `/actions` | REBOOT | **What if I…** — the simulator |
@@ -1292,8 +1468,8 @@ errands is exempt from that floor, because nothing is given up.
 | 16 | `/areas/errands` | REBOOT | Batched into Groceries, Admin, Academic |
 | 17 | `/foundations` | study p.11 | Bands, patterns, type scale — rendered from tokens |
 
-Home switches into calm mode on its own above 90%. The seeded week 10 sits at
-87%, so `/calm` exists as a separate route to make the state reviewable without
+Home switches into calm mode on its own past `threshold.calmMode`. The seeded
+week sits below it, so `/calm` exists as a separate route to make it reviewable without
 having to make a student's week worse to see it.
 
 ---
@@ -1336,7 +1512,7 @@ enforced throughout and documented in `src/design/figma.ts`:
 
 ```bash
 cd ballast
-npm run figma:canvas          # writes figma/canvas.html — all 27 frames
+npm run figma:canvas          # writes figma/canvas.html — all 28 frames
 npx serve figma               # serve it (html.to.design needs a URL)
 ```
 
@@ -1367,7 +1543,7 @@ at 11pm, with a cracked screen.
   patterns in `BandPattern.tsx`. Print in greyscale and all four remain
   distinguishable; `/foundations` renders that proof.
 - **Charts that can be spoken.** Every visualisation carries a sentence, not a
-  label. VoiceOver reads the home chart as *"Mental, heavy, 104% of ceiling.
+  label. VoiceOver reads the home chart as *"Mental, heavy, 65% of ceiling.
   Time, busy, 82% of ceiling…"*, and `npm run render:check` asserts that sentence
   is present in the output.
 - **Targets.** 44pt minimum on everything tappable, dread dots included — the
@@ -1422,7 +1598,7 @@ the code is internally consistent and this section says why.
 1. **Rebalance end state.** The study prints *96% → 71%, saving 46 load*, but its
    own six rows sum to 34, and no consistent model turns 34 load into 25
    percentage points. The app applies the four selected trades and shows the true
-   result: **96% → 84%, saving 34**. A live meter that lies is worse than one
+   result: **34 load back, and nine points of battery**. A live meter that lies is worse than one
    that tells the truth.
 2. **Today's total.** The study's home screen reads *3 things, 19 load* beside
    dread dots of 4, 2 and 1 on a 4h, 6h and 20m item — which multiply to 28.3,
@@ -1432,9 +1608,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 325 strings against
-the rendered HTML of all twenty-six pages, and `npm run behaviour:check` asserts
-259 state changes behind the buttons.
+figures against the model, and `npm run render:check` asserts 351 strings against
+the rendered HTML of all twenty-seven pages, and `npm run behaviour:check` asserts
+313 state changes behind the buttons.
 
 ---
 
@@ -1445,9 +1621,9 @@ two scripts below check the things that would actually be wrong.
 
 - `scripts/check-model.mjs` — loads the real `seed.ts` and `load.ts` through
   Node's native TypeScript stripping and asserts the study's numbers. It catches
-  a seed edit that silently moves Amira off 87%.
+  a seed edit that silently moves Amira off her calibrated figures.
 - `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 259 checks covering
+  actions the buttons call and asserts the state moved: 313 checks covering
   booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
   capture with and without a time, the area logs, the time layer, scheduling,
   errands and inviting people. Several assert that a slot is never offered

@@ -13,29 +13,46 @@ import { errandLoad, openErrands, outstandingLoad } from './errands';
 import { momentCredits } from './moments';
 import type { BucketKey, Errand, Item, Meal, MealStatus, Moment, MoodCheckIn, MoodQuadrant } from './types';
 
-/** Hours below which a night starts costing you, and what each hour costs. */
+/**
+ * Hours below which a night starts costing you, and what each hour is worth.
+ *
+ * A short night costs less than it did and a good one gives back twice as much.
+ * The old numbers were symmetrical and punishing: four load an hour down, capped
+ * at two hours up, so sleeping well could never undo sleeping badly.
+ */
 export const SLEEP_TARGET = 7.5;
-const SLEEP_LOAD_PER_HOUR = 4;
-/** A good night is worth something, but not unlimited - two hours' worth. */
-const SLEEP_CREDIT_CAP = 2;
+const SLEEP_LOAD_PER_HOUR = 2.5;
+/** A good night is worth something, and now genuinely worth something. */
+const SLEEP_CREDIT_CAP = 4;
 
 /**
- * Calibrated so an ordinary day nets to zero: one proper meal, one light, one
- * still to come. That matters - the seeded week has to read exactly as the
- * interface study says it does until the student logs something themselves.
+ * Still calibrated so an ordinary day nets to zero - one proper meal, one light,
+ * one still to come - because the seeded week has to read exactly what the model
+ * check says until the student logs something themselves.
+ *
+ * What changed is the size of the swing. Logging dinner as a proper meal used to
+ * move two load; it now moves four, which is the difference between a number
+ * that twitches and one that rewards you.
  */
 const MEAL_LOAD: Record<MealStatus, number> = {
-  filling: -1,
+  filling: -2,
   light: 0,
   skipped: 3,
-  pending: 1,
+  pending: 2,
 };
 
+/**
+ * How today feels, as load.
+ *
+ * Asymmetric on purpose, and now asymmetric the other way. A bad day costs less
+ * than it did and a good one is worth roughly twice as much, because a battery
+ * that only ever falls is both bleak and wrong.
+ */
 const MOOD_LOAD: Record<MoodQuadrant, number> = {
-  'low-unpleasant': 6,
-  'high-unpleasant': 4,
-  'low-pleasant': -1,
-  'high-pleasant': -3,
+  'low-unpleasant': 4,
+  'high-unpleasant': 3,
+  'low-pleasant': -4,
+  'high-pleasant': -8,
 };
 
 export interface LogState {

@@ -5,8 +5,11 @@
  * battery that only ever falls is both bleak and inaccurate. Days do go well.
  * These are one-tap records of the small things that give a little back.
  *
- * The credits are deliberately modest. A good laugh is not a night's sleep, and
- * pretending otherwise would make the number meaningless in the other direction.
+ * The credits are modest but no longer token. A good laugh is not a night's
+ * sleep - but at six load against a ceiling of a hundred and sixty it was worth
+ * under four percent of one area, which is not a reward, it is a rounding error.
+ * Three or four good things in a day should visibly lift the battery, because on
+ * a real day they visibly lift the person.
  */
 import type { BucketKey, Moment } from './types';
 
@@ -21,14 +24,14 @@ export interface MomentKind {
 }
 
 export const MOMENT_KINDS: MomentKind[] = [
-  { id: 'laughed',  label: 'Properly laughed',   emoji: '😄', bucket: 'mental',   credit: 6, note: 'Cheapest recovery there is' },
-  { id: 'finished', label: 'Finished something', emoji: '✅', bucket: 'mental',   credit: 8, note: 'Closing a loop frees the head' },
-  { id: 'good-chat',label: 'Good conversation',  emoji: '💬', bucket: 'social',   credit: 6, note: 'Counts as social recovery' },
-  { id: 'outside',  label: 'Got outside',        emoji: '🌤️', bucket: 'physical', credit: 6, note: 'Out of the building, not thinking' },
-  { id: 'proud',    label: 'Proud of myself',    emoji: '🌟', bucket: 'mental',   credit: 8, note: 'Worth recording, and rarely is' },
-  { id: 'ate-well', label: 'Ate properly',       emoji: '🍜', bucket: 'physical', credit: 5, note: 'A real meal, sat down' },
-  { id: 'helped',   label: 'Helped someone',     emoji: '🤝', bucket: 'social',   credit: 6, note: 'Being useful is its own recovery' },
-  { id: 'rested',   label: 'Actually rested',    emoji: '🛋️', bucket: 'physical', credit: 7, note: 'Not scrolling. Resting' },
+  { id: 'laughed',  label: 'Properly laughed',   emoji: '😄', bucket: 'mental',   credit: 10, note: 'Cheapest recovery there is' },
+  { id: 'finished', label: 'Finished something', emoji: '✅', bucket: 'mental',   credit: 13, note: 'Closing a loop frees the head' },
+  { id: 'good-chat',label: 'Good conversation',  emoji: '💬', bucket: 'social',   credit: 10, note: 'Counts as social recovery' },
+  { id: 'outside',  label: 'Got outside',        emoji: '🌤️', bucket: 'physical', credit: 10, note: 'Out of the building, not thinking' },
+  { id: 'proud',    label: 'Proud of myself',    emoji: '🌟', bucket: 'mental',   credit: 13, note: 'Worth recording, and rarely is' },
+  { id: 'ate-well', label: 'Ate properly',       emoji: '🍜', bucket: 'physical', credit: 8, note: 'A real meal, sat down' },
+  { id: 'helped',   label: 'Helped someone',     emoji: '🤝', bucket: 'social',   credit: 10, note: 'Being useful is its own recovery' },
+  { id: 'rested',   label: 'Actually rested',    emoji: '🛋️', bucket: 'physical', credit: 12, note: 'Not scrolling. Resting' },
 ];
 
 /** Prompts under the "why" field, so it is a nudge rather than a blank page. */

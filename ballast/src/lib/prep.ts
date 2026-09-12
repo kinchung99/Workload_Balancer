@@ -17,9 +17,24 @@ import type { Item } from './types';
 export const remaining = (item: Item): number =>
   Math.max(0, Math.round(((item.prepHours ?? 0) - (item.prepDone ?? 0)) * 10) / 10);
 
-/** Hours already booked into a day as sittings of this work. */
+/**
+ * Hours booked into a day and not yet done.
+ *
+ * A ticked-off sitting has moved into `prepDone`, so counting it here as well
+ * would show the same two hours twice - once as booked and once as finished.
+ */
 export const scheduledHours = (item: Item, items: Item[]): number =>
-  Math.round(items.filter((i) => i.parentId === item.id).reduce((total, i) => total + i.hours, 0) * 10) / 10;
+  Math.round(
+    items
+      .filter((i) => i.parentId === item.id && !i.sessionDone)
+      .reduce((total, i) => total + i.hours, 0) * 10,
+  ) / 10;
+
+/** Every sitting of this work, done or not, earliest first. */
+export const sittingsOf = (item: Item, items: Item[]): Item[] =>
+  items
+    .filter((i) => i.parentId === item.id)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.startHour ?? 0) - (b.startHour ?? 0));
 
 /**
  * Hours with neither a slot nor a tick: the part that is still only a worry.

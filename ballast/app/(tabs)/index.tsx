@@ -17,6 +17,7 @@ import { findCollision, leadLabel } from '@/lib/forecast';
 import { successFeedback } from '@/lib/haptics';
 import { formatShort } from '@/lib/dates';
 import { openPrep, remaining } from '@/lib/prep';
+import { prioritise } from '@/lib/priority';
 import { WEEK_NUMBER, prescriptions } from '@/data/seed';
 import { useHydrated } from '@/hooks/useHydrated';
 
@@ -42,7 +43,7 @@ export default function Home() {
   const {
     items, today, onboarded, recovery, booked, dayReports, overallCeiling, minimumViableWeek,
     showEverythingAnyway, setShowEverything, setMinimumViableWeek,
-    scheduleItem, scheduleSessions, pushSittings, setProgressPercent, unscheduleSession, setSessionNote,
+    scheduleItem, scheduleSessions, pushSittings, completeSitting, logUnbookedHours, unscheduleSession, setSessionNote,
   } = useStore();
 
   const { items: withLogs, percents, overall } = useReading();
@@ -70,13 +71,23 @@ export default function Home() {
   const owing = openPrep(withLogs, today);
   const owingMeta = `${owing.length} · ${Math.round(owing.reduce((total, item) => total + remaining(item), 0) * 10) / 10}h to go`;
 
+  // The top of the priority list, so Home can say what it is before you tap.
+  const { first: ranked, couldMove } = prioritise(withLogs, today);
+  const priorityCount = ranked.length;
+  const movableCount = couldMove.length;
+  const priorityTop = ranked[0]?.item.title;
+
   const pulling = drains(percents).slice(0, 2);
   const unbooked = prescriptions.filter((entry) => !booked.includes(entry.id));
   const suggestion = unbooked.find((entry) => entry.best) ?? unbooked[0];
   const restOwed = restOwedFrom(recovery);
   const ceiling = liveCeiling(overallCeiling, dayReports);
 
-  if (isCalm(overall) && !showEverythingAnyway) {
+  // Calm mode has two ways out and they do different things. "Show me
+  // everything anyway" returns the full Home; "Hide the rest until Friday"
+  // returns a Home cut down to what actually has to happen. Before this, only
+  // the first one left calm mode, so the second looked like a dead button.
+  if (isCalm(overall) && !showEverythingAnyway && !minimumViableWeek) {
     return (
       <CalmMode
         percent={overall}
@@ -182,6 +193,30 @@ export default function Home() {
           </Stack>
         ) : null}
 
+        {/* The question a list never answers: of all of this, what first? */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`What to do first. ${priorityCount} things want you this week.`}
+          onPress={() => router.push('/priority')}
+          className="active:opacity-70"
+        >
+          <Card tone="busy" gap={4}>
+            <Stack direction="row" gap={4} align="center">
+              <Sticker name="star" size={46} wiggle />
+              <Stack gap={1} grow>
+                <Text variant="micro" tone="busy">WHAT TO DO FIRST</Text>
+                <Text variant="heading">{priorityTop ?? 'Nothing is pressing'}</Text>
+                <Text variant="micro" tone="muted">
+                  {priorityCount
+                    ? `Ranked ahead of ${priorityCount - 1} others · ${movableCount} you could move`
+                    : 'Nothing is due in the next week'}
+                </Text>
+              </Stack>
+              <Text variant="heading" tone="muted">›</Text>
+            </Stack>
+          </Card>
+        </Pressable>
+
         {/* Today. */}
         <Stack gap={3}>
           <Stack direction="row" justify="between" align="center">
@@ -199,7 +234,7 @@ export default function Home() {
               onSchedule={(item, startHour) => { scheduleItem(item.id, startHour); successFeedback(); }}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
               todoMeta={owingMeta}
-              todo={
+              todo={minimumViableWeek ? undefined : (
                 <TodoList
                   todo={openPrep(withLogs, today)}
                   items={withLogs}
@@ -211,19 +246,30 @@ export default function Home() {
                   }}
                   onPlan={(item, sessions) => { scheduleSessions(item.id, sessions, { replace: true }); successFeedback(); }}
                   onDefer={(item, to) => { pushSittings(item.id, today, to); successFeedback(); }}
-                  onSetPercent={(item, percent) => { setProgressPercent(item.id, percent); successFeedback(); }}
+                  onDone={(sessionId) => { completeSitting(sessionId); successFeedback(); }}
+                  onUnbooked={(item, hours) => { logUnbookedHours(item.id, hours); successFeedback(); }}
                   onUnschedule={(sessionId) => { unscheduleSession(sessionId); successFeedback(); }}
                   onNote={(sessionId, note) => setSessionNote(sessionId, note)}
                 />
-              }
+              )}
             />
           </Card>
         </Stack>
 
-        {hidden > 0 ? (
-          <Card tone="sunken" gap={3}>
-            <Text variant="callout" weight="semibold">{hidden} hidden until Sunday.</Text>
-            <Button label="Show everything" kind="secondary" onPress={() => setMinimumViableWeek(false)} />
+        {minimumViableWeek ? (
+          <Card tone="recovery" gap={4}>
+            <Stack direction="row" gap={4} align="center">
+              <Sticker name="leaf" size={44} />
+              <Stack gap={1} grow>
+                <Text variant="heading">Cut down to what matters.</Text>
+                <Text variant="footnote" tone="muted">
+                  {hidden > 0
+                    ? `${hidden} other thing${hidden === 1 ? '' : 's'} today, and the work owing, are hidden until Friday.`
+                    : 'Today was already down to the essentials.'}
+                </Text>
+              </Stack>
+            </Stack>
+            <Button label="Show everything again" kind="secondary" onPress={() => setMinimumViableWeek(false)} />
           </Card>
         ) : null}
 

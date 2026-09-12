@@ -96,7 +96,10 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
       .filter((b) => b.startHour !== undefined)
       .map((b) => ({
         id: b.id, title: b.label, bucket: b.bucket, hours: b.hours,
-        dread: 1, commitment: 'self', date: today, startHour: b.startHour, isRecovery: true,
+        // `day`, not `today`. Dated to today, a block placed earlier in this
+        // same pass did not count as occupied on any other evening - so a walk
+        // and your own activity were both offered the same hour.
+        dread: 1, commitment: 'self', date: day, startHour: b.startHour, isRecovery: true,
       }));
     // Placed in the window the activity belongs in, and never on top of one
     // already placed by this same plan.

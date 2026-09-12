@@ -2,14 +2,16 @@
  * Calm mode — the interface gets simpler as the week gets worse.
  *
  * Most apps add urgency when things get bad: more red, more badges, more
- * prompts. That is precisely backwards. Above 90% the person using this has the
- * least capacity for decisions they will have all term, so we give them fewer.
+ * prompts. That is precisely backwards. Past the calm-mode line the person using
+ * this has the least capacity for decisions they will have all term, so we give
+ * them fewer.
  *
  * One number, one sentence, one button. The list, the charts, the forecast and
  * the circle are all still there and all deliberately out of the way.
  */
 import type { Href } from 'expo-router';
 import { Battery, Button, Screen, Stack, Text } from '@/components';
+import { threshold } from '@design/tokens';
 import { bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { dayName } from '@/lib/dates';
@@ -39,8 +41,11 @@ export function CalmMode({ percent, today, focus, onHide, onShowEverything, back
         <>
           <Button label="Hide the rest until Friday" onPress={onHide} />
           <Button label="Show me everything anyway" kind="secondary" onPress={onShowEverything} />
+          <Text variant="footnote" tone="subtle" className="text-center">
+            Hiding keeps today's hard deadlines and puts everything else away.
+          </Text>
           <Text variant="footnote" tone="subtle" className="pt-2 text-center">
-            Full view comes back on its own when you drop below 90%.
+            Full view comes back on its own when you drop below {threshold.calmMode}%.
           </Text>
         </>
       }

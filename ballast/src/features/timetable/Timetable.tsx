@@ -196,6 +196,14 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
             })}
           </Stack>
 
+          {/* The point of flagging a class is what it does to the rest of the
+              app, which is on another screen. Say so, and take them there. */}
+          <Button
+            label="View these in my week"
+            kind="secondary"
+            onPress={() => router.push(`/plan?day=${selected}`)}
+          />
+
           <Card gap={4}>
             {classesToday.length ? (
               classesToday.map((session) => (

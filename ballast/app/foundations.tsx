@@ -6,14 +6,18 @@ import {
 } from '@/components';
 import { SCREEN } from '@design/screens';
 import { BAND_LABEL } from '@/lib/load';
-import { color, radius, space, target, type as typeScale } from '@design/tokens';
+import { color, radius, space, target, threshold, type as typeScale } from '@design/tokens';
 import { BUCKETS, BUCKET_LABEL, MIX_WORD } from '@/lib/load';
 import { ARTBOARD, FIGMA_FRAMES } from '@design/figma';
 import type { BandName } from '@/lib/types';
 
 const BANDS: BandName[] = ['steady', 'busy', 'heavy', 'recovery'];
+/** Read off the tokens, so a recalibration cannot leave this page lying. */
 const RANGE: Record<BandName, string> = {
-  steady: 'under 70%', busy: '70 to 85%', heavy: 'over 85%', recovery: 'load you get back',
+  steady: `under ${threshold.steadyMax}%`,
+  busy: `${threshold.steadyMax} to ${threshold.busyMax}%`,
+  heavy: `over ${threshold.busyMax}%`,
+  recovery: 'load you get back',
 };
 const PATTERN: Record<BandName, string> = {
   steady: 'flat fill', busy: 'diagonal hatch', heavy: 'cross hatch', recovery: 'vertical rule',

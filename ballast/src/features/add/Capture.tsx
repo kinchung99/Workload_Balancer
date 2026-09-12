@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -105,14 +105,15 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
 
   /**
    * The parser's guess, as a mix: everything it found, in the one area it
-   * picked. Shown pre-filled so page three opens with something to react to
-   * rather than five zeroes and a shrug.
+   * picked. Seeded into state rather than layered over it, so there is exactly
+   * one copy of the answer. Deriving `liveMix` as `touched ? mix : guess` meant
+   * the dial's callback could write a value computed from the *guess* back into
+   * `mix`, which is half of why dragging one dial cleared the others.
    */
-  const guessMix = useMemo(
-    () => ({ ...EMPTY_MIX, [parsed.bucket]: parsed.dread }) as Record<BucketKey, number>,
-    [parsed.bucket, parsed.dread],
-  );
-  const liveMix = mixTouched ? mix : guessMix;
+  useEffect(() => {
+    if (!mixTouched) setMix({ ...EMPTY_MIX, [parsed.bucket]: parsed.dread });
+  }, [parsed.bucket, parsed.dread, mixTouched]);
+  const liveMix = mix;
 
   const dread = dreadFromMix(liveMix);
   const bucket = dominantArea(liveMix, parsed.bucket);
@@ -145,7 +146,9 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
 
   const setArea = (area: BucketKey, value: number) => {
     setMixTouched(true);
-    setMix({ ...liveMix, [area]: value });
+    // Functional: several drag events can land before React re-renders, and
+    // each one must build on the last rather than on a stale copy.
+    setMix((prev) => ({ ...prev, [area]: value }));
   };
 
   const go = (next: number) => { tapFeedback(); setStep(next); };

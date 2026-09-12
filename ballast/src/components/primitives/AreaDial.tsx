@@ -20,7 +20,7 @@ import { useRef, useState } from 'react';
 import { PanResponder, Pressable, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
 import { color, radius, target } from '@design/tokens';
-import { BUCKET_LABEL, MIX_MAX, MIX_WORD } from '@/lib/load';
+import { BUCKET_LABEL, MIX_MAX, MIX_WORD, notchAt } from '@/lib/load';
 import { tapFeedback } from '@/lib/haptics';
 import type { BucketKey } from '@/lib/types';
 import { AreaIcon } from './AreaIcon';
@@ -28,6 +28,9 @@ import { Stack } from './Stack';
 import { Text } from './Text';
 
 const INK = color.ink.default;
+
+/** Knob diameter. The track's usable travel is the width minus this. */
+const KNOB = 34;
 
 /**
  * The knob's face, nought to five.
@@ -102,7 +105,20 @@ export function AreaDial({
   const lastRef = useRef(value);
   const hue = color.area[area];
 
-  const quantise = (raw: number) => Math.max(0, Math.min(MIX_MAX, Math.round(raw)));
+  /**
+   * The gesture is built once; the props are not.
+   *
+   * `PanResponder.create` runs on the first render only, so a handler that
+   * closes over `onChange` keeps calling the FIRST render's version of it
+   * forever. That callback still held the first render's copy of the mix, so
+   * dragging any dial wrote `{...mixAsItWasAtMount, thisArea: value}` and reset
+   * the other four to nought. Reading both through refs keeps one stable
+   * gesture pointed at the current props.
+   */
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   const emit = (next: number) => {
     if (next !== lastRef.current) {
@@ -113,21 +129,21 @@ export function AreaDial({
   };
 
   const fromX = (x: number) => {
-    if (widthRef.current <= 0) return value;
-    return emit(quantise((x / widthRef.current) * MIX_MAX));
+    if (widthRef.current <= 0) return valueRef.current;
+    return emit(notchAt(x, widthRef.current, KNOB));
   };
 
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => onChange(fromX(event.nativeEvent.locationX)),
-      onPanResponderMove: (event) => onChange(fromX(event.nativeEvent.locationX)),
+      onPanResponderGrant: (event) => onChangeRef.current(fromX(event.nativeEvent.locationX)),
+      onPanResponderMove: (event) => onChangeRef.current(fromX(event.nativeEvent.locationX)),
     }),
   ).current;
 
   const ratio = value / MIX_MAX;
-  const knobSize = 34;
+  const knobSize = KNOB;
   const travel = Math.max(0, width - knobSize);
   const on = value > 0;
 
@@ -154,8 +170,9 @@ export function AreaDial({
           accessibilityValue={{ text: `${MIX_WORD[value]}, ${value} of ${MIX_MAX}` }}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(event) => {
-            if (event.nativeEvent.actionName === 'increment') onChange(quantise(value + 1));
-            if (event.nativeEvent.actionName === 'decrement') onChange(quantise(value - 1));
+            const step = (next: number) => Math.max(0, Math.min(MIX_MAX, next));
+            if (event.nativeEvent.actionName === 'increment') onChange(step(value + 1));
+            if (event.nativeEvent.actionName === 'decrement') onChange(step(value - 1));
           }}
           className="justify-center"
           style={{ height: target.min }}

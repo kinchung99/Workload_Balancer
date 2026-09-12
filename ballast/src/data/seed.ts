@@ -32,15 +32,15 @@ const d = (week: string, offset: number) => addDays(week, offset);
  * setting. See `recalibrate` in lib/load.ts.
  */
 export const CEILINGS = {
-  mental: 100,
-  time: 83,
-  errands: 26,
-  social: 17.2,
-  physical: 9.7,
+  mental: 160,
+  time: 160,
+  errands: 34,
+  social: 24,
+  physical: 18,
 };
 
 /** Overall ceiling. Also hers, also moved. */
-export const OVERALL_CEILING = 85;
+export const OVERALL_CEILING = 78;
 
 /**
  * Four modules, second year computer science.

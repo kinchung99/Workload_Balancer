@@ -33,6 +33,7 @@ for (const [from, to] of [
   ['src/lib/prep.ts', 'prep.ts'],
   ['src/lib/moments.ts', 'moments.ts'],
   ['src/lib/timetable.ts', 'timetable.ts'],
+  ['src/lib/priority.ts', 'priority.ts'],
   ['src/lib/battery.ts', 'battery.ts'],
   ['src/lib/simulate.ts', 'simulate.ts'],
   ['src/data/seed.ts', 'seed.ts'],
@@ -77,10 +78,11 @@ const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn, sleepWi
 const { categorise, errandLoad, outstandingLoad, openErrands } = await import(join(tmp, 'errands.ts'));
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
-const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
+const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, sittingsOf, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
-const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, MIX_MAX } = await import(join(tmp, 'load.ts'));
+const { prioritise, rank, urgencyFactor } = await import(join(tmp, 'priority.ts'));
+const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
 const charge = (extra = []) => {
@@ -89,7 +91,7 @@ const charge = (extra = []) => {
   return chargeOf(overallPercent(percentByBucket(itemsInWeek(all, st.today), st.ceilings)));
 };
 const { prescriptions } = await import(join(tmp, 'seed.ts'));
-const { ACTIONS, PRESETS, initialSim, pointsOf, project, totalPoints } = await import(join(tmp, 'simulate.ts'));
+const { ACTIONS, PRESETS, customAction, initialSim, pointsOf, project, totalPoints } = await import(join(tmp, 'simulate.ts'));
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -173,7 +175,7 @@ console.log('\nCapture — adding a task changes the week');
   const before = weekReading(s().items, s().today, s().ceilings).overall;
   s().addItem({ title: 'OS assignment', bucket: 'mental', hours: 8, dread: 4, commitment: 'hard', date: s().today });
   const after = weekReading(s().items, s().today, s().ceilings).overall;
-  check('87% before', before, 87);
+  check('the week reads 53% used before', before, 53);
   check('the meter climbs on a 32-load task', after > before, true);
   check('and it is on today\'s list', itemsOnDay(s().items, s().today).some((i) => i.title === 'OS assignment'), true);
 }
@@ -212,7 +214,7 @@ console.log('\nLogging moves the battery immediately');
   s().setMealStatus('dinner', 'skipped');
   const skipped = logItems({ today: s().today, sleepHours: 9, meals: s().meals, moods: [] });
   check('a skipped meal shows up as load', skipped.some((i) => i.loadOverride > 0), true);
-  check('base week is unaffected by any of it', base, 13);
+  check('base week is unaffected by any of it', base, 47);
 }
 
 console.log('\nThe time layer');
@@ -547,7 +549,7 @@ console.log('\nApplying a rebalance actually changes the week');
   const before = weekReading(s().items, anchor, s().ceilings).overall;
   const count = week().length;
 
-  check('next week starts at 96%', before, 96);
+  check('next week starts at 59% used', before, 59);
   check('four trades come pre-selected', trades.filter((t) => t.selected).length, 4);
 
   // Exactly what the screen passes: the selection travels on the trades.
@@ -555,7 +557,7 @@ console.log('\nApplying a rebalance actually changes the week');
   const after = weekReading(s().items, anchor, s().ceilings).overall;
 
   check('the week actually gets lighter', after < before, true);
-  check('it lands at 84%', after, 84);
+  check('it lands at 50% used', after, 50);
   check("Aisyah's dinner is gone", !s().items.find((i) => i.id === 'w11-birthday'), true);
   check("Amin's shift is handed back", !s().items.find((i) => i.id === 'w11-amin'), true);
   check('the chapter 9 reading is pushed', !s().items.find((i) => i.id === 'w11-ch9'), true);
@@ -741,18 +743,37 @@ console.log('\nBooking moves the bar, giving it back moves it straight in again'
   check('and the sitting is gone from the day', scheduledHours(algo(), s().items), 0);
 }
 
-console.log('\nProgress in percent, not hours');
+console.log('\nProgress is sittings ticked off, not a percentage guessed');
 {
   s().reset();
-  s().setProgressPercent('algo-set', 50);
-  check('half done on a four-hour job is two hours', s().items.find((i) => i.id === 'algo-set').prepDone, 2);
-  check('which reads as 50% undone', percentUndone(s().items.find((i) => i.id === 'algo-set')), 50);
-  s().setProgressPercent('algo-set', 100);
-  check('100% clears it from the list', openPrep(s().items, s().today).some((i) => i.id === 'algo-set'), false);
-  s().setProgressPercent('algo-set', 0);
-  check('and it can be put back to nothing', percentUndone(s().items.find((i) => i.id === 'algo-set')), 100);
-  s().setProgressPercent('algo-set', 500);
-  check('out-of-range input is clamped', s().items.find((i) => i.id === 'algo-set').prepDone, 4);
+  const algo = () => s().items.find((i) => i.id === 'algo-set');
+  s().scheduleSessions('algo-set', [
+    { date: s().today, startHour: 8, hours: 2, note: 'Finish section 2' },
+    { date: addDaysISO(s().today, 1), startHour: 9, hours: 1 },
+  ]);
+  const first = () => sittingsOf(algo(), s().items)[0];
+  check('two sittings are booked', sittingsOf(algo(), s().items).length, 2);
+  check('and none of them is done', sittingsOf(algo(), s().items).filter((x) => x.sessionDone).length, 0);
+  check('booked hours are booked, not done', scheduledHours(algo(), s().items), 3);
+
+  const id = first().id;
+  s().completeSitting(id);
+  check('ticking one off moves its hours onto the bar', algo().prepDone, 3);
+  check('the sitting is marked rather than deleted', first().sessionDone, true);
+  check('a done sitting stops counting as booked', scheduledHours(algo(), s().items), 1);
+  check('and the day still remembers it happened', s().items.some((i) => i.id === id && i.date === s().today), true);
+  check('ticking the same one twice changes nothing', (s().completeSitting(id), algo().prepDone), 3);
+
+  s().completeSitting(sittingsOf(algo(), s().items)[1].id);
+  check('finishing the work clears it from the list', openPrep(s().items, s().today).some((i) => i.id === 'algo-set'), false);
+
+  // Work also happens without being booked first.
+  s().reset();
+  s().logUnbookedHours('algo-set', 1);
+  check('an unbooked hour still counts', algo().prepDone, 2);
+  check('which reads as half undone', percentUndone(algo()), 50);
+  s().logUnbookedHours('algo-set', 99);
+  check('and it can never exceed the whole job', algo().prepDone, 4);
 }
 
 console.log('\nThe battery can go up, not only down');
@@ -786,7 +807,25 @@ console.log('\nThe battery can go up, not only down');
   check('twenty taps of one thing tails off', spam < laughed.credit * 5, true);
   check('a genuinely varied day is worth more per tap', varied / 4 > spam / 20, true);
   check('but a good day is no longer capped', spam > 12, true);
-  check('base week unchanged by any of it', base, 13);
+  check('base week unchanged by any of it', base, 47);
+}
+
+console.log('\nEvery notch on a dial is reachable');
+{
+  // A 300pt track with a 34pt knob. The usable travel is 266, not 300, because
+  // the knob is half a knob wide at each end - and mapping x/width onto the
+  // scale put the top notch past the right edge, where no thumb could land.
+  const W = 300, KNOB = 34;
+  check('the far left is nothing', notchAt(0, W, KNOB), 0);
+  check('the far right is the top of the scale', notchAt(W, W, KNOB), MIX_MAX);
+  check('the knob centre at the left edge is still nothing', notchAt(KNOB / 2, W, KNOB), 0);
+  check('the knob centre at the right edge is the top', notchAt(W - KNOB / 2, W, KNOB), MIX_MAX);
+  check('the middle is the middle', notchAt(W / 2, W, KNOB), Math.round(MIX_MAX / 2));
+  check('past either end is clamped, not wrapped', [notchAt(-40, W, KNOB), notchAt(W + 40, W, KNOB)], [0, MIX_MAX]);
+  check('every notch has somewhere to land', [0, 1, 2, 3, 4, 5].every((n) => {
+    const x = KNOB / 2 + (n / MIX_MAX) * (W - KNOB);
+    return notchAt(x, W, KNOB) === n;
+  }), true);
 }
 
 console.log('\nOne thing, five areas — the mix');
@@ -833,8 +872,171 @@ console.log('\nOne thing, five areas — the mix');
   const row = rows.find((r) => r.title === 'Group presentation');
   check('and survives becoming a row on the day', row.mix, { mental: 3, social: 3 });
   check('it moves the battery', charge() < before, true);
-  check('the seeded week still reads as the study states', before, 13);
+  check('the seeded week reads 47% left', before, 47);
   check('social carries half of it', mixShares(row.mix).social, 0.5);
+}
+
+console.log('\nAn evening plan never books two things at once');
+{
+  s().reset();
+  // Your own activity, added the way the Tonight screen adds it.
+  const mine = customAction('badminton', 'Badminton', 2, 'physical');
+  s().addCustomAction(mine);
+
+  // Two recovery blocks that both want the evening, planned for tomorrow -
+  // which is where the clash lived: blocks already placed in the same pass were
+  // dated "today", so they did not count as occupied on any other night.
+  const day = addDaysISO(s().today, 1);
+  const blocks = [
+    { id: 'walk', label: 'Take a walk', bucket: 'physical', hours: 1, credit: 4, preferred: [12, 19] },
+    { id: mine.id, label: mine.label, bucket: mine.bucket, hours: 2, credit: 8, preferred: mine.preferred },
+  ];
+
+  const items = s().items;
+  const placed = blocks.reduce((acc, block) => {
+    const taken = acc.filter((b) => b.startHour !== undefined).map((b, i) => ({
+      id: `taken-${i}`, title: b.label, bucket: b.bucket, hours: b.hours,
+      dread: 1, commitment: 'self', date: day, startHour: b.startHour, isRecovery: true,
+    }));
+    const startHour = placeIn([...items, ...taken], day, block.hours, block.preferred, s().offHour);
+    return [...acc, { ...block, startHour }];
+  }, []);
+
+  check('both of them got an hour', placed.every((b) => b.startHour !== undefined), true);
+  const overlap2 = (a, b) => a.startHour < b.startHour + b.hours && b.startHour < a.startHour + a.hours;
+  check('and the two do not sit on top of each other', overlap2(placed[0], placed[1]), false);
+  check('neither starts before the hour your day is your own', placed.every((b) => b.startHour >= s().offHour), true);
+
+  // And the same holds once they are really booked.
+  s().applyPlan(placed.map(({ id, label, bucket, hours, credit, startHour }) => ({ id, label, bucket, hours, credit, startHour })), undefined, day);
+  const booked = s().items.filter((i) => i.id.startsWith('plan-') && i.date === day);
+  check('two protected blocks land on that evening', booked.length, 2);
+  const [a, b] = booked.sort((x, y) => x.startHour - y.startHour);
+  check('and they still do not overlap once booked', a.startHour + a.hours <= b.startHour, true);
+}
+
+console.log('\nWhat to do first');
+{
+  s().reset();
+  const items = s().items;
+  const { first, couldMove } = prioritise(items, s().today);
+
+  check('the list is not empty', first.length > 0, true);
+  check('it is sorted worst-first', first.every((row, i) => i === 0 || first[i - 1].score >= row.score), true);
+  check('every row can say why it is there', first.every((row) => row.reasons.length > 0), true);
+
+  // The shape of the urgency curve is the model, so assert the curve itself.
+  check('due today counts for three times its size', urgencyFactor(0), 3);
+  check('it drops steeply inside three days', urgencyFactor(1) > urgencyFactor(3), true);
+  check('and falls below one past the week, so size cannot win on its own', urgencyFactor(8) < 1, true);
+
+  // Same size, same day: a promise to someone else outranks one to yourself.
+  const base = { bucket: 'mental', hours: 2, dread: 3, date: s().today, importance: 2 };
+  const hard = rank({ ...base, id: 'h', title: 'Hard', commitment: 'hard' }, items, s().today);
+  const self = rank({ ...base, id: 's', title: 'Self', commitment: 'self' }, items, s().today);
+  check('a hard deadline outranks a self-imposed one', hard.score > self.score, true);
+  check('and says so', hard.reasons.includes('Hard deadline'), true);
+
+  // A small job due tomorrow beats a big one due next week.
+  const soon = rank({ ...base, id: 'a', title: 'Small, tomorrow', hours: 1, commitment: 'soft', date: addDaysISO(s().today, 1) }, items, s().today);
+  const later = rank({ ...base, id: 'b', title: 'Big, next week', hours: 3, commitment: 'soft', date: addDaysISO(s().today, 6) }, items, s().today);
+  check('near and small beats far and large', soon.score > later.score, true);
+
+  // Work that can no longer fit goes straight to the top, wherever it started.
+  const impossible = {
+    id: 'impossible', title: 'Eight hours due today', bucket: 'mental', hours: 8, dread: 3,
+    commitment: 'self', date: s().today, deadline: s().today, prepHours: 8, prepDone: 0, importance: 1,
+  };
+  const withIt = [...items, impossible];
+  const atRisk = rank(impossible, withIt, s().today);
+  check('eight hours due today cannot fit', atRisk.reasons.includes('Not enough time left'), true);
+  check('and that outranks everything else on the list', atRisk.score > first[0].score, true);
+  check('even though it is the least important thing there', impossible.importance, 1);
+
+  // The other half of the question.
+  check('there is something you could move', couldMove.length > 0, true);
+  check('nothing locked is ever offered', couldMove.every((row) => row.item.commitment !== 'hard'), true);
+  check('nor the lecture that gives the hints', couldMove.every((row) => !isProtectedClass(row.item)), true);
+  check('and it is ordered by what it gives back', couldMove.every((row, i) => i === 0 || couldMove[i - 1].saves >= row.saves), true);
+
+  // Background load is not a choice, so it is not on the list.
+  check('the timetable is not something to prioritise', first.every((row) => !row.item.moduleId || row.item.date >= s().today), true);
+  check('nor repeating commitments', first.every((row) => !row.item.repeats), true);
+  check('nor protected recovery', first.every((row) => !row.item.isRecovery), true);
+  check('nor a sitting of something already on the list', first.every((row) => !row.item.parentId), true);
+}
+
+console.log('\nLooking after yourself moves the number');
+{
+  s().reset();
+  const start = charge();
+  check('an ordinary week leaves you something to work with', start >= 30 && start <= 50, true);
+
+  // A good day: slept well, ate properly, felt good, and three things went right.
+  s().logSleep(8.5);
+  const slept = charge();
+  check('a good night is worth having', slept > start, true);
+
+  s().setMealStatus('dinner', 'filling');
+  const fed = charge();
+  check('and so is a proper meal', fed > slept, true);
+
+  s().logMood('high-pleasant', []);
+  for (const id of ['laughed', 'finished', 'rested']) {
+    const kind = MOMENT_KINDS.find((k) => k.id === id);
+    s().logMoment(kind.id, kind.bucket, kind.credit);
+  }
+  const good = charge();
+  check('a genuinely good day lifts it by ten points or more', good - start >= 10, true);
+  check('and it never goes over full', good <= 100, true);
+
+  // The other direction costs less than it used to.
+  s().reset();
+  const before = charge();
+  s().logSleep(5);
+  s().logMood('low-unpleasant', []);
+  const rough = charge();
+  check('a rough day still costs something', rough < before, true);
+  check('but less than a good day gives back', before - rough < good - start, true);
+
+  // And the thing the app recommends is worth doing.
+  s().reset();
+  const pre = charge();
+  const walk = prescriptions[0];
+  s().bookRecovery(walk, 12, 1, s().today);
+  check('booking the recovery it suggested moves the battery up', charge() > pre, true);
+  check('by what the ledger says it is worth, not by one hour', s().items.at(-1).loadOverride, -walk.credit);
+}
+
+console.log('\nThe battery has room to move in both directions');
+{
+  s().reset();
+  const start = charge();
+
+  // The floor of a student's week: classes, the commute, the shift, the chores -
+  // everything entered once and counted forever, with no deadlines on top. That
+  // is what an ordinary quiet week looks like, and it is the reading the app has
+  // to be able to get to, or "you are doing fine" is a state it can never show.
+  const floor = itemsInWeek(s().items.filter((i) => i.repeats || i.spread), s().today);
+  const quiet = chargeOf(overallPercent(percentByBucket(floor, s().ceilings)));
+  console.log(`    (classes and the shift alone read ${quiet}%)`, JSON.stringify(percentByBucket(floor, s().ceilings)));
+  check('a quiet week reads in the seventies', quiet >= 68 && quiet <= 88, true);
+
+  const half = s().items.map((i) => (i.repeats || i.spread || i.isRecovery ? i : { ...i, hours: i.hours / 2 }));
+  const light = chargeOf(overallPercent(percentByBucket(itemsInWeek(half, s().today), s().ceilings)));
+  console.log(`    (half the deadline work reads ${light}%)`);
+  check('halving the work you chose is worth ten points', light - start >= 10, true);
+
+  // And the worst week in the seed is still clearly worse, without bottoming out.
+  const next = chargeOf(weekReading(s().items, nextWeek(s().today), s().ceilings).overall);
+  check('the wall week is worse than this one', next < start, true);
+  check('but not pinned at nothing', next >= 25, true);
+
+  // No area sits at zero any more, which was the thing that made the headline
+  // number useless: one flat bucket dragged everything with it.
+  const areas = percentByBucket(itemsInWeek(s().items, s().today), s().ceilings);
+  check('no area is over its own ceiling', Object.values(areas).every((p) => p <= 100), true);
+  check('and the emptiest still has something left', 100 - Math.max(...Object.values(areas)) >= 25, true);
 }
 
 console.log('\nInviting people');

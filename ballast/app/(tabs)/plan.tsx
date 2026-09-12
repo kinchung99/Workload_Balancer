@@ -29,8 +29,8 @@ import { WEEK_NUMBER } from '@/data/seed';
  */
 export default function Plan() {
   const router = useRouter();
-  const { ceilings, today, scheduleItem, scheduleSessions, pushSittings, setProgressPercent, unscheduleSession,
-    setSessionNote } = useStore();
+  const { ceilings, today, scheduleItem, scheduleSessions, pushSittings, completeSitting, logUnbookedHours,
+    unscheduleSession, setSessionNote } = useStore();
   const items = useItemsWithLogs();
 
   // Arriving from Home's week strip opens straight onto that day.
@@ -146,10 +146,8 @@ export default function Plan() {
                     pushSittings(item.id, selected, to);
                     successFeedback();
                   }}
-                  onSetPercent={(item, percent) => {
-                    setProgressPercent(item.id, percent);
-                    successFeedback();
-                  }}
+                  onDone={(sessionId) => { completeSitting(sessionId); successFeedback(); }}
+                  onUnbooked={(item, hours) => { logUnbookedHours(item.id, hours); successFeedback(); }}
                   onUnschedule={(sessionId) => {
                     unscheduleSession(sessionId);
                     successFeedback();

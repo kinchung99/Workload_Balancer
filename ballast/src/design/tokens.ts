@@ -134,9 +134,9 @@ export const pattern = {
 
 /** Product constants. Tokens, not magic numbers, so the deck cannot disagree with the build. */
 export const threshold = {
-  steadyMax: 70,
-  busyMax: 85,
-  calmMode: 90,
+  steadyMax: 45,
+  busyMax: 60,
+  calmMode: 78,
   dreadMin: 1,
   dreadMax: 5,
   forecastDays: 14,

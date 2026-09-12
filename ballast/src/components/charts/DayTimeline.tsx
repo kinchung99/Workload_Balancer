@@ -209,8 +209,10 @@ export function DayTimeline({
                   <Text variant="body" weight="semibold" className="flex-1">{row.item.title}</Text>
                   {row.item.isRecovery ? null : <DreadDots value={row.item.dread} />}
                 </Stack>
-                <Text variant="micro" tone={row.item.isRecovery ? 'recovery' : 'subtle'}>
-                  {row.item.isRecovery
+                <Text variant="micro" tone={row.item.sessionDone ? 'steady' : row.item.isRecovery ? 'recovery' : 'subtle'}>
+                  {row.item.sessionDone
+                    ? `Done · ${row.item.hours}h`
+                    : row.item.isRecovery
                     ? 'Protected'
                     : row.item.room
                       ? `${row.item.room} · ${loadOf(row.item)}`

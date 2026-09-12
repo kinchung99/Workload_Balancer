@@ -7,7 +7,7 @@ import { itemsOnDay, useStore } from '@/state/store';
 /**
  * Calm mode as a standalone frame.
  *
- * Home switches into this on its own above 90%, which the seeded week 10 never
+ * Home switches into this on its own past the calm-mode line, which the seeded week never
  * reaches - it sits at 87%. This route renders the same component at the 94% the
  * interface study documents, so the state is reviewable without having to make a
  * student's week worse to see it.

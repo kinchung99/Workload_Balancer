@@ -45,12 +45,20 @@ if (!CHROME) {
   process.exit(1);
 }
 
-/** [route, file, height in points]. Taller than 844 where the story is lower down. */
+/**
+ * [route, file, window height in points, crop height?, crop offset?].
+ *
+ * The last two are for the parts of a screen you have to scroll to: headless
+ * Chrome only ever photographs the top of a page, so we open a very tall window
+ * and cut the band we want out of the result.
+ */
 const SHOTS = [
   ['/',                       'home',       1560],
   ['/add',                    'add-what',    880],
   ['/add/takes',              'add-takes',  1120],
   ['/add/when',               'add-when',   1080],
+  ['/priority',               'priority',   1500],
+  ['/priority',               'priority-move', 2900, 750, 1410],
   ['/plan',                   'plan',       1000],
   ['/plan',                   'plan-day',   1700],
   ['/rebalance',              'rebalance',  1160],
@@ -123,7 +131,7 @@ createServer((req, res) => {
 
   // 3. Photograph each screen, then crop the artboard out of the middle.
   mkdirSync(out, { recursive: true });
-  for (const [route, name, height] of SHOTS) {
+  for (const [route, name, height, cropHeight, cropOffset] of SHOTS) {
     const file = join(out, `${name}.png`);
     execFileSync(CHROME, [
       '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-sandbox',
@@ -133,8 +141,15 @@ createServer((req, res) => {
       `--screenshot=${file}`,
       `http://localhost:${PORT}${route}`,
     ], { stdio: 'pipe' });
-    execFileSync('sips', ['-c', String(height * SCALE), String(FRAME * SCALE), file, '--out', file], { stdio: 'pipe' });
-    console.log(`  ${name}.png  ${FRAME}x${height}`);
+    const keep = cropHeight ?? height;
+    const crop = ['-c', String(keep * SCALE), String(FRAME * SCALE)];
+    // sips takes the offset as (y, x) and defaults x to zero, which lands on the
+    // blank margin rather than the artboard. Centre it by hand.
+    if (cropOffset !== undefined) {
+      crop.push('--cropOffset', String(cropOffset * SCALE), String(((WIDE - FRAME) / 2) * SCALE));
+    }
+    execFileSync('sips', [...crop, file, '--out', file], { stdio: 'pipe' });
+    console.log(`  ${name}.png  ${FRAME}x${keep}`);
   }
   console.log(`\n  ${SHOTS.length} screenshots in docs/shots/\n`);
 } finally {

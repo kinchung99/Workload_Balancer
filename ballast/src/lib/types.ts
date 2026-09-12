@@ -90,6 +90,14 @@ export interface Item {
   importance?: 1 | 2 | 3;
   /** A booked sitting of a larger piece of work. */
   parentId?: string;
+  /**
+   * This sitting has been done.
+   *
+   * Progress is recorded by ticking sittings off rather than by dragging a
+   * percentage: "I did the two hours I booked" is a thing you know, and "I am
+   * 40% through" is a thing you guess.
+   */
+  sessionDone?: boolean;
   /** What you mean to get through in this sitting. Yours, in your words. */
   note?: string;
   /**
