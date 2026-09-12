@@ -19,7 +19,7 @@ import { completionCredit } from '@/lib/errands';
 import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
-  CEILINGS, OVERALL_CEILING, TODAY, contacts as seedContacts, errands as seedErrands,
+  CEILINGS, OVERALL_CEILING, TODAY, contacts as seedContacts, customActions as seedCustomActions, errands as seedErrands,
   meals as seedMeals, modules as seedModules, moodHistory, recoveryLedger, seedItems,
 } from '@/data/seed';
 
@@ -141,7 +141,7 @@ export const useStore = create<State>()(
   invites: [],
   moments: [],
   offHour: 17,
-  customActions: [],
+  customActions: seedCustomActions,
   modules: seedModules,
 
   addItem: (item) =>
@@ -597,7 +597,7 @@ export const useStore = create<State>()(
       items: seedItems, showEverythingAnyway: false, minimumViableWeek: false,
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
-      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: [], modules: seedModules,
+      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: seedCustomActions, modules: seedModules,
       // Ceilings too. They move when you report a hard day below your line, and
       // reset clears the day reports that moved them - leaving the lowered line
       // in place with the evidence for it gone made every later reading read

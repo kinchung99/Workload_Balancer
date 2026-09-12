@@ -92,7 +92,7 @@ const EXPECTATIONS = [
     'past midnight',                                // six hours means 1am, given a 7am start
     'Drag a slider, or pick a night above.',
     'WHAT YOU ACTUALLY DO', 'Add your own',         // your evening, in the model
-    'Badminton, a night run, band practice',
+    'Badminton', 'Remove', '1 of your own above',   // and one she added herself
   ]],
   ['tonight/book.html', 'Tonight · book it', [
     'STEP 3 OF 3 \u00b7 BOOK IT',

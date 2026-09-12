@@ -135,10 +135,9 @@ change a task and the forecast changes with it.
 
 ### 3.1 ✍️ Add anything — five dials, four short pages
 
-<p align="center">
-  <img src="docs/shots/add-takes.png" width="405" alt="Five area dials, each with a face on the knob">
-  <img src="docs/shots/add-when.png" width="405" alt="Choosing a day and a time, with the battery before committing">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/add-takes.png" alt="Five area dials, each with a face on the knob">
+</td><td>
 
 Capture is where every planner loses people, because it looks like a form. Ours is **four pages, one
 question each.**
@@ -147,20 +146,26 @@ question each.**
 - 🎚️ **Five dials, not one number.** Say what it takes out of your head, hours, body, social life and
   admin, by dragging a face that gets more overwhelmed as you push it.
 - ➗ **The maths stays honest.** Still `hours × dread`, where dread is the **worst** area, not the sum.
-  Three areas at "a fair bit" is one weight landing in three places.
 - 📉 **Spreading a load reads lower, correctly** — the worst area counts for **double its share**.
 - 🙂 **Nobody learns a scale.** You can read the faces without reading the labels.
-- 🔍 **Page four shows the damage before you agree to it.** Pick a day and an hour from gaps that actually
-  exist; the battery updates to what your week *will* read. Nothing saves until you press the button.
+
+</td></tr><tr><td>
+<img src="docs/shots/add-when.png" alt="Choosing a day and a time, with the battery before committing">
+</td><td>
+
+**Page four shows the damage before you agree to it.** Pick a day and an hour from the gaps that actually
+exist in your week, and the battery underneath updates to what your week *will* read if you add this.
+Nothing is saved until you press the button.
+
+</td></tr></table>
 
 ---
 
 ### 3.2 📄 Owing — assignments that stop hiding until the night before
 
-<p align="center">
-  <img src="docs/shots/day-bands.png" width="405" alt="A day split into Scheduled, Owing and This day">
-  <img src="docs/shots/owing-card.png" width="405" alt="Owing cards with their done, booked and loose bars">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/day-bands.png" alt="A day split into Scheduled, Owing and This day">
+</td><td>
 
 A deadline is not a task. An assignment due Thursday is nine hours spread across the days *before* it —
 and a normal list shows you nothing until Thursday, which is why it ruins the night before.
@@ -169,20 +174,24 @@ So a day splits into **three honest bands**:
 
 | | |
 |---|---|
-| 🕐 **Scheduled** | Things with a time, on a clock rail. Gaps are real space you can tap to fill. |
-| 📄 **Owing** | Work due later, unfinished. Sits on **every** day until it's done. |
-| 🧺 **This day** | Loose tasks and errands with no time yet. |
+| 🕐 **Scheduled** | Things with a time, on a clock rail |
+| 📄 **Owing** | Work due later. Sits on **every** day until done |
+| 🧺 **This day** | Loose tasks with no time yet |
 
-Each Owing card carries a **three-state bar** — green is done, blue is booked into a day, grey is still
-loose. Booking a sitting moves work out of grey **before** any of it is finished, because a plan genuinely
-is progress. Give the sitting back and it returns to grey.
+</td></tr><tr><td>
+<img src="docs/shots/owing-card.png" alt="Owing cards with their done, booked and loose bars">
+</td><td>
+
+Each Owing card carries a **three-state bar** — green is done, blue is booked, grey is still loose.
 
 - ✅ **Progress is sittings ticked off, not a percentage guessed.** **Done** moves exactly its hours onto
   the bar — you know you did the two hours you booked; you don't know you're 40% through.
-- 🗂️ **Sittings fold away** behind *Sittings · 1/3 done*. Three jobs × three sittings was nine open rows.
+- 🗂️ **Sittings fold away** behind *Sittings · 1/3 done*.
 - 📝 **Each takes a note** — *"finish section 2"* — which becomes the record of what you did.
 - 🚨 **It warns before it's too late:** *"Not enough free time left. Something has to move."*
 - ⏭️ **Push today's sitting to tomorrow** in one tap. The work moves; **the deadline never does.**
+
+</td></tr></table>
 
 > ### 📌 "Book my sittings for me"
 >
@@ -200,56 +209,71 @@ is progress. Give the sitting back and it returns to grey.
 
 ### 3.3 ⭐ What to do first — the question a list never answers
 
-<p align="center">
-  <img src="docs/shots/priority.png" width="405" alt="A ranked list of what to do first, with the reason on every row">
-  <img src="docs/shots/priority-move.png" width="405" alt="Could move: what you are allowed to put down, and what it gives back">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/priority.png" alt="A ranked list of what to do first, with the reason on every row">
+</td><td>
 
 Lists sort by what you typed first; calendars sort by the clock. Neither knows a two-hour job due
-tomorrow beats a nine-hour job due next week. Everything in the next seven days goes on **one scale**, and
-every row says why it's there.
+tomorrow beats a nine-hour job due next week. Everything in the next seven days goes on **one scale**.
 
 | What counts | How much |
 |---|---|
 | **Size** | Hours still owed, or its load |
-| **Deadline** | Due today counts **×3**; past a week it falls **below ×1** |
+| **Deadline** | Today is **×3**; past a week, **below ×1** |
 | **Who you promised** | hard > soft > yourself |
-| **How much it matters** | The importance you set |
 | **Can it still be finished?** | If not — **straight to the top** |
 
-- 6️⃣ **Six at a time**, rest behind a tap. A *what-to-do-first* screen opening with 24 things is the
-  problem it was built to solve.
+- 6️⃣ **Six at a time**, rest behind a tap.
 - 🔘 **Every row has a button that does the next thing.**
 - 🌿 **In rest debt, rest goes above all of it.**
-- 🔒 **Then the half nobody asks: what are you *allowed* to move?** The same ranking turned around, sorted
-  by what each gives back. **Hard deadlines never appear here**, nor the lecture you flagged for exam hints.
+
+</td></tr><tr><td>
+<img src="docs/shots/priority-move.png" alt="Could move: what you are allowed to put down, and what it gives back">
+</td><td>
+
+**Then the half nobody asks: what are you *allowed* to move?**
+
+The same ranking turned around — sorted by what each one gives you back, with a button to write the
+message or move it to another day.
+
+🔒 **Hard deadlines never appear here**, nor does the lecture you flagged for exam hints. The app will not
+offer you something it would then refuse to do.
+
+</td></tr></table>
 
 ---
 
 ### 3.4 🎓 Timetable — paste it, then mark the lectures that matter more
 
-<p align="center">
-  <img src="docs/shots/timetable.png" width="405" alt="A week of classes with rooms and flags">
-  <img src="docs/shots/modules.png" width="405" alt="Modules with dread, importance and attendance">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/timetable.png" alt="A week of classes with rooms and flags">
+</td><td>
 
 Fourteen hours of class is the biggest single thing in a student's week, and most planners either ignore
 it or make you type it twice.
 
-- 📋 **Paste it from your portal.** Any shape works — `Mon 09:00-11:00 CS2040 … Kilburn LT1`, `Thu 8-10am`.
-  **A line it can't read is handed back on screen, never dropped.**
+- 📋 **Paste it from your portal.** Any shape works — `Mon 09:00-11:00 CS2040 … Kilburn LT1`.
+  **A line it can't read is handed back, never dropped.**
 - ⚠️ *"One more absence takes you under 80%."* Modules with no policy claim nothing.
-- 🔗 **"View these in my week"** opens that day in Plan, so you can see what flagging actually did.
-- 🎯 **Dread belongs to the module, not the class.** You don't dread Tuesday — you dread networks. Set it
-  once and **every class in that module re-prices**: *Networks · 5h · 10 load · 92% attended.*
-
-**Mark why an hour matters:**
+- 🔗 **"View these in my week"** opens that day in Plan, so you see what flagging actually did.
 
 | Flag | What it changes |
 |---|---|
-| 💡 **Gives exam tips** | The rebalancer will never move it — listed **locked**, like a hard deadline |
-| 📝 **Sets coursework** | Adds *"Anything set in this one?"* the minute work is announced |
-| ✅ **Attendance counted** | Feeds the register, warns you **before** you cross the line |
+| 💡 **Gives exam tips** | The rebalancer will never move it — **locked** |
+| 📝 **Sets coursework** | Adds *"Anything set in this one?"* |
+| ✅ **Attendance counted** | Warns you **before** you cross the line |
+
+</td></tr><tr><td>
+<img src="docs/shots/modules.png" alt="Modules with dread, importance and attendance">
+</td><td>
+
+**Dread belongs to the module, not the class.** You don't dread Tuesday — you dread networks. Set it once
+and **every class in that module re-prices**, which is the only way to get an honest number without asking
+you to rate fourteen contact hours one at a time.
+
+Each module shows what it is costing you: *Networks · 5h · 10 load · 92% attended.*
+
+</td></tr></table>
 
 ---
 
@@ -264,11 +288,19 @@ Every other screen reports what happened. This is the day you haven't lived yet.
 
 - 🌗 **Pick a kind of night, not a dial.** *A recovery night* and *push through* show their cost first.
 - 🎚️ **Then adjust anything** — sleep, a walk, texting a friend, study, screen time.
-- 🏸 **Add your own hobby.** Badminton, a night run, choir — type it once and it becomes a permanent
-  slider. The five we ship are a starting point, not a claim about your life.
 - 🛏️ **Sleep says *when*, not just how long.** *"Tonight runs to 11pm, so 6h is not available."*
 - 🕔 **Your evening starts when you say.** Nothing is booked before that hour.
 - 🔐 **Booking writes real protected blocks**, at hours you can change — and never two at once.
+
+</td></tr><tr><td>
+<img src="docs/shots/tonight-custom.png" alt="Badminton added as a permanent slider, with a Remove chip">
+</td><td>
+
+🏸 **And you add your own.** Badminton, a night run, choir, band practice — type it once with a usual
+length and it becomes a **permanent slider on your own screen**, counted like everything else.
+
+The five we ship are a starting point, not a claim about your life. Amira plays badminton, so her Tonight
+screen has a badminton slider.
 
 </td></tr></table>
 
@@ -277,18 +309,27 @@ Every other screen reports what happened. This is the day you haven't lived yet.
 ### 3.6 👥 Friends — see who has room before you ask
 
 <table><tr><td width="42%">
-<img src="docs/shots/social.png" alt="Friends with battery bands, and a planner that finds shared free time">
+<img src="docs/shots/social.png" alt="Friends with contact gaps and a low-effort reconnection suggestion">
 </td><td>
 
 People stop seeing friends in week 10 for want of **coordination**, not motivation — four people all
 assuming everyone else is busier.
 
-- 🔋 **Everyone's battery beside their name.** Inviting the person at 8% to a day trip isn't a kindness.
-- 📆 **Shared free time, worked out for you** — **their** free evenings against the real gaps in **yours**.
-- ✉️ **Sending it books it** — in your week, as social load, with a real time on it.
-- 💗 **Quiet care, no nagging.** *"Jo has been heavy for 6 days"* — one line, no script. Plus a
-  **low-effort reconnection** for whoever you haven't spoken to longest.
+- 💗 **Quiet care, no nagging.** *"Aisyah has been heavy for 11 days"* — one line, no script.
+- ✉️ **A low-effort reconnection** for whoever you haven't spoken to longest, because a two-line text is a
+  realistic ask in a heavy week and a coffee is not.
 - 🔒 **Privacy by design.** Friends see a **band** — steady, busy, heavy. Never your numbers.
+
+</td></tr><tr><td>
+<img src="docs/shots/social-plan.png" alt="Planning something: everyone's battery, what to do, and the evenings that work for all of you">
+</td><td>
+
+📆 **And it does the coordinating.** Pick who and what — dinner, a walk, study together, a day trip — and
+it intersects **their** free evenings with the real gaps in **your** week, then offers only the windows
+that work for everybody. *Wed 12 Nov, 6–8pm. Sat 15 Nov, 5–7pm.*
+
+🔋 **Everyone's battery sits next to their name**, because inviting the person at 8% to a day trip is not
+a kindness. Sending it books it — in your week, as social load, with a real time on it.
 
 </td></tr></table>
 
@@ -316,22 +357,29 @@ made of.
 
 ### 3.8 ⚖️ Plan · Rebalance · Saying no — the part that prevents something
 
-<p align="center">
-  <img src="docs/shots/rebalance.png" width="405" alt="Priced trades with a live battery">
-  <img src="docs/shots/decline.png" width="405" alt="The decline drafter with three tones">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/rebalance.png" alt="Priced trades with a live battery">
+</td><td>
 
 **Plan** slides a 72-hour window across the fortnight and flags **density, not volume** — four things in
 three days is a wall however light the average looks. It warns **eight days out**: long enough to email a
 tutor or swap a shift.
 
-**Rebalance** prices what you could put down. Every row says what it saves and which hour it touches, and
-the battery moves as you toggle. 🔒 **Hard deadlines can't be toggled at all.** Apply, and it says whether
-the wall is actually gone.
+**Rebalance** then prices what you could put down. Every row says what it saves and which hour it touches,
+and the battery moves as you toggle. 🔒 **Hard deadlines can't be toggled at all.** Apply, and it says
+whether the wall is actually gone.
+
+</td></tr><tr><td>
+<img src="docs/shots/decline.png" alt="The decline drafter with three tones">
+</td><td>
 
 **Saying no** is the twist. Knowing what to cut was never the hard part — *writing the message* is, which
-is why it waits four days. So the app writes it, in three tones, and you edit it first. ✉️ **It never sends
-anything.** And *"Actually, I'm going"* re-plans the week around your choice.
+is why it waits four days. So the app writes it, in three tones, and you edit it first.
+
+✉️ **It never sends anything.** And *"Actually, I'm going"* is a first-class button that re-plans the week
+around your choice instead of guilt-tripping you.
+
+</td></tr></table>
 
 ---
 

@@ -10,7 +10,7 @@
  * `new Date()` so the demo reads the same on every phone in every timezone.
  */
 import type {
-  CircleMember, Contact, Errand, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry,
+  CircleMember, Contact, Errand, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry, SimAction,
 } from '@/lib/types';
 import { addDays } from '@/lib/dates';
 
@@ -198,6 +198,33 @@ export const DEFICIT_DAYS = 9;
  * campus. Anything that needs money or a car is not recovery for most students,
  * it is another thing to organise.
  */
+/**
+ * One activity Amira added herself.
+ *
+ * The five evening sliders the app ships with are a guess about somebody else's
+ * life, and the feature that fixes that is invisible until someone uses it. She
+ * plays badminton on a Tuesday, so her Tonight screen has a badminton slider -
+ * which is both the honest seeded state and the only way the feature shows up
+ * without the student having to go looking for it.
+ */
+export const customActions: SimAction[] = [
+  {
+    id: 'custom-badminton',
+    label: 'Badminton',
+    bucket: 'physical',
+    min: 0,
+    max: 3,
+    step: 0.5,
+    baseline: 0,
+    unit: 'h',
+    ptsPerUnit: 4,
+    goodNote: 'Your own evening, counted',
+    badNote: 'Skipped tonight',
+    preferred: [18, 22],
+    custom: true,
+  },
+];
+
 export const prescriptions: Prescription[] = [
   { id: 'river', title: 'Walk the river loop', detail: '40 minutes. Free. Six minutes from your block. No phone needed.', refills: 'physical', credit: 2, slot: 'today at 5pm', preferred: [12, 19], tags: ['Costs nothing', 'Under an hour', 'Alone'], best: true },
   { id: 'nap',   title: 'Nap, 25 minutes',     detail: 'Between your 2pm and your shift', refills: 'mental',   credit: 3, slot: 'this afternoon', preferred: [13, 16] },
