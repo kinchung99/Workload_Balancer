@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Ballast — video plan</title>
+<style>
+  @page { size: A4; margin: 14mm 13mm; }
+  * { box-sizing: border-box; }
+  body { font: 10.5pt/1.45 -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif; color: #14161A; margin: 0; }
+  h1 { font-size: 27pt; margin: 0 0 4pt; letter-spacing: -.6pt; }
+  h2 { font-size: 15pt; margin: 20pt 0 7pt; padding-bottom: 4pt; border-bottom: 2.5pt solid #14161A; letter-spacing: -.2pt; }
+  h3 { font-size: 11.5pt; margin: 13pt 0 5pt; }
+  p { margin: 0 0 7pt; }
+  .lede { font-size: 11.5pt; color: #565A62; margin-bottom: 12pt; }
+  .cover { background: #FFF7EC; border: 2.5pt solid #14161A; border-radius: 14pt; padding: 16pt 18pt; margin-bottom: 14pt; }
+  .pills { display: flex; gap: 7pt; flex-wrap: wrap; margin-top: 10pt; }
+  .pill { border: 1.6pt solid #14161A; border-radius: 99pt; padding: 3.5pt 11pt; font-size: 9pt; font-weight: 700; }
+  .p1 { background: #C4A9F0; } .p2 { background: #8FE0C2; } .p3 { background: #FFD37A; } .p4 { background: #FFB3D1; } .p5 { background: #9CCDF5; }
+  table { width: 100%; border-collapse: collapse; margin: 7pt 0 11pt; font-size: 9pt; }
+  th { background: #14161A; color: #FFF7EC; text-align: left; padding: 5pt 7pt; font-size: 8.5pt; letter-spacing: .4pt; text-transform: uppercase; }
+  td { border-bottom: .8pt solid #E4E2DC; padding: 6pt 7pt; vertical-align: top; }
+  tr.alt td { background: #FBFAF7; }
+  .tc { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .say { font-size: 9.5pt; }
+  .say b { background: #FFF0A8; padding: 0 1.5pt; }
+  .show { font-size: 8.6pt; color: #3C4048; }
+  .show em { color: #A31C38; font-style: normal; font-weight: 700; }
+  .cap { font-size: 8.2pt; color: #6B7079; }
+  .box { border: 1.8pt solid #14161A; border-radius: 10pt; padding: 10pt 12pt; margin: 9pt 0; }
+  .cream { background: #FFF7EC; } .mint { background: #EEF5E2; } .pink { background: #FBE9EC; } .sky { background: #E2F1F7; }
+  ul { margin: 4pt 0 7pt; padding-left: 15pt; } li { margin-bottom: 3.5pt; }
+  .grid2 { display: flex; gap: 11pt; } .grid2 > * { flex: 1; }
+  .bar { display: flex; height: 24pt; border: 1.8pt solid #14161A; border-radius: 7pt; overflow: hidden; margin: 8pt 0 4pt; font-size: 7.4pt; font-weight: 700; }
+  .bar div { display: flex; align-items: center; justify-content: center; border-right: 1.2pt solid #14161A; text-align: center; }
+  .bar div:last-child { border-right: 0; }
+  .page { page-break-before: always; }
+  .no-break { page-break-inside: avoid; }
+  .foot { font-size: 8pt; color: #6B7079; margin-top: 14pt; border-top: .8pt solid #E4E2DC; padding-top: 5pt; }
+  code { background: #F1F0F3; padding: .5pt 3pt; border-radius: 3pt; font-size: 8.6pt; }
+</style></head><body>
+
+<div class="cover">
+  <h1>Ballast — 4:30 video plan</h1>
+  <p class="lede">Shot-by-shot script, what to show, and how to record it. Built for the Presentation rubric (15%) and the host's hint.</p>
+  <div class="pills">
+    <span class="pill p1">Target 4:30</span>
+    <span class="pill p2">Hard limit 5:00</span>
+    <span class="pill p3">~630 spoken words</span>
+    <span class="pill p4">12 segments</span>
+    <span class="pill p5">No ideation — README covers it</span>
+  </div>
+</div>
+
+<div class="box pink no-break">
+  <b>The host's hint, and what it changes.</b> Ideation (25%) is marked from the README alone. So the video
+  spends <b>zero seconds</b> on ideas you dropped, alternatives you weighed, or your process. Every second
+  goes to four jobs: <b>what it is · why it is novel · how it gets built · why it deserves building.</b>
+  Every segment below is tagged with which job it is doing.
+</div>
+
+<h2>What each rubric line actually wants</h2>
+<table>
+  <tr><th style="width:26%">Criterion</th><th style="width:11%">Weight</th><th>How this plan scores it</th></tr>
+  <tr><td><b>Clarity of explanation</b></td><td>5%</td><td>One idea per segment, stated before it is demonstrated. The core claim — <code>load = time × dread</code> — is <b>shown happening on screen</b> in the first 45 seconds, not described.</td></tr>
+  <tr class="alt"><td><b>Structure and flow</b></td><td>4%</td><td>Problem → idea → proof → build → why. Never doubles back. Segments 7–9 are a deliberate montage so the pace lifts before the technical section.</td></tr>
+  <tr><td><b>Delivery and confidence</b></td><td>4%</td><td>Short sentences, one clause each. Script is written to be <i>said</i>, not read. Three planned laugh beats stop it sounding flat.</td></tr>
+  <tr class="alt"><td><b>Engagement and persuasiveness</b></td><td>2%</td><td>Opens on a problem the panel has personally had. Closes on the one line nothing else can say.</td></tr>
+</table>
+
+<h2>The shape, at a glance</h2>
+<div class="bar">
+  <div style="flex:22; background:#FBE9EC">HOOK<br>0:22</div>
+  <div style="flex:50; background:#F0EAFC">THE IDEA<br>0:50</div>
+  <div style="flex:116; background:#EEF5E2">PROOF — THE APP DOING IT<br>1:56</div>
+  <div style="flex:44; background:#E2F1F7">HOW IT IS BUILT<br>0:44</div>
+  <div style="flex:38; background:#FBF0DC">WHY<br>0:38</div>
+</div>
+<p class="cap">Roughly 43% of the video is the product actually working. That ratio is the point — panels believe what they watch happen.</p>
+
+<div class="box cream no-break">
+  <b>Pace check.</b> 630 words over 270 seconds is ~140 words per minute — conversational, not rushed.
+  <b>Record a timed read-through before you touch the screen recorder.</b> If your read alone lands over
+  4:10, cut from the list on the last page <i>before</i> recording, not after.
+</div>
+
+<div class="page"></div>
+<h2>The script, shot by shot</h2>
+<p class="cap"><b>SAY</b> is your narration. <b>SHOW</b> is the screen. <em>Red</em> marks the exact moment a click or drag has to land.</p>
+
+<table>
+<tr><th style="width:8%">Time</th><th style="width:46%">Say</th><th>Show</th></tr>
+
+<tr>
+<td class="tc">0:00<br><span class="cap">22s</span><br><span class="cap">WHAT</span></td>
+<td class="say">"Two weeks. Same number of hours. Same number of tasks. One of them is completely fine — the other one breaks someone. And no planner on earth can tell you which.<br><br>Because every planner measures <b>hours</b>. And an hour of laundry is not an hour of a group presentation."</td>
+<td class="show">Two identical-looking week calendars side by side (a plain slide is fine — Google Calendar screenshots work).<br><br><em>On "breaks someone"</em> — one calendar turns red.<br><br>Caption: <b>Same hours. Very different weeks.</b></td>
+</tr>
+
+<tr class="alt">
+<td class="tc">0:22<br><span class="cap">23s</span><br><span class="cap">NOVEL</span></td>
+<td class="say">"So Ballast measures load as <b>time × dread</b>. Watch — three hours of a presentation you're dreading, six hours of reading you enjoy. Drag the dots…<br><br>…and the three-hour task <b>overtakes</b> the six-hour one. Half the hours. Twice the load.<br><br>That one multiplication is the entire app."</td>
+<td class="show"><code>/welcome</code> — the intro screen.<br><br><em>Drag the dread dots on the presentation up to 4 while you talk.</em> The bars swap live. Let the bar movement land before you speak again.<br><br>Caption: <b>load = time × dread</b></td>
+</tr>
+
+<tr>
+<td class="tc">0:45<br><span class="cap">27s</span><br><span class="cap">NOVEL</span></td>
+<td class="say">"And it doesn't land in one place. Adding something takes four short pages — and on page three you don't pick a number one to five.<br><br>You drag <b>five little faces</b>, and say what this thing takes out of your head, your hours, your body, your social life, your admin.<br><br>Because a group presentation isn't 'mental'. It's mental, <i>and</i> time, <i>and</i> a social cost nobody thinks to count."</td>
+<td class="show"><code>/add</code> → tap <b>Assignment</b> → Next → Next.<br><br><em>On page three, drag Mental up, then Time, then Social.</em> Slowly — the faces changing expression is the moment that sells it.<br><br>Caption: <b>One task. Five areas.</b></td>
+</tr>
+
+<tr class="alt">
+<td class="tc">1:12<br><span class="cap">18s</span><br><span class="cap">WHAT</span></td>
+<td class="say">"Which gives you this. <b>Forty-seven percent left</b> — and underneath, which part of you is actually empty. Mental's at thirty-five. Physical's at eighty-three. That pairing has a fix; one number on its own doesn't.<br><br>And yes, the battery has a face. It's tired too." <span class="cap">← laugh beat 1</span></td>
+<td class="show"><code>/</code> — Home. Hold on the battery for a full second before speaking.<br><br><em>Point the cursor at Mental 35 and Physical 83 as you say them.</em></td>
+</tr>
+
+<tr>
+<td class="tc">1:30<br><span class="cap">25s</span><br><span class="cap">NOVEL</span></td>
+<td class="say">"Now the part that actually <b>prevents</b> something.<br><br>Ballast slides a seventy-two-hour window across your next fortnight looking for <b>density, not volume</b>. Three deadlines over ten days is an ordinary fortnight. The same three inside seventy-two hours is a wall.<br><br>And it tells you <b>eight days out</b>. Long enough to email a tutor or swap a shift."</td>
+<td class="show"><code>/plan</code> — the 14-day strip.<br><br><em>On "wall", the collision card is already on screen — hover it.</em><br><br>Caption: <b>Warned 8 days early</b></td>
+</tr>
+
+<tr class="alt">
+<td class="tc">1:55<br><span class="cap">33s</span><br><span class="cap">NOVEL</span></td>
+<td class="say">"Then it prices what you could put down. Toggle — and the battery moves live.<br><br>Notice the group presentation. You <b>can't</b> toggle it. Hard deadlines are locked, because an app that suggests skipping your exam is an app you stop trusting.<br><br>And then the twist. Knowing what to cut was never the hard part — <b>writing the message</b> is. Four days of drafting a text in your Notes app; we've all done it. <span class="cap">← laugh beat 2</span> So Ballast writes it. Three tones. It never sends anything."</td>
+<td class="show"><code>/rebalance</code> — <em>toggle two trades, let the % climb.</em><br><br><em>Then try to tap the locked Group presentation row</em> so the panel sees it refuse.<br><br>Then <code>/decline/w11-birthday</code> — <em>switch tone Warm → Fully honest</em> so the message visibly rewrites.</td>
+</tr>
+
+<tr>
+<td class="tc">2:28<br><span class="cap">22s</span><br><span class="cap">WHAT</span></td>
+<td class="say">"Assignments stop hiding until the night before. Work you owe sits on <b>every single day</b> until it's done —<br><br>and this button reads your real week and books your study sittings across your lightest days. It even tells you the hours it <b>can't</b> fit, instead of letting you find that out on Wednesday night."</td>
+<td class="show">Home, scrolled to the <b>Owing</b> band.<br><br><em>Press "Book 3 sittings for me" and let the preview appear.</em> Do not rush this — it is your strongest single feature.</td>
+</tr>
+
+<tr class="alt">
+<td class="tc">2:50<br><span class="cap">22s</span><br><span class="cap">WHAT</span></td>
+<td class="say">"Your evening gets planned around what <b>you</b> actually do — add badminton, it becomes a permanent slider.<br><br>And when you've got twelve things and no idea where to start: one ranked list. Deadline, who you promised, how much is left, and whether it can even <b>still be finished</b>."</td>
+<td class="show">Fast cuts, ~10s each.<br><code>/actions</code> → <em>drag one slider, battery moves.</em><br><code>/priority</code> → <em>scroll the ranked rows so the reason chips read.</em></td>
+</tr>
+
+<tr>
+<td class="tc">3:12<br><span class="cap">14s</span><br><span class="cap">NOVEL</span></td>
+<td class="say">"You can also see which friends actually have <b>room</b> before you ask — a band, never a number — and it finds the one evening that works for all of you."</td>
+<td class="show"><code>/areas/social</code> — <em>hold on the row of friends with their batteries (62%, 24%, 8%, 71%).</em></td>
+</tr>
+
+<tr class="alt">
+<td class="tc">3:26<br><span class="cap">32s</span><br><span class="cap">HOW</span></td>
+<td class="say">"It's <b>Expo and React Native</b> — one codebase for iOS, Android and web. It's live right now: no install, no sign-in, open it on your phone.<br><br>Everything runs <b>on the device</b>. No server, no network. The scheduler is a real algorithm, not a language model — which is why it still works on a bus with no signal.<br><br>And none of this is a mock-up. <b>Three hundred and thirteen</b> automated checks prove every button moves the state it claims to."</td>
+<td class="show">Cut away from the phone.<br>1 — the live URL typed into a browser.<br>2 — the architecture diagram from README §5.2.<br>3 — <em>a terminal running <code>npm run preflight</code>, green.</em> Screen-record this beforehand and speed it up 4×.</td>
+</tr>
+
+<tr>
+<td class="tc">3:58<br><span class="cap">12s</span><br><span class="cap">HOW</span></td>
+<td class="say">"If we go ahead, <b>three weeks</b> adds accounts and sync. That's genuinely the only thing the app can't already do on its own."</td>
+<td class="show">The three-week table from README §5.3, one row highlighting at a time.</td>
+</tr>
+
+<tr class="alt">
+<td class="tc">4:10<br><span class="cap">20s</span><br><span class="cap">WHY</span></td>
+<td class="say">"Every wellbeing app tells a drowning student to breathe. <b>Ballast tells them which three things to put down</b> — and writes the awkward message for them.<br><br>No streaks. No scores. Nothing says 'supportive' like an app shaming you for missing a day in exam week. <span class="cap">← laugh beat 3</span><br><br>Ballast. The weight you carry on purpose, so you don't capsize."</td>
+<td class="show">Back to Home. The battery, the face.<br><br>Final frame: logo + live URL, held for 3 seconds in silence.<br><br>Caption: <b>load-balancer-ballast.expo.app</b></td>
+</tr>
+</table>
+
+<div class="page"></div>
+<h2>Recording it</h2>
+
+<div class="grid2">
+<div class="box sky">
+<h3 style="margin-top:0">Getting a clean phone recording</h3>
+<ul>
+<li><b>Best:</b> open the live URL on a real phone, screen-record, then drop it into a phone frame in editing. Most convincing — it is obviously a phone.</li>
+<li><b>Easiest:</b> desktop Chrome → DevTools → device toolbar → <b>iPhone 14 Pro</b>. Record that region only.</li>
+<li>Hide the URL bar and bookmarks. A visible browser chrome makes it read as a website, not an app.</li>
+<li>Move the cursor <b>slowly and deliberately</b>. Fast cursors read as nervous.</li>
+</ul>
+</div>
+<div class="box mint">
+<h3 style="margin-top:0">Before you hit record</h3>
+<ul>
+<li>Open <b>Areas → Reset to the seeded week</b>. Every number in this script assumes the seeded state.</li>
+<li>Check the app reads <b>47%</b> on Home. If it doesn't, you reset wrong.</li>
+<li>Turn off notifications. One Slack banner costs you a retake.</li>
+<li>Record narration <b>separately</b> from the screen. Trying to talk and demo at once is why most submissions sound hesitant.</li>
+</ul>
+</div>
+</div>
+
+<h3>Captions — do not skip these</h3>
+<p>Assume a panel watches at least part of it <b>muted</b>. Burn in captions (CapCut, Premiere or YouTube auto-captions corrected by hand). Beyond the full subtitles, put these <b>seven</b> phrases on screen as large text at the moment you say them — they are the takeaways you want remembered:</p>
+<table>
+<tr><th style="width:8%">Time</th><th style="width:36%">On-screen text</th><th>Why this one</th></tr>
+<tr><td class="tc">0:14</td><td><b>Same hours. Very different weeks.</b></td><td>The problem, in four words.</td></tr>
+<tr class="alt"><td class="tc">0:30</td><td><b>load = time × dread</b></td><td>The single thing you want them to remember.</td></tr>
+<tr><td class="tc">0:58</td><td><b>One task. Five areas.</b></td><td>Your biggest departure from every competitor.</td></tr>
+<tr class="alt"><td class="tc">1:44</td><td><b>Warned 8 days early</b></td><td>Proves it prevents rather than reports.</td></tr>
+<tr><td class="tc">2:10</td><td><b>Hard deadlines are locked</b></td><td>Signals judgement, not just features.</td></tr>
+<tr class="alt"><td class="tc">3:45</td><td><b>313 automated checks</b></td><td>The line that separates you from a Figma mock-up.</td></tr>
+<tr><td class="tc">4:27</td><td><b>load-balancer-ballast.expo.app</b></td><td>Hold 3 seconds. Let them write it down.</td></tr>
+</table>
+
+<h3>Delivery</h3>
+<div class="grid2">
+<div>
+<ul>
+<li><b>Smile on the first line.</b> It is audible, and it buys you the whole first segment.</li>
+<li><b>Land the three jokes and then move on.</b> Do not pause for a laugh that isn't in the room.</li>
+<li><b>Slow down on numbers.</b> "Forty-seven percent." "Eight days out." "Three hundred and thirteen."</li>
+</ul>
+</div>
+<div>
+<ul>
+<li><b>Full stop = full stop.</b> Short sentences are already written in; just honour them.</li>
+<li><b>Never say "um, so basically".</b> Re-record the line instead — it costs eight seconds.</li>
+<li><b>Last line: slower and quieter.</b> Confidence at the end reads as conviction.</li>
+</ul>
+</div>
+</div>
+
+<div class="box pink no-break">
+<h3 style="margin-top:0">If you are over 4:50 — cut in this order</h3>
+<ol style="margin:4pt 0 0; padding-left:16pt">
+<li><b>Friends (3:12, −14s)</b> — the only segment nothing else depends on.</li>
+<li><b>"And yes, the battery has a face. It's tired too." (−5s)</b> — lovely, not load-bearing.</li>
+<li><b>The Notes-app joke (−7s)</b> — keep "writing the message is" and drop the aside.</li>
+<li><b>Tonight, down to one sentence (−10s)</b> — keep Priority; it is the stronger of the pair.</li>
+</ol>
+<p style="margin:7pt 0 0"><b>Never cut:</b> the hook, the dread drag at 0:22, the five dials, or "313 automated checks". Those four carry Clarity, Novelty and Feasibility between them.</p>
+</div>
+
+<div class="box cream no-break">
+<h3 style="margin-top:0">Five ways teams lose Presentation marks</h3>
+<ol style="margin:4pt 0 0; padding-left:16pt">
+<li><b>Running over.</b> The limit is stated in the rubric; 5:01 is a scored penalty. Export, watch, check the runtime.</li>
+<li><b>Explaining the ideation.</b> The README is marked for that. In the video it is 60 seconds you cannot afford.</li>
+<li><b>Narrating the UI.</b> "Now I click here, and this opens…" Say what it <i>means</i>; let the screen show the click.</li>
+<li><b>A slide deck with no product.</b> You have a live app. Nearly half this video is it working — that is your advantage, use it.</li>
+<li><b>Trailing off.</b> End on the closing line and a held logo. No "…so, yeah, thanks."</li>
+</ol>
+</div>
+
+<p class="foot">Ballast · CodeNection, Lifestyle Track: Beating the Burnout · plan targets 4:30 against a 5:00 limit · script ≈630 words at ~140 wpm</p>
+</body></html>

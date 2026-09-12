@@ -136,7 +136,8 @@ change a task and the forecast changes with it.
 ### 3.1 ✍️ Add anything — five dials, four short pages
 
 <p align="center">
-  <img src="docs/shots/add-takes.png" width="620" alt="Five area dials, each with a face on the knob">
+  <img src="docs/shots/add-takes.png" width="405" alt="Five area dials, each with a face on the knob">
+  <img src="docs/shots/add-when.png" width="405" alt="Choosing a day and a time, with the battery before committing">
 </p>
 
 Capture is where every planner loses people, because it looks like a form. Ours is **four pages, one
@@ -149,20 +150,16 @@ question each.**
   Three areas at "a fair bit" is one weight landing in three places.
 - 📉 **Spreading a load reads lower, correctly** — the worst area counts for **double its share**.
 - 🙂 **Nobody learns a scale.** You can read the faces without reading the labels.
-
-<p align="center">
-  <img src="docs/shots/add-when.png" width="620" alt="Choosing a day and a time, with the battery before committing">
-</p>
-
-**Page four shows the damage before you agree to it.** Pick a day and an hour from gaps that actually
-exist; the battery updates to what your week *will* read. Nothing saves until you press the button.
+- 🔍 **Page four shows the damage before you agree to it.** Pick a day and an hour from gaps that actually
+  exist; the battery updates to what your week *will* read. Nothing saves until you press the button.
 
 ---
 
 ### 3.2 📄 Owing — assignments that stop hiding until the night before
 
 <p align="center">
-  <img src="docs/shots/day-bands.png" width="620" alt="A day split into Scheduled, Owing and This day">
+  <img src="docs/shots/day-bands.png" width="405" alt="A day split into Scheduled, Owing and This day">
+  <img src="docs/shots/owing-card.png" width="405" alt="Owing cards with their done, booked and loose bars">
 </p>
 
 A deadline is not a task. An assignment due Thursday is nine hours spread across the days *before* it —
@@ -175,10 +172,6 @@ So a day splits into **three honest bands**:
 | 🕐 **Scheduled** | Things with a time, on a clock rail. Gaps are real space you can tap to fill. |
 | 📄 **Owing** | Work due later, unfinished. Sits on **every** day until it's done. |
 | 🧺 **This day** | Loose tasks and errands with no time yet. |
-
-<p align="center">
-  <img src="docs/shots/owing-card.png" width="620" alt="Two Owing cards with their done, booked and loose bars">
-</p>
 
 Each Owing card carries a **three-state bar** — green is done, blue is booked into a day, grey is still
 loose. Booking a sitting moves work out of grey **before** any of it is finished, because a plan genuinely
@@ -208,13 +201,13 @@ is progress. Give the sitting back and it returns to grey.
 ### 3.3 ⭐ What to do first — the question a list never answers
 
 <p align="center">
-  <img src="docs/shots/priority.png" width="620" alt="A ranked list of what to do first, with the reason on every row">
+  <img src="docs/shots/priority.png" width="405" alt="A ranked list of what to do first, with the reason on every row">
+  <img src="docs/shots/priority-move.png" width="405" alt="Could move: what you are allowed to put down, and what it gives back">
 </p>
 
 Lists sort by what you typed first; calendars sort by the clock. Neither knows a two-hour job due
-tomorrow beats a nine-hour job due next week.
-
-Everything in the next seven days goes on **one scale**, and every row says why it's there.
+tomorrow beats a nine-hour job due next week. Everything in the next seven days goes on **one scale**, and
+every row says why it's there.
 
 | What counts | How much |
 |---|---|
@@ -228,40 +221,16 @@ Everything in the next seven days goes on **one scale**, and every row says why 
   problem it was built to solve.
 - 🔘 **Every row has a button that does the next thing.**
 - 🌿 **In rest debt, rest goes above all of it.**
-
-<p align="center">
-  <img src="docs/shots/priority-move.png" width="620" alt="Could move: what you are allowed to put down, and what it gives back">
-</p>
-
-**Then the half nobody asks: what are you *allowed* to move?** The same ranking turned around, sorted by
-what each gives back, with a button to write the message or move it. 🔒 **Hard deadlines never appear
-here**, nor the lecture you flagged for exam hints.
+- 🔒 **Then the half nobody asks: what are you *allowed* to move?** The same ranking turned around, sorted
+  by what each gives back. **Hard deadlines never appear here**, nor the lecture you flagged for exam hints.
 
 ---
 
-### 3.4 🌙 Tonight — an evening built around what *you* actually do
+### 3.4 🎓 Timetable — paste it, then mark the lectures that matter more
 
 <p align="center">
-  <img src="docs/shots/tonight-what.png" width="620" alt="Sliders for sleep, walking, seeing people, studying and screen time">
-</p>
-
-Every other screen reports what happened. This is the day you haven't lived yet.
-**Which night → what you'd do → book it.**
-
-- 🌗 **Pick a kind of night, not a dial.** *A recovery night* and *push through* show their cost first.
-- 🎚️ **Then adjust anything** — sleep, a walk, texting a friend, study, late-night screen time.
-- 🏸 **Add your own hobby.** Badminton, a night run, choir — type it once and it becomes a permanent
-  slider. The five we ship are a starting point, not a claim about your life.
-- 🛏️ **Sleep says *when*, not just how long.** *"Tonight runs to 11pm, so 6h is not available."*
-- 🕔 **Your evening starts when you say.** Nothing is ever booked before that hour.
-- 🔐 **Booking writes real protected blocks**, at hours you can change — and never two at once.
-
----
-
-### 3.5 🎓 Timetable — paste it, then mark the lectures that matter more
-
-<p align="center">
-  <img src="docs/shots/timetable.png" width="620" alt="A week of classes with rooms and flags">
+  <img src="docs/shots/timetable.png" width="405" alt="A week of classes with rooms and flags">
+  <img src="docs/shots/modules.png" width="405" alt="Modules with dread, importance and attendance">
 </p>
 
 Fourteen hours of class is the biggest single thing in a student's week, and most planners either ignore
@@ -271,6 +240,8 @@ it or make you type it twice.
   **A line it can't read is handed back on screen, never dropped.**
 - ⚠️ *"One more absence takes you under 80%."* Modules with no policy claim nothing.
 - 🔗 **"View these in my week"** opens that day in Plan, so you can see what flagging actually did.
+- 🎯 **Dread belongs to the module, not the class.** You don't dread Tuesday — you dread networks. Set it
+  once and **every class in that module re-prices**: *Networks · 5h · 10 load · 92% attended.*
 
 **Mark why an hour matters:**
 
@@ -280,21 +251,34 @@ it or make you type it twice.
 | 📝 **Sets coursework** | Adds *"Anything set in this one?"* the minute work is announced |
 | ✅ **Attendance counted** | Feeds the register, warns you **before** you cross the line |
 
-<p align="center">
-  <img src="docs/shots/modules.png" width="620" alt="Modules with dread, importance and attendance">
-</p>
+---
 
-**Dread belongs to the module, not the class.** You don't dread Tuesday — you dread networks. Set it once
-and **every class in that module re-prices**. Each module shows its cost: *Networks · 5h · 10 load · 92%
-attended.*
+### 3.5 🌙 Tonight — an evening built around what *you* actually do
+
+<table><tr><td width="42%">
+<img src="docs/shots/tonight-what.png" alt="Sliders for sleep, walking, seeing people, studying and screen time">
+</td><td>
+
+Every other screen reports what happened. This is the day you haven't lived yet.
+**Which night → what you'd do → book it.**
+
+- 🌗 **Pick a kind of night, not a dial.** *A recovery night* and *push through* show their cost first.
+- 🎚️ **Then adjust anything** — sleep, a walk, texting a friend, study, screen time.
+- 🏸 **Add your own hobby.** Badminton, a night run, choir — type it once and it becomes a permanent
+  slider. The five we ship are a starting point, not a claim about your life.
+- 🛏️ **Sleep says *when*, not just how long.** *"Tonight runs to 11pm, so 6h is not available."*
+- 🕔 **Your evening starts when you say.** Nothing is booked before that hour.
+- 🔐 **Booking writes real protected blocks**, at hours you can change — and never two at once.
+
+</td></tr></table>
 
 ---
 
 ### 3.6 👥 Friends — see who has room before you ask
 
-<p align="center">
-  <img src="docs/shots/social.png" width="620" alt="Friends with battery bands, and a planner that finds shared free time">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/social.png" alt="Friends with battery bands, and a planner that finds shared free time">
+</td><td>
 
 People stop seeing friends in week 10 for want of **coordination**, not motivation — four people all
 assuming everyone else is busier.
@@ -306,13 +290,15 @@ assuming everyone else is busier.
   **low-effort reconnection** for whoever you haven't spoken to longest.
 - 🔒 **Privacy by design.** Friends see a **band** — steady, busy, heavy. Never your numbers.
 
+</td></tr></table>
+
 ---
 
 ### 3.7 🔋 The battery, and the five areas under it
 
-<p align="center">
-  <img src="docs/shots/areas.png" width="620" alt="Five areas, emptiest first, each with its own battery">
-</p>
+<table><tr><td width="42%">
+<img src="docs/shots/areas.png" alt="Five areas, emptiest first, each with its own battery">
+</td><td>
 
 One number is easy to read and easy to be wrong about. Ballast shows one, with a face — then what it's
 made of.
@@ -324,12 +310,15 @@ made of.
 - 🎉 **The one input that puts charge back.** *Properly laughed*, *finished something*, *actually rested* —
   and the battery goes **up**. Repeats tail off, so it stays honest.
 
+</td></tr></table>
+
 ---
 
 ### 3.8 ⚖️ Plan · Rebalance · Saying no — the part that prevents something
 
 <p align="center">
-  <img src="docs/shots/rebalance.png" width="620" alt="Priced trades with a live battery">
+  <img src="docs/shots/rebalance.png" width="405" alt="Priced trades with a live battery">
+  <img src="docs/shots/decline.png" width="405" alt="The decline drafter with three tones">
 </p>
 
 **Plan** slides a 72-hour window across the fortnight and flags **density, not volume** — four things in
@@ -340,14 +329,9 @@ tutor or swap a shift.
 the battery moves as you toggle. 🔒 **Hard deadlines can't be toggled at all.** Apply, and it says whether
 the wall is actually gone.
 
-<p align="center">
-  <img src="docs/shots/decline.png" width="620" alt="The decline drafter with three tones">
-</p>
-
 **Saying no** is the twist. Knowing what to cut was never the hard part — *writing the message* is, which
-is why it waits four days. So the app writes it, in three tones, and you edit it first.
-
-✉️ **It never sends anything.** And *"Actually, I'm going"* re-plans the week around your choice.
+is why it waits four days. So the app writes it, in three tones, and you edit it first. ✉️ **It never sends
+anything.** And *"Actually, I'm going"* re-plans the week around your choice.
 
 ---
 
@@ -513,10 +497,3 @@ of them fail.
 | `behaviour:check` | **313** state changes — every button moves the state it claims to |
 | `render:check` | **351** strings across **27 pages**, and every screen has a way out |
 | `tokens:check` | **90** design tokens consistent across the whole app |
-
----
-
-<p align="center">
-  <b><a href="ballast/README.md">Technical documentation →</a></b><br>
-  architecture · the load model · accessibility · how every figure is verified
-</p>
