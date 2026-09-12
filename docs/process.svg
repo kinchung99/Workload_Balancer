@@ -35,13 +35,13 @@
   </g>
   <g font-size="16" font-weight="700" fill="#14161A" text-anchor="middle">
     <text x="117" y="184">Discover</text><text x="308" y="184">Diverge</text><text x="499" y="184">Decide</text>
-    <text x="690" y="184">Build</text><text x="882" y="184">Iterate</text>
+    <text x="690" y="184">Prototype</text><text x="882" y="184">Iterate</text>
   </g>
   <g font-size="12.5" fill="#14161A" text-anchor="middle">
     <text x="117" y="206">Who burns out,</text><text x="117" y="223">and why</text>
     <text x="308" y="206">Eight ideas,</text><text x="308" y="223">no filtering</text>
     <text x="499" y="206">Kill four on</text><text x="499" y="223">stated criteria</text>
-    <text x="690" y="206">Riskiest part</text><text x="690" y="223">first</text>
+    <text x="690" y="206">Front end only,</text><text x="690" y="223">riskiest part first</text>
     <text x="882" y="206">Use it, then</text><text x="882" y="223">replace it</text>
   </g>
 
@@ -59,8 +59,8 @@
     <text x="64" y="410" font-weight="700" fill="#A63A8C">✂️ Decide</text>
     <text x="188" y="410" fill="#14161A">Three rules: must work offline · must change the week, not describe it · must never punish a bad week.</text>
 
-    <text x="64" y="446" font-weight="700" fill="#7A5200">🛠️ Build</text>
-    <text x="188" y="446" fill="#14161A">The load model first, because if `time × dread` was not convincing, nothing above it would matter.</text>
+    <text x="64" y="446" font-weight="700" fill="#7A5200">🛠️ Prototype</text>
+    <text x="188" y="446" fill="#14161A">A working front end, load model first — if `time × dread` was not convincing, nothing above it mattered.</text>
 
     <text x="64" y="482" font-weight="700" fill="#1B5C46">🔁 Iterate</text>
     <text x="188" y="482" fill="#14161A">Eight features replaced after living with them. Every figure asserted so a change cannot pass quietly.</text>

@@ -73,10 +73,11 @@ AI planner, a battery metaphor, a dread multiplier.
 | Must **never punish a bad week** | Streaks, badges, leaderboards |
 | Must solve **overcommitment**, not distraction | The Pomodoro timer |
 
-**🛠️ Build.** The load model first, because if `time × dread` wasn't convincing, nothing built on top of
-it would matter. Then capture, then the forecast, then everything that acts on it.
+**🛠️ Prototype.** A working front end — no backend, no accounts, nothing to configure. The load model
+came first, because if `time × dread` wasn't convincing, nothing on top of it would matter. Then capture,
+then the forecast, then everything that acts on it.
 
-**🔁 Iterate.** Then we used it — and replaced eight things (§2.4).
+**🔁 Iterate.** Then we used it for a fortnight — and replaced eight things (§2.4).
 
 ### 2.2 🧠 Eight ideas, four survived
 
@@ -134,9 +135,9 @@ change a task and the forecast changes with it.
 
 ### 3.1 ✍️ Add anything — five dials, four short pages
 
-<table><tr><td width="44%">
-<img src="docs/shots/add-takes.png" alt="Five area dials with faces on the knobs">
-</td><td>
+<p align="center">
+  <img src="docs/shots/add-takes.png" width="620" alt="Five area dials, each with a face on the knob">
+</p>
 
 Capture is where every planner loses people, because it looks like a form. Ours is **four pages, one
 question each.**
@@ -149,22 +150,20 @@ question each.**
 - 📉 **Spreading a load reads lower, correctly** — the worst area counts for **double its share**.
 - 🙂 **Nobody learns a scale.** You can read the faces without reading the labels.
 
-</td></tr><tr><td>
-<img src="docs/shots/add-when.png" alt="Choosing a day and a time, with the battery before committing">
-</td><td>
+<p align="center">
+  <img src="docs/shots/add-when.png" width="620" alt="Choosing a day and a time, with the battery before committing">
+</p>
 
 **Page four shows the damage before you agree to it.** Pick a day and an hour from gaps that actually
 exist; the battery updates to what your week *will* read. Nothing saves until you press the button.
-
-</td></tr></table>
 
 ---
 
 ### 3.2 📄 Owing — assignments that stop hiding until the night before
 
-<table><tr><td width="44%">
-<img src="docs/shots/day-bands.png" alt="A day split into Scheduled, Owing and This day">
-</td><td>
+<p align="center">
+  <img src="docs/shots/day-bands.png" width="620" alt="A day split into Scheduled, Owing and This day">
+</p>
 
 A deadline is not a task. An assignment due Thursday is nine hours spread across the days *before* it —
 and a normal list shows you nothing until Thursday, which is why it ruins the night before.
@@ -177,7 +176,13 @@ So a day splits into **three honest bands**:
 | 📄 **Owing** | Work due later, unfinished. Sits on **every** day until it's done. |
 | 🧺 **This day** | Loose tasks and errands with no time yet. |
 
-Each Owing card carries a **three-state bar**: hours done · hours booked · hours still loose.
+<p align="center">
+  <img src="docs/shots/owing-card.png" width="620" alt="Two Owing cards with their done, booked and loose bars">
+</p>
+
+Each Owing card carries a **three-state bar** — green is done, blue is booked into a day, grey is still
+loose. Booking a sitting moves work out of grey **before** any of it is finished, because a plan genuinely
+is progress. Give the sitting back and it returns to grey.
 
 - ✅ **Progress is sittings ticked off, not a percentage guessed.** **Done** moves exactly its hours onto
   the bar — you know you did the two hours you booked; you don't know you're 40% through.
@@ -185,16 +190,6 @@ Each Owing card carries a **three-state bar**: hours done · hours booked · hou
 - 📝 **Each takes a note** — *"finish section 2"* — which becomes the record of what you did.
 - 🚨 **It warns before it's too late:** *"Not enough free time left. Something has to move."*
 - ⏭️ **Push today's sitting to tomorrow** in one tap. The work moves; **the deadline never does.**
-
-</td></tr><tr><td>
-<img src="docs/shots/owing-card.png" alt="Two Owing cards with their done, booked and loose bars">
-</td><td>
-
-**The bar, up close.** Green is done, blue is booked into a day, grey is still loose — and booking a
-sitting moves work out of grey **before** any of it is finished, because a plan genuinely is progress.
-Give the sitting back and it returns to grey.
-
-</td></tr></table>
 
 > ### 📌 "Book my sittings for me"
 >
@@ -212,9 +207,9 @@ Give the sitting back and it returns to grey.
 
 ### 3.3 ⭐ What to do first — the question a list never answers
 
-<table><tr><td width="44%">
-<img src="docs/shots/priority.png" alt="A ranked list of what to do first, with reasons">
-</td><td>
+<p align="center">
+  <img src="docs/shots/priority.png" width="620" alt="A ranked list of what to do first, with the reason on every row">
+</p>
 
 Lists sort by what you typed first; calendars sort by the clock. Neither knows a two-hour job due
 tomorrow beats a nine-hour job due next week.
@@ -234,24 +229,21 @@ Everything in the next seven days goes on **one scale**, and every row says why 
 - 🔘 **Every row has a button that does the next thing.**
 - 🌿 **In rest debt, rest goes above all of it.**
 
-</td></tr><tr><td>
-<img src="docs/shots/priority-move.png" alt="Could move: what you are allowed to put down, and what it gives back">
-</td><td>
+<p align="center">
+  <img src="docs/shots/priority-move.png" width="620" alt="Could move: what you are allowed to put down, and what it gives back">
+</p>
 
-**Then the half nobody asks: what are you *allowed* to move?**
-
-The same ranking turned around, sorted by what each gives back, with a button to write the message or move
-it. 🔒 **Hard deadlines never appear here**, nor the lecture you flagged for exam hints.
-
-</td></tr></table>
+**Then the half nobody asks: what are you *allowed* to move?** The same ranking turned around, sorted by
+what each gives back, with a button to write the message or move it. 🔒 **Hard deadlines never appear
+here**, nor the lecture you flagged for exam hints.
 
 ---
 
 ### 3.4 🌙 Tonight — an evening built around what *you* actually do
 
-<table><tr><td width="44%">
-<img src="docs/shots/tonight-what.png" alt="Sliders for sleep, walking, seeing people, studying and screen time">
-</td><td>
+<p align="center">
+  <img src="docs/shots/tonight-what.png" width="620" alt="Sliders for sleep, walking, seeing people, studying and screen time">
+</p>
 
 Every other screen reports what happened. This is the day you haven't lived yet.
 **Which night → what you'd do → book it.**
@@ -264,49 +256,45 @@ Every other screen reports what happened. This is the day you haven't lived yet.
 - 🕔 **Your evening starts when you say.** Nothing is ever booked before that hour.
 - 🔐 **Booking writes real protected blocks**, at hours you can change — and never two at once.
 
-</td></tr></table>
-
 ---
 
 ### 3.5 🎓 Timetable — paste it, then mark the lectures that matter more
 
-<table><tr><td width="44%">
-<img src="docs/shots/timetable.png" alt="A week of classes with rooms and flags">
-</td><td>
+<p align="center">
+  <img src="docs/shots/timetable.png" width="620" alt="A week of classes with rooms and flags">
+</p>
 
 Fourteen hours of class is the biggest single thing in a student's week, and most planners either ignore
 it or make you type it twice.
 
 - 📋 **Paste it from your portal.** Any shape works — `Mon 09:00-11:00 CS2040 … Kilburn LT1`, `Thu 8-10am`.
   **A line it can't read is handed back on screen, never dropped.**
-- 🏷️ **Mark why an hour matters:**
-
-  | Flag | What it changes |
-  |---|---|
-  | 💡 **Gives exam tips** | The rebalancer will never move it — listed **locked**, like a hard deadline |
-  | 📝 **Sets coursework** | Adds *"Anything set in this one?"* the minute work is announced |
-  | ✅ **Attendance counted** | Feeds the register, warns you **before** you cross the line |
-
 - ⚠️ *"One more absence takes you under 80%."* Modules with no policy claim nothing.
 - 🔗 **"View these in my week"** opens that day in Plan, so you can see what flagging actually did.
 
-</td></tr><tr><td>
-<img src="docs/shots/modules.png" alt="Modules with dread, importance and attendance">
-</td><td>
+**Mark why an hour matters:**
+
+| Flag | What it changes |
+|---|---|
+| 💡 **Gives exam tips** | The rebalancer will never move it — listed **locked**, like a hard deadline |
+| 📝 **Sets coursework** | Adds *"Anything set in this one?"* the minute work is announced |
+| ✅ **Attendance counted** | Feeds the register, warns you **before** you cross the line |
+
+<p align="center">
+  <img src="docs/shots/modules.png" width="620" alt="Modules with dread, importance and attendance">
+</p>
 
 **Dread belongs to the module, not the class.** You don't dread Tuesday — you dread networks. Set it once
 and **every class in that module re-prices**. Each module shows its cost: *Networks · 5h · 10 load · 92%
 attended.*
 
-</td></tr></table>
-
 ---
 
 ### 3.6 👥 Friends — see who has room before you ask
 
-<table><tr><td width="44%">
-<img src="docs/shots/social.png" alt="Friends with battery bands, and a planner that finds shared free time">
-</td><td>
+<p align="center">
+  <img src="docs/shots/social.png" width="620" alt="Friends with battery bands, and a planner that finds shared free time">
+</p>
 
 People stop seeing friends in week 10 for want of **coordination**, not motivation — four people all
 assuming everyone else is busier.
@@ -318,15 +306,13 @@ assuming everyone else is busier.
   **low-effort reconnection** for whoever you haven't spoken to longest.
 - 🔒 **Privacy by design.** Friends see a **band** — steady, busy, heavy. Never your numbers.
 
-</td></tr></table>
-
 ---
 
 ### 3.7 🔋 The battery, and the five areas under it
 
-<table><tr><td width="44%">
-<img src="docs/shots/areas.png" alt="Five areas, emptiest first, each with its own battery">
-</td><td>
+<p align="center">
+  <img src="docs/shots/areas.png" width="620" alt="Five areas, emptiest first, each with its own battery">
+</p>
 
 One number is easy to read and easy to be wrong about. Ballast shows one, with a face — then what it's
 made of.
@@ -338,15 +324,13 @@ made of.
 - 🎉 **The one input that puts charge back.** *Properly laughed*, *finished something*, *actually rested* —
   and the battery goes **up**. Repeats tail off, so it stays honest.
 
-</td></tr></table>
-
 ---
 
 ### 3.8 ⚖️ Plan · Rebalance · Saying no — the part that prevents something
 
-<table><tr><td width="44%">
-<img src="docs/shots/rebalance.png" alt="Priced trades with a live battery">
-</td><td>
+<p align="center">
+  <img src="docs/shots/rebalance.png" width="620" alt="Priced trades with a live battery">
+</p>
 
 **Plan** slides a 72-hour window across the fortnight and flags **density, not volume** — four things in
 three days is a wall however light the average looks. It warns **eight days out**: long enough to email a
@@ -356,19 +340,16 @@ tutor or swap a shift.
 the battery moves as you toggle. 🔒 **Hard deadlines can't be toggled at all.** Apply, and it says whether
 the wall is actually gone.
 
-</td></tr><tr><td>
-<img src="docs/shots/decline.png" alt="The decline drafter with three tones">
-</td><td>
+<p align="center">
+  <img src="docs/shots/decline.png" width="620" alt="The decline drafter with three tones">
+</p>
 
 **Saying no** is the twist. Knowing what to cut was never the hard part — *writing the message* is, which
 is why it waits four days. So the app writes it, in three tones, and you edit it first.
 
 ✉️ **It never sends anything.** And *"Actually, I'm going"* re-plans the week around your choice.
 
-</td></tr></table>
-
 ---
-
 
 ### 3.9 The rest of it
 
@@ -431,6 +412,8 @@ A complete, working front end. No screen is a mock-up; every figure is computed.
 Local-first on purpose, all the way into production: **the phone stays the source of truth, the server is
 a synchroniser — never a dependency.**
 
+This is the destination. §5.3 is the first three weeks of it.
+
 | Layer | Choice for v1 | What it's for |
 |---|---|---|
 | **API** | **Node.js + Express**, in TypeScript | The same language as the app, so the load model is written once and shared. A REST API every developer can read. |
@@ -467,19 +450,34 @@ a synchroniser — never a dependency.**
 > must all keep working with the network off. The server adds sync, friends and notifications — it is never
 > required to use the app.
 
-### 5.3 📅 Build plan
+### 5.3 📅 Three weeks, if we go ahead
 
-Phase 0 is finished and live. The rest is four months of two-week sprints for a three-person team working
-part-time alongside study.
+**Already done:** the entire front end — load model, capture, forecast, rebalance, drafter, recovery,
+Tonight, five areas, timetable, owing work, priority, accessibility. Live now, with 351 render and 313
+behaviour assertions passing on every deploy.
 
-| Phase | Weeks | Ships | Done when |
+We have **three weeks** of build time after the finals. That is not enough for everything in §5.2, so the
+plan is a scope decision rather than a wish list: **one vertical slice, finished**, instead of five things
+half-done.
+
+**What we build:** accounts and sync. Nothing else. It is the only item the app genuinely cannot fake —
+every other feature already works offline, on the phone, today.
+
+| Week | Focus | Ships | Done when |
 |---|---|---|---|
-| **0 · Prototype** ✅ | — | The full front end — load model, capture, forecast, rebalance, drafter, recovery, Tonight, five areas, timetable, owing work, priority, accessibility | **Live now.** 351 render + 313 behaviour assertions pass on every deploy |
-| **1 · MVP backend** | 1–4 | Express API + Postgres schema, Firebase Auth (Google / Apple / email), local-first sync, GDPR export & delete | A task added offline appears on the web after reconnecting — and on no other account |
-| **2 · Calendar & alerts** | 5–8 | Google Calendar and ICS import, nightly clustering job, push notifications, attendance warnings | A real timetable imports itself; a genuine wall produces **exactly one** push, eight days out |
-| **3 · Social** | 9–12 | Friend requests, band-only sharing, shared-window finder on real data, invites with accept / decline | Two real accounts find an evening that suits both — and neither sees the other's numbers |
-| **4 · Closed beta** | 13–16 | HealthKit / Health Connect, onboarding that sets real ceilings, **pilot: 20–30 students over four weeks** | Weekly retention, and one survey question: *did it stop a bad week?* |
-| **5 · Launch** | 17–20 | Act on beta findings. Optional AI rewriting, opt-in. App Store and Play submission | Public TestFlight and Play internal testing, crash-free sessions above 99.5% |
+| **1** | 🗄️ **Data layer** | Express API in TypeScript, Postgres schema via Prisma, Firebase Auth (Google · Apple · email), `/sync` endpoint | A signed-in account can push and pull a week over HTTPS, and cannot read anyone else's |
+| **2** | 🔄 **Sync in the app** | Local-first write queue, pull-on-open, per-row conflict resolution, GDPR export and delete | A task added on a phone in aeroplane mode appears on the web after reconnecting — **and on no other account** |
+| **3** | 🚀 **Ship it** | Deploy to Railway, GitHub Actions running the four checks on every push, Sentry, TestFlight build, bug-fix buffer | Five testers install from TestFlight, use it for three days, and nothing is lost |
+
+**Why this order.** Week 3 is deliberately half buffer. A three-week estimate with no slack is a two-week
+estimate with a bad ending, and the checks in §5.5 only protect us if they are actually wired into CI.
+
+**Cut on purpose, and honest about it:** friends syncing between real accounts, push notifications, the ICS
+timetable feed, and health data. Each needs the data layer underneath it, so they are the natural week 4–8
+and not something we will pretend to fit into three.
+
+**What that means for the demo:** nothing changes. Everything you can open today keeps working exactly as
+it does — the three weeks add sync *behind* it, not features on top.
 
 **Risks we already know about**
 
