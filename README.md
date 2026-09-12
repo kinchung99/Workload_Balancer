@@ -115,12 +115,11 @@ screen you can open in the prototype right now.
 
 ### 2.6 👤 Mentor consultation
 
+### 2.6 👤 Mentor consultation
+
 | Date | Mentor | Feedback received | What we changed |
 |---|---|---|---|
-| | | | |
-| | | | |
-
-> *To be completed by the team from our own mentor sessions.*
+| [12-9-2026] | [Faris Imran] | • Reduce focus on secondary features and elevate core strong points (social features).<br>• Tone down overstimulating brightness and colors on UI components.<br>• Simplify the home screen to act purely as an overview rather than offering inline editing.<br>• Make the social feature screen more interactive to drive collaborative planning.<br>• Implement a status update feature showing friends' last battery update/check-in. | • Restructured bottom navigation to `1. Home`, `2. Plan`, `3. Friends`, `4. You` to dedicate a tab to social features.<br>• Redesigned UI components to use neutral palettes (e.g., neutral battery icon, simplified green/red sliders).<br>• Replaced home screen complexity with simplified overview buttons (*My Week*, *Friends*, *What First*, *Recover*).<br>• Enhanced `Friends` tab interactivity (friend timetables, battery visibility, WhatsApp shortcut, contact invites).<br>• Added last checked-in status updates for users and friends within the `Friends` tab. |
 
 ---
 
