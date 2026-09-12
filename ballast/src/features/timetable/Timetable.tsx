@@ -67,8 +67,8 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
 
   return (
     <Screen
-      back="/areas/time"
-      backLabel="Time"
+      back="/you"
+      backLabel="You"
       footer={
         <Button
           label={step === 2 ? 'Back to the week' : 'Import from your portal'}
@@ -83,7 +83,6 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
           {...SCREEN.timetable}
           eyebrow="Timetable"
           title={TITLE[step]}
-          sub={SUB[step]}
         />
 
         {/* Attendance, when somebody is counting. */}
@@ -306,14 +305,6 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
         </Stack>
         ) : null}
 
-        {step !== 2 ? (
-          <Reveal label="Why a class can be worth more than its hours">
-            <Text variant="footnote" tone="muted">
-              A lecture is an hour of load like any other until it is the one where the exam hints get given.
-              Marking it means the rebalancer will never propose moving it, however heavy the week gets.
-            </Text>
-          </Reveal>
-        ) : null}
 
         <View className="h-2" />
       </Stack>

@@ -31,29 +31,13 @@ const textOf = (route) =>
 
 const EXPECTATIONS = [
   ['index.html', 'Home', [
-    'WEEK 10',
+    'WEEK 10', 'Good ',                       // a greeting under a drawing
     '47%', 'Doing fine',                      // the hero: a face, a number, a word
-    '47 percent left. Doing fine. Made of Mental 35%',       // spoken, with its parts
-    'WHAT THIS NUMBER IS',                    // the explanation, behind a tap
-    'Mental, 35% left', 'Physical, 83% left', // areas as icons plus a number
-    'M 10 13.3h', 'S 16 13h',                 // the week, with real class hours in it
-    'Tuesday to Thursday next week is a wall',
-    'Mental 65%',                             // what is pulling you down, as chips
-    '11h rest owed',
-    'TODAY \u00b7 MON 10 NOV', '1pm', '5pm', '11pm',
-    'Operating Systems lecture', 'Kilburn LT1',   // the timetable, on the timeline
-    'Tips', 'Register',                       // and why that hour matters more
-    'Scheduled', 'Owing', 'This day',         // three sections, three drawings, three questions
-    'Book 3 sittings for me',                 // the planner, offered before you ask
-    '3 \u00b7 13h to go', 'no time yet',        // and what each band adds up to, not just its name
-    'NOT ON THE CLOCK',                       // the line between a timeline and a list
-    'takes 20m',                              // a duration, said as one, out of the clock column
-    'Algorithms problem set', '75%', 'unplanned',
-    '1h done', '0h booked', '3h loose',
-    'Give it a time', 'Move', 'Unschedule',
-    'WOULD HELP', 'Walk the river loop',      // one suggestion, not a paragraph
-    'Good ',                                  // the header greets you, under a drawing
-    'WHAT TO DO FIRST', 'you could move',     // the ranked list, named before you tap
+    'DO THIS NEXT', 'Operating systems, part 2',   // one next thing, not a list
+    'Tuesday to Thursday next week is a wall',     // the one warning worth interrupting for
+    'My week', 'Friends', 'What first', 'Recovery',  // four doors, and nothing else
+    '3 checked in',                           // the circle, on the home screen
+    'Add anything',
   ]],
   ['welcome.html', 'Intro', [
     'THE WHOLE IDEA',
@@ -64,26 +48,13 @@ const EXPECTATIONS = [
     'Every planner measures hours',
     'Skip the intro',
   ]],
-  ['areas.html', 'Areas', [
-    'One number hides which part of you is empty.',   // every screen opens the same way
-    'Your areas', 'EMPTIEST FIRST',
-    'Mental, 35% left, running on empty',        // the whole chart, spoken
-    'Mental', 'Mood check-ins and what is contributing',
-    'Physical', 'Meals, movement and sleep',
-    'Errands', 'Batched into trips you can actually do',
-    'ABOUT THIS BUILD', 'Replay the intro', 'Reset to the seeded week',
-  ]],
-  ['actions.html', 'Tonight · which night', [
+  ['tonight/night.html', 'Tonight · which night', [
     'STEP 1 OF 3 \u00b7 WHICH NIGHT',
-    'Which night?', 'One evening at a time.',
-    'Tonight', 'Tomorrow',                          // one evening, chosen
-    'Free from 5pm',                                // off-hours, folded away
-    'WHAT THIS SCREEN IS FOR',                      // the rest of it, behind a tap
-    'Plan tonight',
+    'Which night?', 'Tonight', 'Tomorrow', 'Free from 5pm', 'Plan tonight',
   ]],
   ['tonight/what.html', 'Tonight · what you do', [
     'STEP 2 OF 3 \u00b7 WHAT YOU DO',
-    'What would you do?', 'Drag one and watch the battery move.',
+    'What would you do?',
     'PICK A NIGHT',                                 // a kind of night, not a dial
     'A recovery night', 'A balanced night', 'Push through',
     'NOW', 'PROJECTED', 'YOUR ACTIONS',
@@ -96,64 +67,32 @@ const EXPECTATIONS = [
   ]],
   ['tonight/book.html', 'Tonight · book it', [
     'STEP 3 OF 3 \u00b7 BOOK IT',
-    'Book it?', 'Nothing is saved until you press the button.',
+    'Book it?',
     'WHAT THIS PUTS IN YOUR WEEK',            // the effect, stated before you tap
     'Move a slider and what it books appears here',
     'Move a slider first',                    // becomes a real count once a slider moves
     'Rebalance next week', 'Recovery ledger',
   ]],
-  ['areas/mental.html', 'Mental area', [
-    'How today feels, and what is behind it',         // the area header says why you opened it
-    'LOG YOUR MOOD', 'HIGH ENERGY', 'LOW ENERGY',
-    "WHAT'S CONTRIBUTING?", 'Academics', 'Finances', 'Log check-in',
-    'SOMETHING GOOD HAPPENED?',               // the one input that adds charge
-    'Properly laughed', 'Finished something', 'Proud of myself',
-    'Helped someone', 'Actually rested',
-    'Pick one and say why',                   // a reason, not just a category
-    'RECENT CHECK-INS', 'High Energy \u00b7 Unpleasant',
-  ]],
-  ['areas/time.html', 'Time area', [
-    'HRS COMMITTED', 'HRS RECOVERY', 'Committed', 'Protected recovery',
-    'WHAT PROTECTED MEANS',                   // the explanation, behind a tap
-  ]],
-  ['areas/physical.html', 'Physical area', [
-    'Tap and describe what you ate', "TODAY'S MEALS",
-    'Breakfast', 'Ate \u00b7 Filling', 'Lunch', 'Light snack', 'Dinner', 'Not yet',
-    'ACTIVITY TODAY', '4,200', '32 active min',
-    'HOW DID YOU SLEEP?', '8h',               // logged on waking
-    'Each option shows what it would do first',  // each option previews its own effect
-  ]],
-  ['areas/social.html', 'Social area', [
-    'LOW-EFFORT RECONNECTION', 'Sam K.', '9 days since you spoke',
-    'CLOSE FRIENDS', 'Last spoke 5 days ago', 'Talked today',
-    'YOUR CIRCLE', '84%', 'heavy for 11 days',
-    'PLAN SOMETHING', 'WHO', 'WHAT', 'WHEN EVERYONE IS FREE',
-    'Day trip', '71%',                        // Ravi's battery, shown before you invite him
-  ]],
-  ['areas/errands.html', 'Errands area', [
-    'ADD A TASK OR ERRAND', 'Pick up oat milk',  // one list for everything you just do
-    'Sorted into a batch, priced, and put on the day you choose',
-    'WHY BATCHING IS FREE',                   // the reasoning, behind a tap
-    'Type something first',                   // empty submits are refused
-    'GROCERIES', 'ADMIN', 'Pay the phone bill', 'ACADEMIC', 'Email Prof. Chen',
-  ]],
   ['plan.html', 'Plan', [
-    'Tap any day to open it hour by hour.',
-    'Next week, 41%',           // 100 - 96, the same number the other way up
-    'Tap a day.',
-    'THE COLLISION', '72 hours', '4 things',  // the pile-up as a shape, not a list
-    'Hard', 'Movable',                        // the legend, trimmed to the words
-    'h free',                                 // gaps are where things get added
-    'h booked', 'h free',
-    'Tuesday to Thursday next week is a wall',
-    'Four things inside seventy-two hours',
-    'In 8 days',
-    '8 days to move something. That is enough',
-    'Networks lab report', 'Group presentation', 'Caf\u00e9 shift, covering Amin', "Aisyah's birthday dinner",
-    'Movable', 'Hard',
+    'WEEK 10 TO 12', 'Next 14 days', 'This week 47%', 'Next 41%',
+    'Today', 'Mon 10 Nov', '13.3h booked', '3h free',
+    'Scheduled', '4 \u00b7 13h',                 // the clock rail
+    'Operating Systems lecture', 'Kilburn LT1', 'Tips', 'Register',
+    'NOT ON THE CLOCK', 'Owing', '3 \u00b7 13h to go', 'This day', 'no time yet',
+    'Algorithms problem set', '75%', 'unplanned', '1h done', '0h booked', '3h loose',
+    'Tap to plan it',                         // read-only rows: the verbs are one tap away
+    'takes 20m',
+    'Tuesday to Thursday next week is a wall.', 'In 8 days',   // one line, not a chart
+    'Rebalance next week',
   ]],
   ['rebalance.html', 'Rebalance', [
     'Something has to come off', 'Toggle a trade and watch the battery move.',
+    // The one piece of advice here a calendar could not have produced: which of
+    // two things to go to, decided from a rating only the student can give.
+    'A SWAP, WEDNESDAY', 'Go to one, not both.',
+    'KEEP', 'Distributed Systems seminar', 'You said you want this',
+    'DROP', 'Caf\u00e9 shift, covering Amin', 'A soft arrangement \u00b7 14 load back',
+    'Make the swap',
     '41%', '50%',             // charge before and after the four trades
     '4 changes selected, saving 34 load',
     'NEXT WEEK, IF YOU APPLY',                // which days get lighter, before you commit
@@ -177,8 +116,7 @@ const EXPECTATIONS = [
     'STEP 2 OF 4 \u00b7 HOW BIG',
     'How big is it?',                         // the shape question, asked second
     'Just turn up', 'An hour you attend',
-    'Work first', 'Hours before the day',
-    'How long', 'Why ask this first',
+    'Work first', 'Hours before the day', 'How long',
   ]],
   ['add/takes.html', 'Add · what it takes', [
     'STEP 3 OF 4 \u00b7 WHAT IT TAKES',
@@ -186,13 +124,16 @@ const EXPECTATIONS = [
     'THIS ONE WEIGHS',                        // the live consequence, above the controls
     'Mental', 'Time', 'Physical', 'Social', 'Errands',   // all five, every time
     'how much this takes out of you',         // the dials, spoken
-    'Why five and not one',
   ]],
   ['add/when.html', 'Add · when', [
     'STEP 4 OF 4 \u00b7 WHEN',
     'Which day', 'Today', 'Tomorrow',         // any day, in view, not behind a chip
     'Anytime that day',                       // "no time" stays a real answer
     'Can it move?', 'Hard deadline',
+    // The one thing the app cannot derive, asked once, in three words, next to
+    // the question it belongs with.
+    'Want to be there?', 'Rather not', "Don't mind", 'Really want to',
+    'Lets the app swap things, not just drop them.',
     'YOUR WEEK RIGHT NOW', 'Before you add anything',   // the battery, before you commit
     '47%', 'Busy week',                       // and it is the real reading, not a mock
   ]],
@@ -230,19 +171,86 @@ const EXPECTATIONS = [
     'Import from your portal',
   ]],
   ['timetable/modules.html', 'Timetable · modules', [
-    'Your modules', 'Dread once, and every class re-prices.',
+    'Your modules',
     'YOUR MODULES', 'CS2040', 'Distributed Systems',
     'Dread 4',                                          // dread lives on the module
     'Below the 80% the department expects.',
   ]],
   ['timetable/import.html', 'Timetable · import', [
-    'Paste it. Nothing is scanned or uploaded.',
     'Paste it from your portal', 'One class per line',
     'Back to the week',
   ]],
+  ['friends.html', 'Friends', [
+    '3 CHECKED IN TODAY', 'Your circle',
+    'You \u00b7 47%', 'Updated 5 min ago',        // your own side of it, first
+    'Sharing: evenings only',                 // your side of it, and one tap to change it
+    'MAYBE CHECK ON', 'Aisyah', 'heavy for 11 days',   // at most one person, ever
+    'Everyone',
+    'running empty \u00b7 2h ago',               // a reading, and how old it is
+    'Finally handed it in',                   // a line they wrote themselves
+    '3 days ago \u00b7 may be out of date',      // a stale reading says so
+    // The calendar is one tap into the row, so it is asserted on the row's own
+    // page rather than here - collapsed is the whole design of these lists.
+    'Tap to change what your circle sees',
+    'Find friends', '3 of your contacts are here',
+    'Plan something together',
+  ]],
+  ['plan-together.html', 'Plan together', [
+    'PLAN SOMETHING', 'Find an evening',
+    'WHO', 'Amin', '62%', 'Aisyah', '8%',      // their capacity, next to the name
+    'WHAT', 'Dinner \u00b7 2h', 'Day trip \u00b7 6h',
+    'WHEN EVERYONE IS FREE',                   // the windows that work for all of you
+    'Wed 12 Nov', '6pm – 8pm', 'Pick a time',
+  ]],
+  ['sharing.html', 'Sharing', [
+    'YOUR PRIVACY', 'What they see',
+    'Your battery \u00b7 47%', 'Always shared. It is how they know to check on you.',
+    // Three levels, each with its consequence written next to it.
+    'Nothing', 'They see your battery. No times at all.',
+    'Evenings only', 'Free evenings, after 5pm. Nothing daytime.',
+    'Free / busy', 'When you are free, all day. Never what you are doing.',
+    // The preview is the whole point: their view of you, in their name.
+    "AMIN'S VIEW OF YOUR WEEK", '5pm\u201311pm',
+    'Never a title, a deadline or who you are with. There is no field for it.',
+  ]],
+  ['find-friends.html', 'Find friends', [
+    '4 IN YOUR CIRCLE', 'Find your people',
+    '3 already here', 'From your contacts. One tap each.',
+    'Nadia Rahman', 'On Ballast', 'Add',        // one tap, nothing to send
+    'Danny Oduya', 'Not on Ballast yet', 'Invite',
+    'Matching happens on your phone.', 'Your contacts are never uploaded.',
+  ]],
+  ['friend/ravi.html', 'A friend\u2019s week', [
+    'UPDATED 2H AGO', 'Ravi', '71%', 'doing fine',
+    'Free most of this week',                   // a line they wrote themselves
+    'THIS WEEK, AS THEY SHARE IT',
+    'Wednesday, free 5pm to 11pm',              // published windows, spoken
+    'Saturday, free 12pm to 10pm',
+    'Free time only. Never what they are doing.',
+    'Ask about Saturday',                       // the longest window, as one tap
+  ]],
+  ['you.html', 'You', [
+    'You', '47%',
+    'Check in', 'Recovery', 'Tonight', 'Timetable', 'What to do first',
+    'Replay intro', 'Reset',
+  ]],
+  ['item/algo-set.html', 'One item', [
+    'DUE THU 13 NOV', 'Algorithms problem set',
+    '12 load', 'Soft', 'No time yet',
+    '3h still to do', '1h done \u00b7 0h booked \u00b7 3h loose',
+    'Book 2 sittings for me',                 // every verb for this thing, in one place
+    'DID SOME WITHOUT BOOKING IT?',
+    'How much are you dreading it?', 'Changing this re-prices the whole week.',
+    'Write a message to get out of it',
+  ]],
+  ['checkin.html', 'Check in', [
+    'How are you?',                           // the whole daily ask, one screen
+    'TODAY FEELS', 'SLEPT', 'ATE TODAY',
+    'SOMETHING GOOD HAPPENED?',               // the one input that adds charge
+    'Properly laughed', 'Actually rested',
+  ]],
   ['priority.html', 'Priority', [
     'WHAT TO DO FIRST', 'Start with this',
-    'Ranked by deadline, who you promised, and what is left.',
     'Start here', 'of 24 \u00b7 next 7 days',   // six shown, the rest behind a tap
     'Show the other 18',
     'Operating systems, part 2', 'Due today', 'Hard deadline',   // the reasons, as chips
@@ -250,18 +258,6 @@ const EXPECTATIONS = [
     'Could move', 'back',                     // the half no planner asks about
     'Write the message', 'Move it',
     'BEFORE ANY OF IT',                       // at 13%, rest stops being a reward
-    'How this order is worked out',
-  ]],
-  ['foundations.html', 'Foundations', [
-    'Colour is never the only signal', 'flat fill', 'diagonal hatch', 'cross hatch', 'vertical rule',
-    'colour taken away', '44 by 44 point minimum',
-    'How it looks at each level', 'Full of it', 'Nearly empty',   // the character, at every reading
-    'The five areas', 'Drawings',
-    'Colour on a reading still means which band',                 // the rule the hues must not break
-    'Decoration has its own palette', 'blush', 'lemon',            // and the group that can never carry one
-    'a bug, not a style choice',
-    'One thing, five areas', 'Nothing', 'Everything',              // the dial, at every notch
-    'the face of the task, not of the person',
   ]],
 ];
 
@@ -271,11 +267,6 @@ const EXPECTATIONS = [
  * exactly what happened on the area screens.
  */
 const EXITS = [
-  ['areas/mental.html', 'Areas'],
-  ['areas/time.html', 'Areas'],
-  ['areas/physical.html', 'Areas'],
-  ['areas/social.html', 'Areas'],
-  ['areas/errands.html', 'Areas'],
   ['add.html', 'Home'],
   ['add/what.html', 'Home'],
   ['add/size.html', 'Home'],
@@ -284,15 +275,21 @@ const EXITS = [
   ['rebalance.html', 'Plan'],
   ['recover.html', 'Home'],
   ['prescription.html', 'Recovery'],
-  ['foundations.html', 'Areas'],
   ['decline/w11-birthday.html', 'Plan'],
   ['widget.html', 'Back'],
   ['calm.html', 'Home'],
   ['priority.html', 'Home'],
-  ['timetable.html', 'Time'],
-  ['timetable/week.html', 'Time'],
-  ['timetable/modules.html', 'Time'],
-  ['timetable/import.html', 'Time'],
+  ['checkin.html', 'You'],
+  ['plan-together.html', 'Friends'],
+  ['sharing.html', 'Friends'],
+  ['find-friends.html', 'Friends'],
+  ['friend/ravi.html', 'Friends'],
+  ['item/algo-set.html', 'Plan'],
+  ['tonight/night.html', 'You'],
+  ['timetable.html', 'You'],
+  ['timetable/week.html', 'You'],
+  ['timetable/modules.html', 'You'],
+  ['timetable/import.html', 'You'],
   ['prescription/what.html', 'Recovery'],
   ['prescription/when.html', 'Recovery'],
   ['welcome.html', 'Skip the intro'],

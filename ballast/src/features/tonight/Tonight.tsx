@@ -119,6 +119,8 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
   if (committed) {
     return (
       <Screen
+        back="/you"
+        backLabel="You"
         footer={
           <>
             <Button label="See the ledger" onPress={() => router.push('/recover')} />
@@ -167,6 +169,8 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
 
   return (
     <Screen
+      back="/you"
+      backLabel="You"
       footer={
         <StepNav
           step={step}
@@ -200,7 +204,6 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
           wash={SCREEN.tonight.wash}
           eyebrow={dayName}
           title={ART[step].title}
-          sub={ART[step].sub}
         />
 
         {step === 0 ? (
@@ -254,12 +257,6 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
           </Card>
         ) : null}
 
-        <Reveal label="What this screen is for">
-          <Text variant="footnote" tone="muted">
-            Every other screen reports what happened. This is the rest of a day you have not lived yet — choose
-            how you spend it, see what it costs, book it only if you want to.
-          </Text>
-        </Reveal>
         </Stack>
         ) : null}
 

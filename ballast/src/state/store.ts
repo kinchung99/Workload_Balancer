@@ -9,18 +9,20 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { SCHEMA_VERSION, STORAGE_KEY, migrateSaved, storage } from './storage';
 import type {
-  BucketKey, Contact, ContributionTag, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
+  BucketKey, CircleMember, Contact, ContributionTag, DayReport, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
   MoodQuadrant, ClassFlag, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
   RecoveryEntry, SimAction, Trade, Mix,
 } from '@/lib/types';
+import type { PhoneContact, Visibility } from '@/lib/sharing';
 import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
 import { completionCredit } from '@/lib/errands';
 import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
-  CEILINGS, OVERALL_CEILING, TODAY, contacts as seedContacts, customActions as seedCustomActions, errands as seedErrands,
-  meals as seedMeals, modules as seedModules, moodHistory, recoveryLedger, seedItems,
+  CEILINGS, OVERALL_CEILING, TODAY, circle as seedCircle, contacts as seedContacts,
+  customActions as seedCustomActions, errands as seedErrands, meals as seedMeals, modules as seedModules,
+  moodHistory, phoneContacts as seedPhoneContacts, recoveryLedger, seedItems,
 } from '@/data/seed';
 
 interface State {
@@ -35,7 +37,7 @@ interface State {
   /** One switch for the worst weeks. Nothing is deleted, it is out of sight. */
   minimumViableWeek: boolean;
   /** The one daily tap. Feeds ceiling calibration. */
-  dayReports: Array<{ date: string; felt: 'fine' | 'meh' | 'hard'; percent: number }>;
+  dayReports: DayReport[];
 
   // Per-area logs. Each area records the thing it is actually made of.
   moods: MoodCheckIn[];
@@ -63,10 +65,24 @@ interface State {
   customActions: SimAction[];
   /** The courses behind the timetable. Dread lives here, not on each class. */
   modules: Module[];
+  /**
+   * Your circle. State rather than a constant, because you can add to it.
+   *
+   * It was a seeded module export while nothing could change it, and a "find
+   * friends" screen whose Add button did nothing would be worse than no screen.
+   */
+  circle: CircleMember[];
+  /** The address book, as the app would see it. See `phoneContacts` in the seed. */
+  phoneContacts: PhoneContact[];
+  /** How much of your week your circle can see. Yours, changeable, off included. */
+  sharing: Visibility;
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
   applyTrades: (trades: Trade[]) => void;
+  dropSwap: (id: string) => void;
+  addFriend: (contactId: string) => void;
+  setSharing: (visibility: Visibility) => void;
   setShowEverything: (value: boolean) => void;
   setMinimumViableWeek: (value: boolean) => void;
   finishOnboarding: () => void;
@@ -102,7 +118,7 @@ interface State {
   toggleClassFlag: (itemId: string, flag: ClassFlag) => void;
   markAttendance: (moduleId: string, attended: boolean) => void;
   importTimetable: (items: Item[], modules: Module[]) => void;
-  reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number) => void;
+  reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number, verdict?: DayReport['verdict']) => void;
   logMood: (quadrant: MoodQuadrant, tags: ContributionTag[]) => void;
   setMealStatus: (id: string, status: MealStatus) => void;
   toggleErrand: (id: string) => void;
@@ -114,6 +130,7 @@ interface State {
     when: { date: string; startHour?: number },
     bucket?: BucketKey,
     mix?: Mix,
+    want?: Item['want'],
   ) => void;
   scheduleItem: (id: string, startHour: number | undefined) => void;
   cycleContact: (id: string) => void;
@@ -143,6 +160,11 @@ export const useStore = create<State>()(
   offHour: 17,
   customActions: seedCustomActions,
   modules: seedModules,
+  circle: seedCircle,
+  phoneContacts: seedPhoneContacts,
+  // Free evenings by default, which is what makes the planning side work at all.
+  // Off is one tap away and is genuinely off, not "off but still discoverable".
+  sharing: 'evenings',
 
   addItem: (item) =>
     set((state) => {
@@ -183,6 +205,50 @@ export const useStore = create<State>()(
         Object.fromEntries(trades.map((trade) => [trade.id, !!trade.selected])),
       ),
     })),
+
+  /**
+   * Take one thing off, because you chose the other one.
+   *
+   * Separate from `applyTrades` because a swap is one decision about two named
+   * things rather than a basket of toggles, and because a task you only have to
+   * turn up to lives in the errands list and arrives at the swap model as its
+   * row - so the id has to be unwrapped before it can be found.
+   */
+  dropSwap: (id) =>
+    set((state) => ({
+      items: state.items.filter((item) => item.id !== id),
+      errands: state.errands.filter((errand) => `log-errand-${errand.id}` !== id),
+    })),
+
+  /**
+   * Someone from your phone becomes someone in your circle.
+   *
+   * They arrive with no reading and no published evenings, which is the honest
+   * state: you have added them, they have not checked in since, and the circle
+   * screen says "never checked in" rather than inventing a battery for them.
+   */
+  addFriend: (contactId) =>
+    set((state) => {
+      const contact = state.phoneContacts.find((c) => c.id === contactId);
+      /*
+       * Someone who is not on Ballast cannot be added, only invited.
+       *
+       * The screen only offers Invite for them, but allowing it here would put a
+       * person in your circle who can never have a reading or a free evening -
+       * a permanently blank row, and the one kind of dishonesty this feature
+       * cannot afford.
+       */
+      if (!contact || contact.added || !contact.onBallast) return {};
+      return {
+        phoneContacts: state.phoneContacts.map((c) => (c.id === contactId ? { ...c, added: true } : c)),
+        circle: [
+          ...state.circle,
+          { id: contact.id, name: contact.name, initials: contact.initials, band: 'steady' as const },
+        ],
+      };
+    }),
+
+  setSharing: (visibility) => set({ sharing: visibility }),
 
   setShowEverything: (value) => set({ showEverythingAnyway: value }),
   setMinimumViableWeek: (value) => set({ minimumViableWeek: value }),
@@ -519,8 +585,12 @@ export const useStore = create<State>()(
       ),
     })),
 
-  reportDay: (felt, percent) =>
-    set((state) => ({ dayReports: [...state.dayReports, { date: state.today, felt, percent }] })),
+  /**
+   * One evening's answer. Two things move, and they are separate on purpose:
+   * `felt` lowers your ceilings, `verdict` re-weights the ranking.
+   */
+  reportDay: (felt, percent, verdict) =>
+    set((state) => ({ dayReports: [...state.dayReports, { date: state.today, felt, percent, verdict }] })),
 
   logMood: (quadrant, tags) =>
     set((state) => ({
@@ -561,10 +631,10 @@ export const useStore = create<State>()(
    * place - so it shows up on its day *and* in the list, rather than one or the
    * other depending on where it was typed.
    */
-  addErrand: (title, category, hours, effort, when, bucket, mix) =>
+  addErrand: (title, category, hours, effort, when, bucket, mix, want) =>
     set((state) => ({
       errands: [
-        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, bucket, mix, ...when },
+        { id: `errand-${Date.now()}`, title, category, done: false, hours, effort, addedByUser: true, bucket, mix, want, ...when },
         ...state.errands,
       ],
     })),
@@ -598,6 +668,7 @@ export const useStore = create<State>()(
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
       sleepHours: null, invites: [], moments: [], offHour: 17, customActions: seedCustomActions, modules: seedModules,
+      circle: seedCircle, phoneContacts: seedPhoneContacts, sharing: 'evenings',
       // Ceilings too. They move when you report a hard day below your line, and
       // reset clears the day reports that moved them - leaving the lowered line
       // in place with the evidence for it gone made every later reading read

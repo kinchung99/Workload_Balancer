@@ -56,7 +56,7 @@ export function WeekStrip({
           const column = (
             <Stack gap={2} align="center" className="w-full">
               {/* The bar. Height is this day against the heaviest day of the week. */}
-              <View className="h-14 w-full justify-end">
+              <View className="w-full justify-end" style={{ height: MAX_BAR }}>
                 <View className={`w-full rounded-sm ${BAR[band]}`} style={{ height }} />
               </View>
               <Stack

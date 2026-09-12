@@ -4,15 +4,19 @@ import { Text } from '@/components';
 import { TabIcon, type TabName } from '@/components/layout/TabIcon';
 
 /**
- * Four tabs: where you are, which part of you is empty, what is coming, and
- * what you can do about it. Rebalance and the drafter are not tabs - they are
- * reached from the thing that flagged them.
+ * Four tabs: how you are, what is coming, who else is out there, and everything
+ * about you.
+ *
+ * Friends is a tab because it is the one part of this app that is between
+ * people, and the only reason to open it on a week that is going fine. Areas and
+ * Tonight moved under You - they were tabs because they were built early, not
+ * because they earn a quarter of the bar.
  */
 const TABS: Array<{ name: string; title: string; icon: TabName }> = [
   { name: 'index',   title: 'Home',    icon: 'home' },
-  { name: 'areas',   title: 'Areas',   icon: 'areas' },
   { name: 'plan',    title: 'Plan',    icon: 'plan' },
-  { name: 'actions', title: 'Tonight', icon: 'actions' },
+  { name: 'friends', title: 'Friends', icon: 'areas' },
+  { name: 'you',     title: 'You',     icon: 'actions' },
 ];
 
 export default function TabsLayout() {

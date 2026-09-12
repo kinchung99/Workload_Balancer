@@ -25,6 +25,16 @@ const TINT = {
   recovery: { off: 'bg-recovery-wash', on: 'bg-recovery-wash border-recovery-fill', dot: 'bg-recovery-fill' },
 } as const;
 
+/**
+ * Cell height, in points.
+ *
+ * `h-24` was never in this theme's spacing scale - it is generated from
+ * tokens.json and replaces Tailwind's, so the class silently did nothing and
+ * the four quadrants collapsed to the height of the dot inside them. Same trap
+ * as the timeline's clock column.
+ */
+const CELL = 92;
+
 export function MoodGrid({
   value,
   onChange,
@@ -35,38 +45,45 @@ export function MoodGrid({
   return (
     <Stack gap={3}>
       <Text variant="micro" tone="subtle" className="text-center">HIGH ENERGY</Text>
-      <Stack direction="row" gap={3} align="center">
-        <View className="w-6">
-          <Text variant="micro" tone="subtle">UN&shy;PLEASANT</Text>
-        </View>
-        <Stack gap={3} grow>
-          {[QUADRANTS.slice(0, 2), QUADRANTS.slice(2)].map((row, index) => (
-            <Stack key={index} direction="row" gap={3}>
-              {row.map((quadrant) => {
-                const selected = value === quadrant.id;
-                const tint = TINT[quadrant.tone];
-                return (
-                  <Pressable
-                    key={quadrant.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={quadrant.label}
-                    onPress={() => { tapFeedback(); onChange(quadrant.id); }}
-                    className={`h-24 flex-1 items-center justify-center rounded-md border-2 ${
-                      selected ? tint.on : `${tint.off} border-transparent`
-                    }`}
-                  >
-                    <View className={`h-4 w-4 rounded-pill ${selected ? tint.dot : 'bg-transparent border border-line-strong'}`} />
-                  </Pressable>
-                );
-              })}
-            </Stack>
-          ))}
-        </Stack>
-        <View className="w-6 items-end">
-          <Text variant="micro" tone="subtle">PLEASANT</Text>
-        </View>
+
+      <Stack gap={3}>
+        {[QUADRANTS.slice(0, 2), QUADRANTS.slice(2)].map((row, index) => (
+          <Stack key={index} direction="row" gap={3}>
+            {row.map((quadrant) => {
+              const selected = value === quadrant.id;
+              const tint = TINT[quadrant.tone];
+              return (
+                <Pressable
+                  key={quadrant.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={quadrant.label}
+                  onPress={() => { tapFeedback(); onChange(quadrant.id); }}
+                  style={{ height: CELL }}
+                  className={`flex-1 items-center justify-center rounded-md border-2 ${
+                    selected ? tint.on : `${tint.off} border-transparent`
+                  }`}
+                >
+                  <View className={`h-4 w-4 rounded-pill ${selected ? tint.dot : 'bg-transparent border border-line-strong'}`} />
+                </Pressable>
+              );
+            })}
+          </Stack>
+        ))}
       </Stack>
+
+      {/*
+        The pleasantness axis, under the grid rather than beside it.
+        
+        These two words used to sit in 24pt columns on the left and right, which
+        stacked "UNPLEASANT" one letter per line and pushed "PLEASANT" over the
+        top of the grid itself. A row reads the same and fits.
+      */}
+      <Stack direction="row" justify="between">
+        <Text variant="micro" tone="subtle">← UNPLEASANT</Text>
+        <Text variant="micro" tone="subtle">PLEASANT →</Text>
+      </Stack>
+
       <Text variant="micro" tone="subtle" className="text-center">LOW ENERGY</Text>
     </Stack>
   );

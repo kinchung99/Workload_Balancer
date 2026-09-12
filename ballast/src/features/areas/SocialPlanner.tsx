@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { BatteryMini, Button, Card, Chip, Stack, Text } from '@/components';
 import { BAND_LABEL } from '@/lib/load';
 import { formatHour, freeSlots, overlap, type Slot } from '@/lib/schedule';
 import { formatShort } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
-import { circle } from '@/data/seed';
+import { PLAN_MESSAGE, whatsapp } from '@/lib/sharing';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
 
@@ -33,7 +33,7 @@ const PLANS = [
  * who is at 8% to a day trip is not a kindness.
  */
 export function SocialPlanner() {
-  const { today, invites, sendInvite } = useStore();
+  const { today, invites, sendInvite, circle } = useStore();
   const items = useItemsWithLogs();
   const friends = circle.filter((person) => !person.isYou);
 
@@ -166,15 +166,36 @@ export function SocialPlanner() {
         }}
       />
 
+      {/*
+        An invite that only exists in this app is not an invite.
+        
+        It lands in your own week the moment you make it - that part is honest,
+        it is time you have now committed - but the people in it do not know yet.
+        So the last step hands the words to the chat they are already in. Ballast
+        does not need an inbox and should not have one.
+      */}
       {already ? (
-        <Card tone="steady" gap={3}>
+        <Card tone="steady" gap={4}>
           <Text variant="micro" tone="steady">INVITED</Text>
           {invites.map((invite) => (
-            <Stack key={invite.id} gap={1}>
-              <Text variant="callout" weight="semibold">{invite.title}</Text>
-              <Text variant="footnote" tone="muted">
-                {formatShort(invite.date)}, {formatHour(invite.startHour)} · already in your week
-              </Text>
+            <Stack key={invite.id} gap={3}>
+              <Stack gap={1}>
+                <Text variant="callout" weight="semibold">{invite.title}</Text>
+                <Text variant="footnote" tone="muted">
+                  {formatShort(invite.date)}, {formatHour(invite.startHour)} · already in your week
+                </Text>
+              </Stack>
+              <Button
+                label="Send it in WhatsApp"
+                kind="secondary"
+                onPress={() => {
+                  Linking.openURL(whatsapp(PLAN_MESSAGE(
+                    `${formatShort(invite.date)} at ${formatHour(invite.startHour)}`,
+                    invite.people,
+                  )));
+                  successFeedback();
+                }}
+              />
             </Stack>
           ))}
         </Card>

@@ -131,9 +131,145 @@ screen you can open in the prototype right now.
 Every figure on every screen is computed from a seeded fictional semester. Nothing here is a mock-up —
 change a task and the forecast changes with it.
 
+<table><tr><td width="42%">
+<img src="docs/shots/home.png" alt="Home: one reading, one next thing, and four doors">
+</td><td>
+
+**Four tabs, and Home stays out of the way.** 🏠 Home answers two questions — *how am I* and *what do I do
+next* — then hands you four doors. 📅 **Plan** owns the schedule. 👥 **Friends** is a tab because it is the one
+part of this app that is between people. 🙋 **You** holds everything about your own week beyond today.
+
+**And every list is read-only.** Rows used to carry their own buttons — *Plan it*, *Progress*, *Move*,
+*Unschedule*, *Give it a time* — so three pieces of work put a dozen controls on a screen whose job was to
+show you your day. Tap any row and you get **one page with every verb on it**. Nothing is hidden; it is one
+tap further away, and the screen you came from is legible again.
+
+</td></tr></table>
+
 ---
 
-### 3.1 ✍️ Add anything — five dials, four short pages
+### 3.1 👥 Friends — the part that is between people
+
+<table><tr><td width="42%">
+<img src="docs/shots/friends.png" alt="Your circle: everyone's band, charge, and how long ago they updated it">
+</td><td>
+
+Everything else in Ballast measures one student's week. **This measures the gap between four of them** — and
+it is the only reason to open the app on a week that is going fine.
+
+It runs on one number: **how long ago each person last updated their own battery.**
+
+- 🕐 **"22 min ago." "3 days ago."** Every reading carries its age, because Jo at 24% three days ago is not
+  the same claim as Jo at 24% twenty minutes ago.
+- 🫥 **A stale reading says so** and sinks down the list. *"3 days ago · may be out of date."* The app will
+  not invent news.
+- 💬 **One line they wrote themselves** — *"Finally handed it in"*, *"Two labs and a shift"*. Never generated.
+- 🔋 **Emptiest first**, so the person who might need something is at the top.
+- 🔒 **A band, a charge, and that line. That is the whole payload.** Never a task, a deadline or a module.
+  Free time only if you choose to publish it — §3.2.
+
+</td></tr><tr><td>
+<img src="docs/shots/circle.png" alt="Your own row first, and the one person worth checking on">
+</td><td>
+
+**Your own row comes first, on purpose.** *"3 checked in today. Sharing: evenings only."*
+
+That is the whole retention loop, and it is honest rather than manipulative: no streak, no badge, no
+notification at 11pm. Just the fact that four people can see how you are, and yours is nine hours old.
+
+💗 **And at most one person to check on. Ever.** *"Aisyah — heavy for 11 days."* A list of five people who
+might need you is a list nobody acts on, and it turns a kindness into an obligation.
+
+💬 **Then it opens WhatsApp with the message already written.** *"Hey Aisyah, thinking of you. How have you
+been?"* — in the chat they are already in, with your thumb over send. Ballast has no inbox and should not
+have one: a "thinking of you" that has to be read inside a productivity app arrives with the wrong tone,
+and a message you have to go and find is a message that never gets sent.
+
+</td></tr><tr><td>
+<img src="docs/shots/find-friends.png" alt="Find friends: three of your contacts are already on Ballast">
+</td><td>
+
+**And a circle has to start somewhere.** On day one you are the only person in it, which makes the best
+part of this app worth nothing — so it starts from the address book you already have.
+
+- 📲 **"3 already here."** People from your contacts who are on Ballast are **one tap**. Nothing to send,
+  nothing to wait for, they are in your circle this evening.
+- ✉️ **Everyone else gets an invitation written for them** and handed to WhatsApp.
+- 🔐 **Matching happens on your phone.** Your contacts are never uploaded — in production, matched against
+  hashed numbers so no server ever learns who is in anybody's address book.
+
+</td></tr></table>
+
+---
+
+### 3.2 🗓️ Their week, without their week
+
+<table><tr><td width="42%">
+<img src="docs/shots/friend-week.png" alt="Ravi's published week: free windows only, never what fills the rest">
+</td><td>
+
+Four students trying to find an evening send eleven messages and settle on a day that suits nobody. The
+reason is not laziness — it is that **none of them can see each other's weeks**, and until now "share my
+calendar" has meant *share my calendar*: every title, every deadline, everyone you are seeing.
+
+Ballast shares a different thing. **A free window, and nothing else.**
+
+- 🟦 **Filled blocks are time they chose to give you.** *"Wed 5pm–11pm. Sat 12pm–10pm."*
+- ⬜ **Empty blocks just say "taken".** There is no field in what gets published for a title, so no amount
+  of looking will tell you what fills them. That asymmetry is the entire design.
+- 🔋 **Their battery stays at the top the whole time.** A free Saturday from someone at 71% is not the same
+  offer as a free Saturday from someone at 8%.
+- 💬 **Tap any day to ask about it** — WhatsApp opens with *"Are you free Saturday from 12pm? Looks like it
+  works for everyone."*
+
+</td></tr><tr><td>
+<img src="docs/shots/sharing.png" alt="Three sharing levels, with a live preview of what a friend actually sees">
+</td><td>
+
+**And you can turn it off.** 🔐 Privacy settings usually fail the same way: three options explained in
+prose, no way to check what you just agreed to, so people pick one at random and never trust it again.
+
+So this screen **shows you their view of you, live, as you change the setting** — *"Amin's view of your
+week: Tue 7pm–11pm · Wed 5pm–11pm."*
+
+| Level | What they see |
+|---|---|
+| 🚫 **Nothing** | Your battery. No times at all — and it is genuinely nothing, one tap from here. |
+| 🌙 **Evenings only** | Free evenings after 5pm. Nothing daytime. *The default.* |
+| 🗓️ **Free / busy** | When you are free, all day. Never what you are doing. |
+
+Your battery is always shared, and we say so on the screen rather than in a policy: **it is how they know
+to check on you**, and that is the one thing this feature exists for.
+
+</td></tr></table>
+
+---
+
+### 3.3 📆 Find an evening — the feature with no equivalent
+
+<table><tr><td width="42%">
+<img src="docs/shots/together.png" alt="Everyone's battery, what to do, and the evenings that work for all of you">
+</td><td>
+
+Every calendar shows you *your* free time. None of them can tell you which of your friends has any
+**capacity** left — because none of them measure capacity, only availability. An empty Thursday and an
+empty Thursday are not the same offer if one of you is at 8%.
+
+- 📆 **Pick who and what** — dinner, a walk, study together, a day trip.
+- 🔗 **It intersects their free evenings with the real gaps in yours** — around your classes, your shift and
+  any recovery you have already protected — and offers only the windows long enough for what you picked.
+  *Wed 12 Nov, 6–8pm. Sat 15 Nov, 5–7pm.*
+- 🔋 **Their battery stays next to their name the whole time**, because inviting the person at 8% to a six-hour
+  day trip is not a kindness.
+- ✉️ **Sending it books it** — in your week, as social load, with a real time on it.
+- 💬 **Then *Send it in WhatsApp*** hands the group the words: *"Are you both free Sat 15 Nov at 5pm? Looks
+  like it works for everyone."* An invite that only exists inside one person's app is not an invite.
+
+</td></tr></table>
+
+---
+
+### 3.4 ✍️ Add anything — five dials, four short pages
 
 <table><tr><td width="42%">
 <img src="docs/shots/add-takes.png" alt="Five area dials, each with a face on the knob">
@@ -157,11 +293,18 @@ question each.**
 exist in your week, and the battery underneath updates to what your week *will* read if you add this.
 Nothing is saved until you press the button.
 
+🙋 **And one question, in three words: *want to be there?*** *Rather not · Don't mind · Really want to.*
+
+It is the **only** thing on any of these four pages the app could not work out for itself — and it is what
+makes §3.10's swap possible. Everything else a hard decision needs is already here: how big it is, whether
+it can move, and, for a class, whether your attendance record says you can afford to miss it. Whether you
+*want* to be there is not in any of that, so it gets asked once and never again.
+
 </td></tr></table>
 
 ---
 
-### 3.2 📄 Owing — assignments that stop hiding until the night before
+### 3.5 📄 Owing — assignments that stop hiding until the night before
 
 <table><tr><td width="42%">
 <img src="docs/shots/day-bands.png" alt="A day split into Scheduled, Owing and This day">
@@ -207,7 +350,7 @@ Each Owing card carries a **three-state bar** — green is done, blue is booked,
 
 ---
 
-### 3.3 ⭐ What to do first — the question a list never answers
+### 3.6 ⭐ What to do first — the question a list never answers
 
 <table><tr><td width="42%">
 <img src="docs/shots/priority.png" alt="A ranked list of what to do first, with the reason on every row">
@@ -243,7 +386,7 @@ offer you something it would then refuse to do.
 
 ---
 
-### 3.4 🎓 Timetable — paste it, then mark the lectures that matter more
+### 3.7 🎓 Timetable — paste it, then mark the lectures that matter more
 
 <table><tr><td width="42%">
 <img src="docs/shots/timetable.png" alt="A week of classes with rooms and flags">
@@ -277,7 +420,7 @@ Each module shows what it is costing you: *Networks · 5h · 10 load · 92% atte
 
 ---
 
-### 3.5 🌙 Tonight — an evening built around what *you* actually do
+### 3.8 🌙 Tonight — an evening built around what *you* actually do
 
 <table><tr><td width="42%">
 <img src="docs/shots/tonight-what.png" alt="Sliders for sleep, walking, seeing people, studying and screen time">
@@ -306,39 +449,10 @@ screen has a badminton slider.
 
 ---
 
-### 3.6 👥 Friends — see who has room before you ask
+### 3.9 🔋 The battery, and the five areas under it
 
 <table><tr><td width="42%">
-<img src="docs/shots/social.png" alt="Friends with contact gaps and a low-effort reconnection suggestion">
-</td><td>
-
-People stop seeing friends in week 10 for want of **coordination**, not motivation — four people all
-assuming everyone else is busier.
-
-- 💗 **Quiet care, no nagging.** *"Aisyah has been heavy for 11 days"* — one line, no script.
-- ✉️ **A low-effort reconnection** for whoever you haven't spoken to longest, because a two-line text is a
-  realistic ask in a heavy week and a coffee is not.
-- 🔒 **Privacy by design.** Friends see a **band** — steady, busy, heavy. Never your numbers.
-
-</td></tr><tr><td>
-<img src="docs/shots/social-plan.png" alt="Planning something: everyone's battery, what to do, and the evenings that work for all of you">
-</td><td>
-
-📆 **And it does the coordinating.** Pick who and what — dinner, a walk, study together, a day trip — and
-it intersects **their** free evenings with the real gaps in **your** week, then offers only the windows
-that work for everybody. *Wed 12 Nov, 6–8pm. Sat 15 Nov, 5–7pm.*
-
-🔋 **Everyone's battery sits next to their name**, because inviting the person at 8% to a day trip is not
-a kindness. Sending it books it — in your week, as social load, with a real time on it.
-
-</td></tr></table>
-
----
-
-### 3.7 🔋 The battery, and the five areas under it
-
-<table><tr><td width="42%">
-<img src="docs/shots/areas.png" alt="Five areas, emptiest first, each with its own battery">
+<img src="docs/shots/checkin.png" alt="One check-in: the five areas, emptiest first">
 </td><td>
 
 One number is easy to read and easy to be wrong about. Ballast shows one, with a face — then what it's
@@ -355,7 +469,7 @@ made of.
 
 ---
 
-### 3.8 ⚖️ Plan · Rebalance · Saying no — the part that prevents something
+### 3.10 ⚖️ Plan · Rebalance · Saying no — the part that prevents something
 
 <table><tr><td width="42%">
 <img src="docs/shots/rebalance.png" alt="Priced trades with a live battery">
@@ -383,23 +497,23 @@ around your choice instead of guilt-tripping you.
 
 ---
 
-### 3.9 The rest of it
+### 3.11 The rest of it
 
 <p align="center">
   <img src="docs/shots/welcome.png" width="150" alt="The intro: two tasks, two dread dials">
   <img src="docs/shots/recover.png" width="150" alt="The recovery ledger: eleven hours down">
   <img src="docs/shots/prescribe.png" width="150" alt="Matched recovery: a walk that fits">
-  <img src="docs/shots/mental.png" width="150" alt="The mental area: a mood grid">
-  <img src="docs/shots/physical.png" width="150" alt="The physical area: meals, sleep and steps">
+  <img src="docs/shots/checkin.png" width="150" alt="One check-in for all five areas">
+  <img src="docs/shots/item.png" width="150" alt="One item, and every verb for it">
 </p>
 <p align="center">
-  <img src="docs/shots/errands.png" width="150" alt="Errands batched into trips">
+  <img src="docs/shots/find-friends.png" width="150" alt="Finding friends from your contacts">
   <img src="docs/shots/import.png" width="150" alt="Pasting a timetable in">
   <img src="docs/shots/tonight-book.png" width="150" alt="What tonight puts in your week">
   <img src="docs/shots/calm.png" width="150" alt="Calm mode on the worst weeks">
   <img src="docs/shots/widget.png" width="150" alt="Lock screen widget and the daily one-tap check-in">
 </p>
-<p align="center"><i>Intro · recovery ledger · matched rest · mood · body · errands · timetable import · booking a night · calm mode · lock screen</i></p>
+<p align="center"><i>Intro · recovery ledger · matched rest · check in · one item · find friends · timetable import · booking a night · calm mode · lock screen</i></p>
 
 ---
 
@@ -414,7 +528,7 @@ around your choice instead of guilt-tripping you.
 | 5 | 🧱 **Clustering, not totals** | Everyone warns on volume. We slide a 72-hour window and flag **density**, eight days early. |
 | 6 | ✉️ **The decline drafter** | It doesn't just say what to cut — it writes the message, in three tones, and never sends it. |
 | 7 | 🌿 **Recovery in the same units as work** | Rest is a credit you're owed, in hours, carried forward. Booking it writes protected time in a gap that really exists. |
-| 8 | 👥 **Your friends' *capacity*, not their calendar** | A band, never a number — and the evening that suits everyone. Nothing else tells you who has room before you ask. |
+| 8 | 👥 **Your friends' *capacity*, not their calendar** | A band, never a number — plus **how old that reading is**, so a three-day-old battery says so instead of pretending to be news. Then it finds the one evening that suits everybody. Nothing else tells you *who has room* before you ask. |
 | 9 | 💡 **Classes marked for *why* they matter** | A lecture is just an hour until it's the one giving exam hints. Flag it and the rebalancer refuses to move it, visibly. |
 | 10 | 🧘 **The interface gets simpler as the week gets worse** | Past the calm line it collapses to one number, one sentence, one button. Most apps add urgency when things get bad — that's backwards. |
 | 11 | 🎮 **Game feel without game pressure** | A character, a drawing on every screen, a face on every dial — and no streak, no score, no leaderboard. |
@@ -485,8 +599,8 @@ This is the destination. §5.3 is the first three weeks of it.
 ### 5.3 📅 Three weeks, if we go ahead
 
 **Already done:** the entire front end — load model, capture, forecast, rebalance, drafter, recovery,
-Tonight, five areas, timetable, owing work, priority, accessibility. Live now, with 351 render and 313
-behaviour assertions passing on every deploy.
+Tonight, five areas, timetable, owing work, priority, friends, accessibility. Live now, with 398 render and
+329 behaviour assertions passing on every deploy.
 
 We have **three weeks** of build time after the finals. That is not enough for everything in §5.2, so the
 plan is a scope decision rather than a wish list: **one vertical slice, finished**, instead of five things
@@ -542,6 +656,6 @@ of them fail.
 | Check | What it proves |
 |---|---|
 | `model:check` | **20** figures — the study's loads, and the calibration we set |
-| `behaviour:check` | **313** state changes — every button moves the state it claims to |
-| `render:check` | **351** strings across **27 pages**, and every screen has a way out |
+| `behaviour:check` | **329** state changes — every button moves the state it claims to |
+| `render:check` | **398** strings across **31 pages**, and every screen has a way out |
 | `tokens:check` | **90** design tokens consistent across the whole app |

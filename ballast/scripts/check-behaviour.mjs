@@ -34,6 +34,10 @@ for (const [from, to] of [
   ['src/lib/moments.ts', 'moments.ts'],
   ['src/lib/timetable.ts', 'timetable.ts'],
   ['src/lib/priority.ts', 'priority.ts'],
+  ['src/lib/circle.ts', 'circle.ts'],
+  ['src/lib/swap.ts', 'swap.ts'],
+  ['src/lib/sharing.ts', 'sharing.ts'],
+  ['src/lib/review.ts', 'review.ts'],
   ['src/lib/battery.ts', 'battery.ts'],
   ['src/lib/simulate.ts', 'simulate.ts'],
   ['src/data/seed.ts', 'seed.ts'],
@@ -82,6 +86,10 @@ const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, si
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
 const { prioritise, rank, urgencyFactor } = await import(join(tmp, 'priority.ts'));
+const { circleOrder, isStale, lastSeen, updatedToday, worthANudge, STALE_AFTER_MINS } = await import(join(tmp, 'circle.ts'));
+const { bestSwap, findSwap, firstRefusal, skippable, wantOf, whyNoSwap, DEFAULT_WANT, WANT_CHOICES } = await import(join(tmp, 'swap.ts'));
+const { CHECK_IN_MESSAGE, EVENING_FROM, PLAN_MESSAGE, VISIBILITY, busyFrom, freeOn, onBallastCount, published, sharedDays, suggestions, whatsapp } = await import(join(tmp, 'sharing.ts'));
+const { CADENCE_WORD, DEFAULT_WEIGHTS, REVIEW_FROM_HOUR, VERDICT, adherence, describeWeights, dueForReview, retune, reviewEvery, weightsFrom } = await import(join(tmp, 'review.ts'));
 const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
@@ -1037,6 +1045,358 @@ console.log('\nThe battery has room to move in both directions');
   const areas = percentByBucket(itemsInWeek(s().items, s().today), s().ceilings);
   check('no area is over its own ceiling', Object.values(areas).every((p) => p <= 100), true);
   check('and the emptiest still has something left', 100 - Math.max(...Object.values(areas)) >= 25, true);
+}
+
+console.log('\nYour circle, and how old each reading is');
+{
+  const { circle } = await import(join(tmp, 'seed.ts'));
+
+  // The number the whole feature runs on.
+  check('a fresh reading reads in minutes', lastSeen({ updatedMinsAgo: 22 }), '22 min ago');
+  check('an hour or more reads in hours', lastSeen({ updatedMinsAgo: 140 }), '2h ago');
+  check('a day or more reads in days', lastSeen({ updatedMinsAgo: 4380 }), '3 days ago');
+  check('never checked in says so', lastSeen({}), 'never checked in');
+
+  // A reading nobody has confirmed is not news, and must not be presented as it.
+  check('a day-old reading is stale', isStale({ updatedMinsAgo: STALE_AFTER_MINS + 1 }), true);
+  check('an hour-old one is not', isStale({ updatedMinsAgo: 60 }), false);
+  check('and no reading at all is stale', isStale({}), true);
+
+  check('three of the four checked in today', updatedToday(circle), 3);
+  check('you are never counted as one of your own friends', updatedToday(circle.filter((p) => p.isYou)), 0);
+
+  // Emptiest first - but a stale battery sinks rather than rises.
+  const order = circleOrder(circle);
+  check('you are not in your own circle list', order.every((p) => !p.isYou), true);
+  check('the emptiest fresh reading is first', order[0].id, 'aisyah');
+  check('and the stale one is last however low it reads', order.at(-1).id, 'jo');
+
+  // At most one person to check on, ever.
+  const nudge = worthANudge(circle);
+  check('exactly one person is suggested', !!nudge && !!nudge.person, true);
+  check('it is the one stuck heavy', nudge.person.id, 'aisyah');
+  check('and it says why', nudge.reason, 'heavy for 11 days');
+  check('nobody is suggested when everyone is fine', worthANudge([
+    { id: 'a', name: 'A', initials: 'A', band: 'steady', charge: 80, updatedMinsAgo: 10 },
+  ]), null);
+}
+
+console.log('\nSwapping, not dropping');
+{
+  s().reset();
+  const day = '2030-01-10';
+  const mods = [
+    { id: 'safe',  code: 'SAFE', name: 'Comfortable', requiredAttendance: 80, held: 10, attended: 10, dread: 2, importance: 2 },
+    { id: 'tight', code: 'TGHT', name: 'On the line',  requiredAttendance: 80, held: 10, attended: 8,  dread: 2, importance: 2 },
+    { id: 'free',  code: 'FREE', name: 'Uncounted',    requiredAttendance: null, held: 10, attended: 4, dread: 2, importance: 2 },
+  ];
+  const item = (over) => ({
+    id: over.id, title: over.title, bucket: over.bucket ?? 'social', hours: over.hours ?? 4,
+    dread: over.dread ?? 3, commitment: over.commitment ?? 'soft', date: day, ...over,
+  });
+
+  // The one thing the app asks, and what it assumes when nobody has said.
+  check('silence is neutral', wantOf(item({ id: 'x', title: 'x' })), DEFAULT_WANT);
+  check('and never drives a decision', DEFAULT_WANT, 3);
+  check('capture offers the ends and the middle', WANT_CHOICES.map(([v]) => v), [1, 3, 5]);
+
+  // Adam's dilemma: the wedding and the Thursday class.
+  const wedding = item({ id: 'wedding', title: "Sister's wedding", want: 5, hours: 8 });
+  const comfortable = item({ id: 'lecture', title: 'Thursday lecture', want: 2, hours: 3, dread: 2, commitment: 'hard', moduleId: 'safe' });
+  const swap = findSwap([wedding, comfortable], mods);
+  check('the wedding is what you keep', swap.keep.id, 'wedding');
+  check('the lecture is what goes', swap.drop.id, 'lecture');
+  check('and it says what missing it costs', swap.cost, 'You would be at 91%, still above 80%');
+  check('with the load handed back', swap.saves, 6);
+
+  // The same class, from a student who cannot afford it. This is the whole test:
+  // a timetable cannot tell these two students apart and the arithmetic can.
+  const onTheLine = item({ ...comfortable, id: 'lecture', moduleId: 'tight' });
+  check('at 80% exactly, one more absence is refused',
+    skippable(onTheLine, mods).reason, 'One more absence takes you under 80%');
+  check('and nothing is offered', findSwap([wedding, onTheLine], mods), null);
+
+  // Ordering: every timetabled class is stored hard, so checking `commitment`
+  // first made the app answer "hard deadline" to the question it exists to answer.
+  check('a counted class is judged on attendance, not on being timetabled',
+    skippable(comfortable, mods).canSkip, true);
+
+  // The refusals the model will not talk itself out of.
+  check('the class that gives hints is never traded',
+    skippable(item({ id: 'tips', title: 'Revision lecture', flags: ['tips'], moduleId: 'free' }), mods).reason,
+    'This is the one that gives hints');
+  check('nor is a hard deadline', skippable(item({ id: 'h', title: 'Exam', commitment: 'hard' }), mods).canSkip, false);
+  check('nor anything weekly', skippable(item({ id: 'w', title: 'Bins', repeats: true }), mods).canSkip, false);
+  check('nor anything with a date on it',
+    skippable(item({ id: 'd', title: 'Form', deadline: '2030-01-20' }), mods).canSkip, false);
+
+  // Trust, in two rules. Trivia and your own study are not currency.
+  const errand = item({ id: 'post', title: 'Post office', hours: 0.5, dread: 3, bucket: 'errands' });
+  check('a one-and-a-half-load errand is not worth a trade', findSwap([wedding, errand], mods), null);
+  const prep = item({ id: 'prep', title: 'Seminar reading', bucket: 'mental', commitment: 'self', hours: 4, prepHours: 6 });
+  check('and the app never offers to drop the prep for the thing itself',
+    findSwap([wedding, prep], mods), null);
+  const solo = item({ id: 'solo', title: 'Revision block', bucket: 'mental', commitment: 'self', hours: 4 });
+  check('nor your own study time', findSwap([wedding, solo], mods), null);
+
+  // Wanting something is not enough on its own.
+  check('a day of things you merely tolerate offers nothing',
+    findSwap([item({ id: 'a', title: 'A' }), item({ id: 'b', title: 'B' })], mods), null);
+  check('one thing on its own is not a choice', findSwap([wedding], mods), null);
+
+  // Sleep and meals are not appointments; a captured task is.
+  const logRow = { ...item({ id: 'log-sleep', title: 'Short night' }), isLog: true, spread: true };
+  check('logs are not on the table', findSwap([wedding, logRow], mods), null);
+  const captured = { ...item({ id: 'log-errand-1', title: 'Shift at the cafe', bucket: 'time', hours: 6 }), isLog: true, spread: false };
+  check('but a shift you typed in yourself is', findSwap([wedding, captured], mods).drop.id, 'log-errand-1');
+
+  // The refusal, which is the answer on most days.
+  const why = whyNoSwap([wedding, onTheLine], mods);
+  check('it names what you wanted', why.keep.id, 'wedding');
+  check('and exactly what would not move', why.blocked.map((b) => b.item.id), ['lecture']);
+  check('there is no refusal to report when there is a swap', whyNoSwap([wedding, comfortable], mods), null);
+  check('nor when you wanted nothing in particular',
+    whyNoSwap([item({ id: 'a', title: 'A' }), item({ id: 'b', title: 'B', commitment: 'hard' })], mods), null);
+
+  // A week at a time, which is how Rebalance reads it.
+  const week = [addDaysISO(day, 0), addDaysISO(day, 1)];
+  const both = [wedding, onTheLine, { ...comfortable, id: 'later', date: week[1] }, { ...wedding, id: 'gig', title: 'The gig', date: week[1] }];
+  const found = bestSwap(both, week, mods);
+  check('the week offers the day that has a real trade on it', found.date, week[1]);
+  check('with the thing you want kept', found.keep.id, 'gig');
+  check('a week of refusals offers no swap', bestSwap([wedding, onTheLine], week, mods), null);
+  check('and reports the first one instead', firstRefusal([wedding, onTheLine], week, mods).date, week[0]);
+}
+
+console.log('\nMaking the swap');
+{
+  s().reset();
+  // The seeded fortnight holds exactly one honest trade: covering Amin's shift
+  // on the Wednesday, against the seminar the student marked as wanted.
+  const anchor = nextWeek(s().today);
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(anchor, i));
+  const real = bestSwap(s().items, days, s().modules);
+  check('next week has one', !!real, true);
+  check('it is the shift picked up for someone else', real.drop.id, 'w11-amin');
+  check('kept for the thing marked really-want', wantOf(real.keep) > DEFAULT_WANT, true);
+
+  const before = s().items.length;
+  s().dropSwap(real.drop.id);
+  check('taking it off removes exactly one thing', s().items.length, before - 1);
+  check('and it is gone', s().items.some((i) => i.id === 'w11-amin'), false);
+  check('so the same swap is not offered twice', bestSwap(s().items, days, s().modules)?.drop?.id ?? null, null);
+
+  // A captured turn-up task lives in the errands list, so dropping it has to
+  // reach there or the button would appear to do nothing.
+  s().reset();
+  s().addErrand('Shift at the bar', 'Admin', 6, 3, { date: s().today }, 'time', undefined, 1);
+  const errandId = s().errands[0].id;
+  check('the rating is stored with it', s().errands[0].want, 1);
+  s().dropSwap(`log-errand-${errandId}`);
+  check('and dropping its row removes the errand', s().errands.some((e) => e.id === errandId), false);
+}
+
+console.log('\nWhat leaves your phone');
+{
+  s().reset();
+  const { circle, phoneContacts } = await import(join(tmp, 'seed.ts'));
+  const today = s().today;
+  const mine = s().items;
+
+  check('three levels, no more', VISIBILITY.map((v) => v.value), ['off', 'evenings', 'busy']);
+  check('evenings by default', s().sharing, 'evenings');
+
+  // Off is genuinely off. Not "off but still discoverable".
+  check('off publishes nothing at all', published(mine, today, 'off'), []);
+  const evening = published(mine, today, 'evenings');
+  check('evenings never start before five', evening.every((slot) => slot.start >= EVENING_FROM), true);
+  const all = published(mine, today, 'busy');
+  check('free/busy shows more of the day than evenings does', all.length >= evening.length, true);
+
+  // The privacy promise, as arithmetic: what is published has no field for a
+  // title, so no amount of reading it can reveal one.
+  check('a published window carries only two numbers',
+    [...new Set(all.flatMap((slot) => Object.keys(slot)))].sort(), ['end', 'start']);
+
+  // Busy is the inverse of free and says nothing about what fills it.
+  const free = [{ start: 18, end: 22 }];
+  check('the rest of the day is blocked out', busyFrom(free), [{ start: 7, end: 18 }, { start: 22, end: 23 }]);
+  check('and a day with nothing free is one solid block', busyFrom([]), [{ start: 7, end: 23 }]);
+  check('a fully free day has no blocks', busyFrom([{ start: 7, end: 23 }]), []);
+
+  // Whose evenings these are.
+  const ravi = circle.find((p) => p.id === 'ravi');
+  check('their published windows come back in order',
+    freeOn(ravi, addDaysISO(today, 2)).map((s2) => s2.start), [17]);
+  check('a day they published nothing for is empty', freeOn(ravi, addDaysISO(today, 1)), []);
+
+  // Finding an evening: the coordination four people never do themselves.
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(today, i));
+  const withRavi = sharedDays(mine, [ravi], days, 'busy', 2);
+  check('you and Ravi share at least one evening', withRavi.length > 0, true);
+  check('longest window first', withRavi[0].best.end - withRavi[0].best.start >= 2, true);
+  const aisyah = circle.find((p) => p.id === 'aisyah');
+  check('the more people, the fewer windows',
+    sharedDays(mine, [ravi, aisyah], days, 'busy', 2).length <= withRavi.length, true);
+  check('someone who shared nothing cannot be counted free',
+    sharedDays(mine, [{ id: 'x', name: 'X', initials: 'X', band: 'steady' }], days, 'busy', 2), []);
+  check('and nobody asked means nothing offered', sharedDays(mine, [], days, 'busy', 2), []);
+
+  // Starting a circle from the address book.
+  check('people already on Ballast come first',
+    suggestions(phoneContacts).slice(0, 3).every((c) => c.onBallast), true);
+  check('anyone already added is not offered again',
+    suggestions(phoneContacts).some((c) => c.added), false);
+  check('three of your contacts are here and not yet added', onBallastCount(phoneContacts), 3);
+
+  const before = s().circle.length;
+  s().addFriend('c-nadia');
+  check('adding one grows your circle', s().circle.length, before + 1);
+  check('she arrives with no invented battery', s().circle.at(-1).charge, undefined);
+  check('and no invented calendar', s().circle.at(-1).free, undefined);
+  s().addFriend('c-nadia');
+  check('adding her twice does nothing', s().circle.length, before + 1);
+  check('and she drops off the suggestions', onBallastCount(s().phoneContacts), 2);
+  s().addFriend('c-priya');
+  check('someone not on Ballast is never silently added', s().circle.length, before + 1);
+
+  // Handing a message to the app they already use.
+  check('the link opens a chat with the words in it',
+    whatsapp('Hey Jo', '60123456702'), 'https://wa.me/60123456702?text=Hey%20Jo');
+  check('spaces and punctuation survive the trip',
+    whatsapp(CHECK_IN_MESSAGE('Aisyah Binti')),
+    'https://wa.me/?text=Hey%20Aisyah%2C%20thinking%20of%20you.%20How%20have%20you%20been%3F');
+  check('a number is stripped to digits', whatsapp('hi', '+60 12-345 6701'), 'https://wa.me/60123456701?text=hi');
+  check('the plan message names the time, not the task',
+    PLAN_MESSAGE('Thu from 7pm', ['amin', 'ravi']),
+    'Are you both free Thu from 7pm? Looks like it works for everyone.');
+  check('and reads right for one person',
+    PLAN_MESSAGE('Thu from 7pm', ['amin']),
+    'Are you free Thu from 7pm? Looks like it works for everyone.');
+
+  // Turning it off, and back on.
+  s().setSharing('off');
+  check('the setting sticks', s().sharing, 'off');
+  check('and publishes nothing while it is off', published(s().items, today, s().sharing), []);
+  s().reset();
+  check('reset puts your circle back', s().circle.length, circle.length);
+  check('and your sharing back to evenings', s().sharing, 'evenings');
+}
+
+console.log('\nThe evening question');
+{
+  s().reset();
+  check('three answers, no more', VERDICT.map((v) => v.value), ['good', 'too-much', 'wrong-order']);
+  check('everything starts at one', DEFAULT_WEIGHTS, { urgency: 1, importance: 1, want: 1 });
+
+  // "Too full" is read as a complaint about what was done, not how much.
+  const full = retune(DEFAULT_WEIGHTS, 'too-much');
+  check('too full leans towards what you want', full.want > 1, true);
+  check('and away from raw importance', full.importance < 1, true);
+  check('without touching deadlines', full.urgency, 1);
+
+  // "Wrong order" is a deadline problem.
+  const wrong = retune(DEFAULT_WEIGHTS, 'wrong-order');
+  check('wrong order leans on deadlines', wrong.urgency > 1, true);
+  check('and off what you fancy', wrong.want < 1, true);
+
+  // A good day is not a no-op: it walks an old over-correction back.
+  check('a good day settles a stretched weight back towards neutral',
+    retune({ urgency: 1.6, importance: 1, want: 1 }, 'good').urgency < 1.6, true);
+  check('and leaves a neutral one alone', retune(DEFAULT_WEIGHTS, 'good'), DEFAULT_WEIGHTS);
+
+  // Bounded, both ways. One bad evening cannot rewrite the app.
+  let hammered = DEFAULT_WEIGHTS;
+  for (let i = 0; i < 40; i += 1) hammered = retune(hammered, 'wrong-order');
+  check('forty complaints cannot push a weight past the ceiling', hammered.urgency <= 1.6, true);
+  check('nor below the floor', hammered.want >= 0.6, true);
+  let softened = DEFAULT_WEIGHTS;
+  for (let i = 0; i < 40; i += 1) softened = retune(softened, 'too-much');
+  check('and a deadline can never be flattened to nothing', softened.importance >= 0.6, true);
+
+  // Folded over history, in order.
+  check('an unanswered history teaches nothing',
+    weightsFrom([{ date: '2030-01-01', felt: 'hard', percent: 60 }]), DEFAULT_WEIGHTS);
+  const history = [
+    { date: '2030-01-01', felt: 'hard', percent: 60, verdict: 'too-much' },
+    { date: '2030-01-02', felt: 'hard', percent: 60, verdict: 'too-much' },
+  ];
+  check('two evenings move it twice as far', weightsFrom(history).want, retune(retune(DEFAULT_WEIGHTS, 'too-much'), 'too-much').want);
+  check('and it says what it learned', describeWeights(weightsFrom(history)), 'What you want to be at counts more');
+  check('a fresh app claims to have learned nothing', describeWeights(DEFAULT_WEIGHTS), null);
+
+  // The weights have to reach the ranking, or the question is theatre.
+  const today = s().today;
+  const base = { bucket: 'social', hours: 4, dread: 3, commitment: 'soft', date: addDaysISO(today, 1) };
+  const wanted = { ...base, id: 'wanted', title: 'The thing you want', want: 5 };
+  const not = { ...base, id: 'not', title: 'The thing you do not', want: 1, hours: 4.4 };
+  const pool = [wanted, { ...not, hours: 4 }];
+  const gap = (w) => {
+    const [top, bottom] = prioritise(pool, today, 7, w).first;
+    return Math.round((top.score / bottom.score) * 100) / 100;
+  };
+  // Wanting something counts, quietly, before anyone has tuned anything - it has
+  // to, because a factor sitting at exactly 1 could never be tuned at all.
+  check('untuned, wanting it is worth a little', gap(DEFAULT_WEIGHTS) < 1.3, true);
+  check('and saying your days are too full is worth more', gap(softened) > gap(DEFAULT_WEIGHTS), true);
+  check('the wanted one leads either way', prioritise(pool, today, 7, softened).first[0].item.id, 'wanted');
+  check('and the row only says why once you have tuned it',
+    [
+      prioritise(pool, today, 7, DEFAULT_WEIGHTS).first[0].reasons.includes('You want this'),
+      prioritise(pool, today, 7, softened).first[0].reasons.includes('You want this'),
+    ],
+    [false, true]);
+
+  /*
+   * The assertion that keeps this safe to ship.
+   *
+   * A task the student never rated cannot be moved by the `want` weight, however
+   * hard it is pushed: unrated sits at the middle of the scale, the factor there
+   * is exactly 1, and 1 to any power is 1. So a whole seeded semester ranks
+   * identically - the tuning only ever moves things it was actually told about.
+   *
+   * Only the want weight is pushed here. The other two multiply factors that
+   * *are* set on every task, so of course they move the scores; that is them
+   * working, not leaking.
+   */
+  const unrated = s().items.map(({ want, ...rest }) => rest);
+  check('a task nobody rated cannot be moved by that rating',
+    prioritise(unrated, today, 7, { urgency: 1, importance: 1, want: 1.6 }).first.map((r) => r.score),
+    prioritise(unrated, today, 7, DEFAULT_WEIGHTS).first.map((r) => r.score));
+
+  // Keeping to your own plan buys you quiet.
+  check('no history is not bad history', adherence([], today).rate, 1);
+  const sittings = [
+    { id: 's1', parentId: 'p', title: 'a', bucket: 'mental', hours: 2, dread: 3, commitment: 'self', date: addDaysISO(today, -2), sessionDone: true },
+    { id: 's2', parentId: 'p', title: 'b', bucket: 'mental', hours: 2, dread: 3, commitment: 'self', date: addDaysISO(today, -1) },
+  ];
+  check('half the sittings kept reads as half', adherence(sittings, today), { kept: 1, booked: 2, rate: 0.5 });
+  check('tomorrow is not yet a broken promise',
+    adherence([{ ...sittings[1], date: addDaysISO(today, 3) }], today).booked, 0);
+  check('keeping to it earns you quiet', reviewEvery(1), 3);
+  check('drifting gets asked nightly', reviewEvery(0.2), 1);
+  check('and it says so plainly', CADENCE_WORD(1), 'Asking every few days');
+
+  // When to ask.
+  check('never before the evening', dueForReview([], today, 14, 1), false);
+  check('but once it is late, yes', dueForReview([], today, REVIEW_FROM_HOUR, 1), true);
+  check('not twice in one night',
+    dueForReview([{ date: today, felt: 'fine', percent: 40, verdict: 'good' }], today, 22, 1), false);
+  check('not again tomorrow when you are keeping to the plan',
+    dueForReview([{ date: addDaysISO(today, -1), felt: 'fine', percent: 40, verdict: 'good' }], today, 22, 1), false);
+  check('but yes tomorrow when you are not',
+    dueForReview([{ date: addDaysISO(today, -1), felt: 'fine', percent: 40, verdict: 'good' }], today, 22, 0.2), true);
+
+  // Through the store, which is what the card actually calls.
+  const before = s().dayReports.length;
+  s().reportDay('hard', 62, 'too-much');
+  check('the evening is recorded', s().dayReports.length, before + 1);
+  check('with the answer on it', s().dayReports.at(-1).verdict, 'too-much');
+  check('and the ranking has changed', weightsFrom(s().dayReports).want > 1, true);
+  check('a plain day report still teaches nothing', (() => {
+    s().reset(); s().reportDay('hard', 62);
+    return weightsFrom(s().dayReports);
+  })(), DEFAULT_WEIGHTS);
 }
 
 console.log('\nInviting people');

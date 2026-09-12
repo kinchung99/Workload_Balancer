@@ -36,7 +36,7 @@ export default function Widget() {
   )[0];
 
   return (
-    <Screen surface="night" scroll={false} back="/foundations" backLabel="Back">
+    <Screen surface="night" scroll={false} back="/you" backLabel="Back">
       <Stack gap={8} className="pt-8">
         <Stack gap={2} align="center">
           <Text variant="footnote" tone="nightMuted">{formatLong(tomorrow)}</Text>

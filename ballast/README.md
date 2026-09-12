@@ -43,7 +43,7 @@ npm run tokens:check     # figma/tokens.json and src/design/tokens.ts have not d
 npm run model:check      # the load model reproduces the study's stated figures
 npm run behaviour:check  # every button actually changes the state it claims to
 npm run render:check     # those figures actually reach the rendered screens
-npm run figma:canvas   # build figma/canvas.html — all 28 frames, ready to import
+npm run figma:canvas   # build figma/canvas.html — all 32 frames, ready to import
 npm run shots          # re-photograph every screen into docs/shots/ for the submission README
 ```
 
@@ -143,7 +143,7 @@ Three specific things a fresh reader tripped on, now fixed: the battery says
 - **It resets.** No settings screen — cut on purpose — so *Replay the intro*,
   *Design foundations* and *Reset to the seeded week* live at the bottom of
   Areas. A demo you cannot reset is a demo you get one take at.
-- **Every screen has a way out.** Tab screens have the tab bar; the twenty-five that
+- **Every screen has a way out.** Tab screens have the tab bar; the twenty-nine that
   do not now carry a labelled back control — *Areas*, *Plan*, *Recovery*, *Home*
   — and it falls back to a real destination rather than `router.back()`, because
   a link opened from a share has no history to pop. `render:check` fails if any
@@ -1177,10 +1177,10 @@ The things most likely to break later, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 351 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 313 actions |
+| A component hard-codes a number | `render:check` asserts 398 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through all 329 actions |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
-| A screen becomes a dead end | `render:check` asserts all 25 non-tab routes carry an exit |
+| A screen becomes a dead end | `render:check` asserts all 29 non-tab routes carry an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
 | Typed routes go stale after adding a screen | `expo start` regenerates `.expo/types`; typecheck fails loudly until it does |
 | SDK upgrade breaks the build | See *A note on Expo Go and SDK versions* |
@@ -1369,7 +1369,7 @@ ballast/
 │
 ├── figma/
 │   ├── tokens.json             W3C DTCG. The source of truth for every value.
-│   └── canvas.html             Generated: 28 frames, one page, import-ready
+│   └── canvas.html             Generated: 32 frames, one page, import-ready
 │
 └── scripts/                    Verification and build scripts, no build step
 ```
@@ -1608,9 +1608,9 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 351 strings against
-the rendered HTML of all twenty-seven pages, and `npm run behaviour:check` asserts
-313 state changes behind the buttons.
+figures against the model, and `npm run render:check` asserts 398 strings against
+the rendered HTML of all thirty-one pages, and `npm run behaviour:check` asserts
+329 state changes behind the buttons.
 
 ---
 
@@ -1623,7 +1623,7 @@ two scripts below check the things that would actually be wrong.
   Node's native TypeScript stripping and asserts the study's numbers. It catches
   a seed edit that silently moves Amira off her calibrated figures.
 - `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 313 checks covering
+  actions the buttons call and asserts the state moved: 329 checks covering
   booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
   capture with and without a time, the area logs, the time layer, scheduling,
   errands and inviting people. Several assert that a slot is never offered

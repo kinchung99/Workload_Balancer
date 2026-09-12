@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  AreaIcon, Battery, Button, Card, Chip, PageHeader, Reveal, Screen, Stack, Sticker, Text,
+  AreaIcon, Battery, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { BUCKET_LABEL, bandFor } from '@/lib/load';
-import { CHARGE_NOTE } from '@/lib/battery';
 import { prioritise, rankedDetail, type Ranked } from '@/lib/priority';
+import { CADENCE_WORD, adherence, describeWeights, weightsFrom } from '@/lib/review';
 import { formatShort } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import { restOwedFrom, useStore } from '@/state/store';
@@ -36,11 +36,15 @@ const ACTION: Record<Ranked['kind'], string> = {
  */
 export default function Priority() {
   const router = useRouter();
-  const { today, booked, recovery } = useStore();
+  const { today, booked, recovery, dayReports } = useStore();
   const items = useItemsWithLogs();
   const reading = useReading();
 
-  const { first, couldMove } = useMemo(() => prioritise(items, today), [items, today]);
+  const weights = useMemo(() => weightsFrom(dayReports), [dayReports]);
+  const { first, couldMove } = useMemo(() => prioritise(items, today, 7, weights), [items, today, weights]);
+  /** What the evenings have taught it, and how often it still needs to ask. */
+  const learned = describeWeights(weights);
+  const kept = adherence(items, today);
   /**
    * Six, then the rest behind a tap.
    *
@@ -85,7 +89,6 @@ export default function Priority() {
           wash={color.decor.lemon}
           eyebrow="What to do first"
           title={first.length ? 'Start with this' : 'Nothing is pressing'}
-          sub="Ranked by deadline, who you promised, and what is left."
         />
 
         {/* Where you are starting from, because it changes the advice. */}
@@ -98,10 +101,7 @@ export default function Priority() {
               height={42}
               label={`${reading.charge} percent left`}
             />
-            <Stack gap={1} grow>
-              <Text variant="display" tone={TONE[band]}>{reading.charge}%</Text>
-              <Text variant="footnote" tone="muted">{CHARGE_NOTE[band]}</Text>
-            </Stack>
+            <Text variant="display" tone={TONE[band]}>{reading.charge}%</Text>
           </Stack>
         </Card>
 
@@ -114,9 +114,7 @@ export default function Priority() {
                 <Text variant="micro" tone="recovery">BEFORE ANY OF IT</Text>
                 <Text variant="heading">{rest.title}</Text>
                 <Text variant="footnote" tone="muted">
-                  {reading.charge < 30
-                    ? `You are ${restOwed}h down, and at ${reading.charge}% the next hour of work costs more than it gives.`
-                    : `You are ${restOwed}h down on rest. That debt outlasts any one week.`}
+                  {restOwed}h owed
                 </Text>
               </Stack>
             </Stack>
@@ -175,7 +173,9 @@ export default function Priority() {
                   ))}
                 </Stack>
 
-                <Chip label={ACTION[row.kind]} tone="steady" onPress={() => go(row)} />
+                {/* Only the top row gets a bright action. Six green buttons is
+                    six things shouting, which is the same as none. */}
+                <Chip label={ACTION[row.kind]} tone={index === 0 ? 'steady' : 'plain'} onPress={() => go(row)} />
               </Stack>
             ))}
 
@@ -226,7 +226,7 @@ export default function Priority() {
                   <Chip label={`${row.saves} back`} tone="recovery" readOnly />
                 </Stack>
                 <Stack direction="row" gap={2} wrap>
-                  <Chip label="Write the message" tone="steady" onPress={() => router.push(`/decline/${row.item.id}`)} />
+                  <Chip label="Write the message" onPress={() => router.push(`/decline/${row.item.id}`)} />
                   <Chip label="Move it" onPress={() => router.push(`/plan?day=${row.item.date}`)} />
                 </Stack>
               </Stack>
@@ -234,15 +234,29 @@ export default function Priority() {
           </Stack>
         ) : null}
 
-        <Reveal label="How this order is worked out">
-          <Text variant="footnote" tone="muted">
-            Size first — hours still owed for work with preparation, load for everything else. Then how close
-            the deadline is, which climbs steeply inside three days and is flat after a week. Then who you
-            promised: a hard deadline outranks a soft one, and both outrank a promise to yourself. Then how
-            much you said it matters. Anything that can no longer be finished in the free time left jumps
-            straight to the top, because that is the only genuinely alarming thing a list can tell you.
-          </Text>
-        </Reveal>
+
+        {/*
+          Where this order came from.
+          
+          A ranking nobody can question is a ranking nobody believes. This says
+          what the app has been told, by whom, and how often it intends to ask
+          again - and every word of it is a consequence of taps the student made.
+        */}
+        <Card tone="sunken" gap={3}>
+          <Stack direction="row" gap={4} align="center">
+            <Sticker name="scales" size={32} />
+            <Stack gap={1} grow>
+              <Text variant="footnote" weight="semibold">
+                {learned ?? 'Ranked the standard way'}
+              </Text>
+              <Text variant="micro" tone="muted">
+                {kept.booked
+                  ? `${kept.kept} of ${kept.booked} sittings kept · ${CADENCE_WORD(kept.rate).toLowerCase()}`
+                  : CADENCE_WORD(kept.rate)}
+              </Text>
+            </Stack>
+          </Stack>
+        </Card>
 
         <View className="h-2" />
       </Stack>

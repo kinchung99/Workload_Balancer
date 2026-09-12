@@ -88,6 +88,17 @@ export interface Item {
   prepDone?: number;
   /** 1 low, 2 normal, 3 high. Used to order what gets scheduled first. */
   importance?: 1 | 2 | 3;
+  /**
+   * How much you want to be there, 1 to 5.
+   *
+   * Not the same as importance and not the opposite of dread, which is why it
+   * needs its own number. A lecture can be important and unwanted. A sibling's
+   * wedding can be wanted and, strictly speaking, skippable. Dread is how much
+   * the thing costs you; this is how much you would mind losing it.
+   *
+   * It is the one thing in this list the app cannot work out for itself.
+   */
+  want?: 1 | 2 | 3 | 4 | 5;
   /** A booked sitting of a larger piece of work. */
   parentId?: string;
   /**
@@ -221,6 +232,50 @@ export interface CircleMember {
   charge?: number;
   /** Evenings they are free, by date. The raw material for finding an overlap. */
   free?: Array<{ date: string; start: number; end: number }>;
+  /**
+   * Minutes since they last updated their own battery.
+   *
+   * The only number in this app that exists to bring someone back. Seeing that
+   * four people checked in this morning is the difference between an app you
+   * remember on a bad week and one you remember once.
+   */
+  updatedMinsAgo?: number;
+  /** One short line they wrote themselves. Never generated, never inferred. */
+  status?: string;
+  /**
+   * Their number, for handing a message to WhatsApp.
+   *
+   * Held so the app never has to ask for it twice, and used in exactly one
+   * place: building a `wa.me` link the student then presses send on.
+   */
+  phone?: string;
+}
+
+/**
+ * One evening, reported by the student.
+ *
+ * `felt` moves your ceilings - report being flattened at 70% twice and 70%
+ * becomes your line. `verdict` moves how the app ranks things. Two different
+ * lessons from one question, which is why the question is worth asking.
+ */
+export interface DayReport {
+  date: string;
+  felt: 'fine' | 'meh' | 'hard';
+  percent: number;
+  verdict?: 'good' | 'too-much' | 'wrong-order';
+}
+
+/**
+ * How much each factor counts when deciding what comes first.
+ *
+ * One each for the three things a ranking can over-weight. They start at 1 and
+ * are moved only by the evening question - never by the app deciding on its own
+ * that it knows better. See `lib/review.ts`.
+ */
+export interface Weights {
+  urgency: number;
+  importance: number;
+  want: number;
 }
 
 /** A gathering you proposed. Local until someone accepts, which is the honest state. */
@@ -291,6 +346,8 @@ export interface Errand {
   done: boolean;
   /** Rough size, hours. Used to price it against the errands ceiling. */
   hours?: number;
+  /** How much you want to be there. Same scale and same purpose as `Item.want`. */
+  want?: 1 | 2 | 3 | 4 | 5;
   /** How much it takes out of you, 1 to 3. Yours to set - a bank call is not a walk. */
   effort?: 1 | 2 | 3;
   /**

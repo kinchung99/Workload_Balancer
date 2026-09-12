@@ -9,12 +9,11 @@
  * the fixed from the floating. Coursework with no slot is not "late", it is
  * unscheduled, and treating those the same is why a packed week reads as noise.
  */
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
-import { DAY_END, endHour, formatHour, freeSlots, slotHours, daySchedule, placeIn, startOptions } from '@/lib/schedule';
+import { DAY_END, endHour, formatHour, freeSlots, slotHours, daySchedule } from '@/lib/schedule';
 import { BUCKET_LABEL, bandFor, describeMix, loadOf, shortMix } from '@/lib/load';
 import type { Item } from '@/lib/types';
-import { tapFeedback } from '@/lib/haptics';
 import { FLAG_SHORT, isProtectedClass } from '@/lib/timetable';
 import { color } from '@design/tokens';
 import { AreaIcon } from '../primitives/AreaIcon';
@@ -57,6 +56,8 @@ function SectionHeader({
   );
 }
 
+
+
 const FILL = {
   steady: color.band.steady.fill,
   busy: color.band.busy.fill,
@@ -66,6 +67,13 @@ const FILL = {
 /** Width of the clock column. `w-14` was never in this theme's scale, so the
  *  times had been auto-sizing and no two rows lined up. */
 const CLOCK_WIDTH = 46;
+
+const EDGE = {
+  steady: 'border-l-steady-fill bg-steady-wash',
+  busy: 'border-l-busy-fill bg-busy-wash',
+  heavy: 'border-l-heavy-fill bg-heavy-wash',
+  recovery: 'border-l-recovery-fill bg-recovery-wash',
+} as const;
 
 /**
  * The rail — a dot on a line, down the left of everything with a time.
@@ -90,12 +98,7 @@ function Rail({ tone, hollow }: { tone: string; hollow?: boolean }) {
   );
 }
 
-const EDGE = {
-  steady: 'border-l-steady-fill bg-steady-wash',
-  busy: 'border-l-busy-fill bg-busy-wash',
-  heavy: 'border-l-heavy-fill bg-heavy-wash',
-  recovery: 'border-l-recovery-fill bg-recovery-wash',
-} as const;
+
 
 /** Load per hour, so a 6h shift at dread 2 does not out-shout a 1h crisis. */
 const intensity = (item: Item) => bandFor((loadOf(item) / Math.max(item.hours, 0.5)) * 22);
@@ -104,7 +107,6 @@ export function DayTimeline({
   items,
   date,
   onSelect,
-  onSchedule,
   onAddAt,
   todo,
   todoMeta,
@@ -112,9 +114,8 @@ export function DayTimeline({
 }: {
   items: Item[];
   date: string;
+  /** Opens the one screen where a thing can be changed. Rows are read-only. */
   onSelect?: (item: Item) => void;
-  /** Give a floating task a slot, or pass undefined to take its slot away. */
-  onSchedule?: (item: Item, startHour: number | undefined) => void;
   /** Tapping an empty stretch. This is how something gets added *at a time*. */
   onAddAt?: (date: string, startHour: number) => void;
   /** Work owing before a deadline, rendered above the plain unscheduled items. */
@@ -125,15 +126,6 @@ export function DayTimeline({
 }) {
   const { timed, anytime } = daySchedule(items, date);
   const gaps = showGaps ? freeSlots(items, date, 1) : [];
-  const [scheduling, setScheduling] = useState<string | null>(null);
-
-  const startsFor = (item: Item) => startOptions(items, date, item.hours);
-  /**
-   * Where this would go if it were being placed now. Marked in the picker so a
-   * fixed time is a starting point rather than a decision already taken.
-   */
-  const suggestedFor = (item: Item) =>
-    placeIn(items.filter((i) => i.id !== item.id), date, item.hours, item.isRecovery ? [12, 21] : undefined);
 
   // Interleave gaps between blocks so free time occupies real space on screen.
   const rows: Array<{ kind: 'item'; item: Item } | { kind: 'gap'; start: number; end: number }> = [];
@@ -226,38 +218,6 @@ export function DayTimeline({
                     ))}
                   </Stack>
                 ) : null}
-                {/* Protected recovery is movable too. Protected means work is
-                    planned around it, not that the hour is beyond question. */}
-                {onSchedule && !row.item.repeats && !isProtectedClass(row.item) ? (
-                  <Stack direction="row" gap={2} wrap>
-                    <Chip
-                      label={scheduling === row.item.id ? 'Close' : row.item.isRecovery ? 'Move this block' : 'Move'}
-                      tone={scheduling === row.item.id ? 'selected' : row.item.isRecovery ? 'recovery' : 'plain'}
-                      onPress={() => {
-                        tapFeedback();
-                        setScheduling((id) => (id === row.item.id ? null : row.item.id));
-                      }}
-                    />
-                    <Chip
-                      label={row.item.isRecovery ? 'Give it back' : 'Unschedule'}
-                      onPress={() => {
-                        onSchedule(row.item, undefined);
-                        setScheduling(null);
-                      }}
-                    />
-                  </Stack>
-                ) : null}
-                {scheduling === row.item.id ? (
-                  <SlotPicker
-                    starts={startsFor(row.item)}
-                    current={row.item.startHour}
-                    suggested={suggestedFor(row.item)}
-                    onPick={(hour) => {
-                      onSchedule?.(row.item, hour);
-                      setScheduling(null);
-                    }}
-                  />
-                ) : null}
               </Stack>
             </Pressable>
           </Stack>
@@ -326,28 +286,6 @@ export function DayTimeline({
                     </Stack>
                     <DreadDots value={item.dread} />
                   </Stack>
-                  {onSchedule ? (
-                    <Stack gap={3}>
-                      <Chip
-                        label={scheduling === item.id ? 'Close' : 'Give it a time'}
-                        tone={scheduling === item.id ? 'selected' : 'steady'}
-                        onPress={() => {
-                          tapFeedback();
-                          setScheduling((id) => (id === item.id ? null : item.id));
-                        }}
-                      />
-                      {scheduling === item.id ? (
-                        <SlotPicker
-                          starts={startsFor(item)}
-                          suggested={suggestedFor(item)}
-                          onPick={(hour) => {
-                            onSchedule(item, hour);
-                            setScheduling(null);
-                          }}
-                        />
-                      ) : null}
-                    </Stack>
-                  ) : null}
                 </Stack>
               </Pressable>
           ))}
@@ -366,48 +304,3 @@ export function DayTimeline({
   );
 }
 
-/**
- * The gaps this would fit into, as tappable times.
- *
- * One is marked as the suggestion — where the app would put it — so the choice
- * is guided without being made for you.
- */
-function SlotPicker({
-  starts,
-  current,
-  suggested,
-  onPick,
-}: {
-  starts: number[];
-  current?: number;
-  suggested?: number;
-  onPick: (hour: number) => void;
-}) {
-  if (starts.length === 0) {
-    return (
-      <Text variant="micro" tone="heavy">
-        Nothing free that day is long enough. Move something else first.
-      </Text>
-    );
-  }
-  return (
-    <Stack gap={2}>
-      <Stack direction="row" gap={2} wrap>
-        {starts.map((hour) => (
-          <Chip
-            key={hour}
-            label={hour === suggested && hour !== current ? `${formatHour(hour)} ·` : formatHour(hour)}
-            tone={hour === current ? 'selected' : hour === suggested ? 'steady' : 'plain'}
-            onPress={() => onPick(hour)}
-            accessibilityHint={hour === suggested ? 'Suggested' : undefined}
-          />
-        ))}
-      </Stack>
-      {suggested !== undefined && suggested !== current ? (
-        <Text variant="micro" tone="subtle">
-          {formatHour(suggested)} is where it would go on its own. Any of these work.
-        </Text>
-      ) : null}
-    </Stack>
-  );
-}

@@ -13,6 +13,9 @@ import { endHour, formatHour, weekDays } from '@/lib/schedule';
 import { formatShort } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
 import { itemsInWeek, nextWeek, useStore, weekReading } from '@/state/store';
+import { useItemsWithLogs } from '@/state/selectors';
+import { bestSwap, firstRefusal } from '@/lib/swap';
+import { SwapCard } from '@/features/rebalance/SwapCard';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -27,7 +30,8 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export default function Rebalance() {
   const router = useRouter();
-  const { items, ceilings, today, applyTrades } = useStore();
+  const { items, ceilings, today, modules, applyTrades, dropSwap } = useStore();
+  const withLogs = useItemsWithLogs();
 
   const anchor = nextWeek(today);
   const week = useMemo(() => itemsInWeek(items, anchor), [items, anchor]);
@@ -51,6 +55,19 @@ export default function Rebalance() {
   const chosen = trades.filter((t) => selected[t.id] && !t.locked).length;
 
   const days = weekDays(anchor);
+
+  /**
+   * The trade worth offering, or the reason there is none.
+   *
+   * Read off the list with logs in it rather than `week`, so a thing you typed
+   * in yourself and only have to turn up to can take part in the trade it was
+   * rated for.
+   */
+  const swap = useMemo(() => bestSwap(withLogs, days, modules), [withLogs, days, modules]);
+  const refusal = useMemo(
+    () => (swap ? null : firstRefusal(withLogs, days, modules)),
+    [swap, withLogs, days, modules],
+  );
   const previewWeek = useMemo(
     () => [...items.filter((i) => !week.some((w) => w.id === i.id)), ...afterItems],
     [items, week, afterItems],
@@ -186,6 +203,16 @@ export default function Rebalance() {
           eyebrow="Next week"
           title="Something has to come off"
           sub="Toggle a trade and watch the battery move."
+        />
+
+        <SwapCard
+          swap={swap}
+          refusal={refusal}
+          onSwap={() => {
+            if (!swap) return;
+            dropSwap(swap.drop.id);
+            successFeedback();
+          }}
         />
 
         <Card gap={5}>

@@ -12,6 +12,7 @@
 import type {
   CircleMember, Contact, Errand, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry, SimAction,
 } from '@/lib/types';
+import type { PhoneContact } from '@/lib/sharing';
 import { addDays } from '@/lib/dates';
 
 export const TODAY = '2025-11-10';
@@ -94,6 +95,9 @@ function klass(
     // Every class in a module carries that module's dread, so the fourteen hours
     // still weigh exactly what the single blob weighed: 14 x 2.
     dread: 2,
+    // A class you are told things in is one you want to be at; a lab you have
+    // already covered is not. The flag carries the pull, not just the cost.
+    want: (flags ?? []).includes('tips') ? 4 : 2,
     commitment: 'hard',
     date: d(week, offset),
     startHour,
@@ -150,8 +154,8 @@ export const seedItems: Item[] = [
   // The wall: four things inside seventy-two hours, Tuesday to Thursday.
   { id: 'w11-net-lab',  title: 'Networks lab report',     bucket: 'mental',  hours: 5,    dread: 2, commitment: 'hard', date: d(W11, 1), when: 'Tue', startHour: 10 },
   { id: 'w11-pres',     title: 'Group presentation',      bucket: 'mental',  hours: 6,    dread: 4, commitment: 'hard', date: d(W11, 2), when: 'Wed', startHour: 9, deadline: d(W11, 2), prepHours: 6, prepDone: 0, importance: 3 },
-  { id: 'w11-amin',     title: 'Café shift, covering Amin', bucket: 'time',  hours: 7,    dread: 2, commitment: 'soft', date: d(W11, 2), when: 'Wed evening', startHour: 16 },
-  { id: 'w11-birthday', title: "Aisyah's birthday dinner", bucket: 'social', hours: 3,    dread: 3, commitment: 'soft', date: d(W11, 3), when: 'Thu', startHour: 19 },
+  { id: 'w11-amin',     title: 'Café shift, covering Amin', bucket: 'time',  hours: 7,    dread: 2, commitment: 'soft', date: d(W11, 2), when: 'Wed evening', startHour: 16, want: 1 },
+  { id: 'w11-birthday', title: "Aisyah's birthday dinner", bucket: 'social', hours: 3,    dread: 3, commitment: 'soft', date: d(W11, 3), when: 'Thu', startHour: 19, want: 5 },
 
   // The rest of week 11, so the wall has a week around it.
   { id: 'w11-ch9',      title: 'Chapter 9 reading',       bucket: 'mental',  hours: 3,    dread: 2, commitment: 'self', date: d(W11, 5) },
@@ -232,36 +236,86 @@ export const prescriptions: Prescription[] = [
   { id: 'empty', title: 'An evening with nothing in it', detail: 'Wednesday is now free', refills: 'mental',   credit: 6, slot: 'Wednesday evening', preferred: [18, 22] },
 ];
 
-/** Seeded: needs other people. Bands only, never a task, never a number, never a mood. */
+/**
+ * Seeded: needs other people.
+ *
+ * A band, a charge, how old the reading is, one line they wrote, and the
+ * evenings they chose to publish. That is the entire payload - there is no field
+ * here for a task, a deadline or a mood, which is what makes the calendar side
+ * of this app safe to turn on.
+ *
+ * `phone` is what the message button hands to WhatsApp. Kept on the record
+ * rather than typed each time, and never sent anywhere by this app: it goes into
+ * a link, and the student presses send.
+ */
 export const circle: CircleMember[] = [
-  { id: 'you',    name: 'You',    initials: 'A',  band: 'heavy',  isYou: true, charge: 13 },
+  { id: 'you', name: 'You', initials: 'A', band: 'busy', isYou: true, charge: 47, updatedMinsAgo: 5 },
   {
     id: 'amin', name: 'Amin', initials: 'Am', band: 'steady', charge: 62,
+    updatedMinsAgo: 22, status: 'Finally handed it in', phone: '60123456701',
     free: [
       { date: d(W10, 2), start: 18, end: 22 },
       { date: d(W10, 4), start: 19, end: 23 },
       { date: d(W10, 5), start: 13, end: 20 },
+      { date: d(W11, 2), start: 18, end: 23 },
+      { date: d(W11, 4), start: 17, end: 22 },
+      { date: d(W11, 5), start: 11, end: 22 },
     ],
   },
   {
     id: 'jo', name: 'Jo', initials: 'J', band: 'busy', charge: 24,
+    updatedMinsAgo: 4380, status: 'Two labs and a shift', phone: '60123456702',
     free: [
       { date: d(W10, 2), start: 20, end: 22 },
       { date: d(W10, 5), start: 15, end: 19 },
+      { date: d(W11, 4), start: 19, end: 22 },
+      { date: d(W11, 5), start: 14, end: 20 },
     ],
   },
   {
     id: 'aisyah', name: 'Aisyah', initials: 'Ai', band: 'heavy', heavyForDays: 11, charge: 8,
-    free: [{ date: d(W10, 5), start: 17, end: 21 }],
+    updatedMinsAgo: 95, phone: '60123456703',
+    free: [
+      { date: d(W10, 5), start: 17, end: 21 },
+      { date: d(W11, 3), start: 19, end: 22 },
+      { date: d(W11, 5), start: 16, end: 21 },
+    ],
   },
   {
     id: 'ravi', name: 'Ravi', initials: 'R', band: 'steady', charge: 71,
+    updatedMinsAgo: 140, status: 'Free most of this week', phone: '60123456704',
     free: [
       { date: d(W10, 2), start: 17, end: 23 },
       { date: d(W10, 3), start: 18, end: 22 },
       { date: d(W10, 5), start: 12, end: 22 },
+      { date: d(W11, 2), start: 17, end: 23 },
+      { date: d(W11, 4), start: 18, end: 23 },
+      { date: d(W11, 5), start: 12, end: 22 },
     ],
   },
+];
+
+/**
+ * Your phone's address book, as the app would see it after a permission prompt.
+ *
+ * Seeded here rather than read for real: in the shipped app this comes from
+ * `expo-contacts`, matched against hashed numbers so no server ever learns who
+ * is in anybody's address book. Reading a genuine address book to demonstrate a
+ * list would be a bad trade, so the prototype does not.
+ *
+ * The split that matters is `onBallast`. A circle that starts empty is a circle
+ * that stays empty, and "three people you already know are on here" is the only
+ * version of this screen that ever gets a first friend added.
+ */
+export const phoneContacts: PhoneContact[] = [
+  { id: 'c-nadia',  name: 'Nadia Rahman',  initials: 'NR', onBallast: true },
+  { id: 'c-wei',    name: 'Wei Ling',      initials: 'WL', onBallast: true },
+  { id: 'c-tom',    name: 'Tom Beckett',   initials: 'TB', onBallast: true },
+  { id: 'c-amin',   name: 'Amin',          initials: 'Am', onBallast: true, added: true },
+  { id: 'c-jo',     name: 'Jo',            initials: 'J',  onBallast: true, added: true },
+  { id: 'c-priya',  name: 'Priya Menon',   initials: 'PM' },
+  { id: 'c-danny',  name: 'Danny Oduya',   initials: 'DO' },
+  { id: 'c-hafiz',  name: 'Hafiz Ismail',  initials: 'HI' },
 ];
 
 /** Seeded: averages only, and only where enough students in a course opted in. */

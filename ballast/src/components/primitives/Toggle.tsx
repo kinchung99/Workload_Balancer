@@ -18,6 +18,9 @@ const TRACK = {
   protected: 'bg-control-lockedFill',
 } as const;
 
+/** 44pt of target around a 30pt track. Not a spacing token: there is none this size. */
+const TRACK_WIDTH = 44;
+
 const HINT: Record<ToggleState, string> = {
   on: 'Selected. This change will be applied.',
   off: 'Not selected.',
@@ -44,7 +47,7 @@ export function Toggle({ state, onPress, label }: ToggleProps) {
       // 44pt target around a 30pt control, which is the WCAG rule people skip.
       className="min-h-min min-w-min items-end justify-center"
     >
-      <View className={`h-6 w-11 justify-center rounded-pill p-1 ${TRACK[state]}`}>
+      <View className={`h-6 justify-center rounded-pill p-1 ${TRACK[state]}`} style={{ width: TRACK_WIDTH }}>
         <View className={`h-5 w-5 rounded-pill bg-control-knob ${state === 'on' ? 'self-end' : 'self-start'}`} />
       </View>
     </Pressable>

@@ -26,6 +26,12 @@ export const SCREEN: Record<string, ScreenStyle> = {
   timetable:    { sticker: 'class',      wash: color.decor.lilac },
   foundations:  { sticker: 'palette',    wash: color.decor.cream },
   welcome:      { sticker: 'wave',       wash: color.decor.lemon },
+  friends:      { sticker: 'people',     wash: color.decor.candy },
+  together:     { sticker: 'heart',      wash: color.decor.blush },
+  you:          { sticker: 'battery',    wash: color.decor.mint },
+  findFriends:  { sticker: 'chat',       wash: color.decor.candy },
+  sharing:      { sticker: 'wave',       wash: color.decor.lilac },
+  friendDay:    { sticker: 'calendar',   wash: color.decor.blush },
 };
 
 /** The five areas keep their own identity hue rather than a decor one. */

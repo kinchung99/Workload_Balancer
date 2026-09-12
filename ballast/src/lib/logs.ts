@@ -131,6 +131,9 @@ export function logItems({ today, sleepHours, meals, moods, errands = [], moment
       // The split given at capture travels with it, or the load would collapse
       // back into one heading the moment it became a row.
       mix: errand.mix,
+      // So does how much you want it: a thing you only turn up to is exactly
+      // the kind of thing a swap should be allowed to trade away.
+      want: errand.want,
     });
   }
 

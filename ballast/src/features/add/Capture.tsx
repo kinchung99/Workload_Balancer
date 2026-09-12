@@ -17,6 +17,7 @@ import { successFeedback, tapFeedback } from '@/lib/haptics';
 import type { BucketKey, CommitmentKind, Item, Mix } from '@/lib/types';
 import { useStore } from '@/state/store';
 import { categorise } from '@/lib/errands';
+import { WANT_CHOICES } from '@/lib/swap';
 import { readingFrom, useItemsWithLogs, useReading } from '@/state/selectors';
 
 const HOUR_OPTIONS = [0.5, 1, 2, 3, 4, 6, 8];
@@ -102,6 +103,15 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const [date, setDate] = useState<string | null>(params.date ?? null);
   const [time, setTime] = useState<number | null>(params.start ? Number(params.start) : null);
   const [deadline, setDeadline] = useState<string | null>(null);
+  /**
+   * The one thing the app cannot work out for itself.
+   *
+   * Everything else a swap needs is already here or derivable - hours, dread,
+   * whether it can move, and for a class whether the attendance arithmetic says
+   * you can afford to miss it. Whether you *want* to be there is not in any of
+   * that, so it is asked once, in three words, and never asked again.
+   */
+  const [want, setWant] = useState<Item['want']>(3);
 
   /**
    * The parser's guess, as a mix: everything it found, in the one area it
@@ -135,11 +145,11 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
       title: titleFrom(text),
       bucket, hours: spentHours, dread, commitment: commit,
       date: needsPrep ? due : day,
-      mix: liveMix,
+      mix: liveMix, want,
       ...(time === null || needsPrep ? {} : { startHour: time }),
     };
     return readingFrom([...scheduleItems, candidate], today, ceilings);
-  }, [ready, text, bucket, spentHours, dread, commit, needsPrep, due, day, liveMix, time, scheduleItems, today, ceilings]);
+  }, [ready, text, bucket, spentHours, dread, commit, needsPrep, due, day, liveMix, want, time, scheduleItems, today, ceilings]);
 
   /** The reading on show: with the new thing folded in once there is one. */
   const shown = after ?? reading;
@@ -163,7 +173,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
         bucket, dread, commitment: commit, date: day,
         hours: prepHours,
         deadline: due, prepHours, prepDone: 0, importance,
-        mix: liveMix,
+        mix: liveMix, want,
       });
     } else {
       // Something you only turn up to is the same kind of object as an errand,
@@ -176,6 +186,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
         { date: day, ...(time === null ? {} : { startHour: time }) },
         bucket,
         liveMix,
+        want,
       );
     }
     successFeedback();
@@ -373,12 +384,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               </Card>
             ) : null}
 
-            <Reveal label="Why ask this first">
-              <Text variant="footnote" tone="muted">
-                An interview is an hour you turn up to. An assignment is hours spread across the days before it.
-                Everything else on these pages depends on which one this is, so it is asked before anything else.
-              </Text>
-            </Reveal>
           </Stack>
         ) : null}
 
@@ -419,14 +424,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               <AreaDial key={area} area={area} value={liveMix[area]} onChange={(next) => setArea(area, next)} />
             ))}
 
-            <Reveal label="Why five and not one">
-              <Text variant="footnote" tone="muted">
-                A group presentation is not "mental". It is mental, and time, and a social cost most people would
-                never have thought to name. Filing it under one heading is how a week reads 60% while you are
-                finished. The total is the same either way — {fmtHours(spentHours)} × dread {dread} — but it lands
-                where it actually costs you, and the worst area counts for half of your overall reading.
-              </Text>
-            </Reveal>
           </Stack>
         ) : null}
 
@@ -478,19 +475,37 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               </Card>
             )}
 
-            <Card gap={3}>
-              <Text variant="heading">Can it move?</Text>
-              <Stack direction="row" gap={2} wrap>
-                {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
-                  <Chip
-                    key={option}
-                    label={COMMITMENT_LABEL[option]}
-                    tone={option === commit ? 'selected' : 'plain'}
-                    onPress={() => { tapFeedback(); setCommitment(option); }}
-                  />
-                ))}
+            <Card gap={5}>
+              <Stack gap={3}>
+                <Text variant="heading">Can it move?</Text>
+                <Stack direction="row" gap={2} wrap>
+                  {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
+                    <Chip
+                      key={option}
+                      label={COMMITMENT_LABEL[option]}
+                      tone={option === commit ? 'selected' : 'plain'}
+                      onPress={() => { tapFeedback(); setCommitment(option); }}
+                    />
+                  ))}
+                </Stack>
               </Stack>
-              <Text variant="footnote" tone="subtle">Hard deadlines are never suggested for moving.</Text>
+
+              {/* Asked next to "can it move" on purpose: together they are what
+                  turns a full day into a decision instead of a list. */}
+              <Stack gap={3}>
+                <Text variant="heading">Want to be there?</Text>
+                <Stack direction="row" gap={2} wrap>
+                  {WANT_CHOICES.map(([value, word]) => (
+                    <Chip
+                      key={value}
+                      label={word}
+                      tone={value === want ? 'selected' : 'plain'}
+                      onPress={() => { tapFeedback(); setWant(value); }}
+                    />
+                  ))}
+                </Stack>
+                <Text variant="footnote" tone="subtle">Lets the app swap things, not just drop them.</Text>
+              </Stack>
             </Card>
 
             {/* What it does to you, before you commit to it. With nothing typed

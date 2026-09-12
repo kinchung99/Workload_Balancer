@@ -29,8 +29,7 @@ import { WEEK_NUMBER } from '@/data/seed';
  */
 export default function Plan() {
   const router = useRouter();
-  const { ceilings, today, scheduleItem, scheduleSessions, pushSittings, completeSitting, logUnbookedHours,
-    unscheduleSession, setSessionNote } = useStore();
+  const { ceilings, today } = useStore();
   const items = useItemsWithLogs();
 
   // Arriving from Home's week strip opens straight onto that day.
@@ -75,7 +74,6 @@ export default function Plan() {
           {...SCREEN.plan}
           eyebrow={`Week ${WEEK_NUMBER} to ${WEEK_NUMBER + 2}`}
           title={`Next ${threshold.forecastDays} days`}
-          sub="Tap any day to open it hour by hour."
         />
 
         <Card gap={5}>
@@ -85,12 +83,10 @@ export default function Plan() {
             selected={selected}
             onSelect={setSelected}
           />
-          <Divider />
           <Stack direction="row" justify="between">
-            <Text variant="footnote" tone="muted">This week, {chargeOf(thisWeek.overall)}% left</Text>
-            <Text variant="footnote" weight="semibold" tone="heavy">Next week, {chargeOf(next.overall)}%</Text>
+            <Text variant="footnote" tone="muted">This week {chargeOf(thisWeek.overall)}%</Text>
+            <Text variant="footnote" weight="semibold" tone="heavy">Next {chargeOf(next.overall)}%</Text>
           </Stack>
-          <Text variant="micro" tone="subtle">Tap a day.</Text>
         </Card>
 
         {/* The selected day, in full. This is the part that was missing. */}
@@ -110,21 +106,12 @@ export default function Plan() {
             </Stack>
           </Stack>
 
-          {inWall ? (
-            <Card tone="heavy" gap={2}>
-              <Text variant="callout" weight="semibold" tone="heavy">Part of the wall.</Text>
-            </Card>
-          ) : null}
 
           <Card gap={4}>
             <DayTimeline
               items={items}
               date={selected}
-              onSelect={(item) => router.push(`/decline/${item.id}`)}
-              onSchedule={(item, startHour) => {
-                scheduleItem(item.id, startHour);
-                successFeedback();
-              }}
+              onSelect={(item) => router.push(`/item/${item.id}`)}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
               todoMeta={owingMeta}
               todo={
@@ -133,73 +120,27 @@ export default function Plan() {
                   items={items}
                   today={today}
                   date={selected}
-                  onSchedule={(item, startHour, hours, note) => {
-                    scheduleSessions(item.id, [{ date: selected, startHour, hours, note }]);
-                    successFeedback();
-                  }}
-                  onPlan={(item, sessions) => {
-                    scheduleSessions(item.id, sessions, { replace: true });
-                    successFeedback();
-                  }}
-                  onDefer={(item, to) => {
-                    // The work moves; the deadline is not ours to move.
-                    pushSittings(item.id, selected, to);
-                    successFeedback();
-                  }}
-                  onDone={(sessionId) => { completeSitting(sessionId); successFeedback(); }}
-                  onUnbooked={(item, hours) => { logUnbookedHours(item.id, hours); successFeedback(); }}
-                  onUnschedule={(sessionId) => {
-                    unscheduleSession(sessionId);
-                    successFeedback();
-                  }}
-                  onNote={(sessionId, note) => setSessionNote(sessionId, note)}
+                  onOpen={(item) => router.push(`/item/${item.id}`)}
                 />
               }
             />
           </Card>
         </Stack>
 
-        {/* Why this screen exists: clustering, found early enough to act on. */}
+        {/* One line, not a chart. The warning is the feature; the diagram was
+            three hundred pixels explaining a sentence. */}
         {collision ? (
-          <Stack gap={3}>
-            <Text variant="micro" tone="subtle">THE COLLISION</Text>
-            <Card tone="heavy" gap={5}>
-              <Stack gap={3}>
-                <Stack direction="row" gap={3} align="center" wrap>
-                  <Chip label={leadLabel(collision.leadDays)} tone="heavy" readOnly />
-                  <Chip label={`${collision.items.length} things`} tone="heavy" readOnly />
-                  <Chip label="72 hours" tone="heavy" readOnly />
-                </Stack>
-                <Text variant="heading">{collision.headline}</Text>
-                <Text variant="callout" tone="muted">{collision.detail}</Text>
-              </Stack>
-
-              <CollisionWindow
-                collision={collision}
-                days={[collision.from, addDays(collision.from, 1), collision.to]}
-                onSelectItem={(item) => router.push(`/decline/${item.id}`)}
-              />
-
-              <Button label="Rebalance next week" onPress={() => router.push('/rebalance')} />
-            </Card>
-          </Stack>
-        ) : (
-          <Card gap={4}>
+          <Card tone="heavy" gap={3}>
             <Stack direction="row" gap={4} align="center">
-              <Sticker name="sun" size={48} />
+              <Sticker name="wall" size={38} />
               <Stack gap={1} grow>
-                <Text variant="heading">Nothing is colliding.</Text>
-                <Text variant="footnote" tone="muted">An ordinary two weeks.</Text>
+                <Text variant="callout" weight="semibold" tone="heavy">{collision.headline}</Text>
+                <Text variant="micro" tone="muted">{leadLabel(collision.leadDays)}</Text>
               </Stack>
             </Stack>
           </Card>
-        )}
+        ) : null}
 
-        <Reveal label="When we notify you">
-          <Text variant="footnote" tone="muted">
-            One message, eight days out, only for a genuine collision. No daily digest, nothing at 11pm.
-          </Text>
-        </Reveal>
         <View className="h-2" />
       </Stack>
     </Screen>
