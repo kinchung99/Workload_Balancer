@@ -11,6 +11,15 @@
   <img src="docs/shots/priority.png" width="230" alt="What to do first: a ranked list with reasons">
 </p>
 
+<p align="center">
+  <a href="#1-project-overview">Overview</a> ·
+  <a href="#2-ideation--process">Ideation</a> ·
+  <a href="#3-design--prototype">Prototype</a> ·
+  <a href="#4-what-makes-it-different">Different</a> ·
+  <a href="#5-technical-architecture--feasibility">Feasibility</a> ·
+  <a href="#6-impact--reach">Impact</a>
+</p>
+
 ---
 
 ## 1. Project Overview
@@ -21,6 +30,22 @@ Burnout is almost never one big thing. It is a pile of small ones nobody was cou
 student can feel it, the week that caused it is already over.
 
 ![Why students burn out](docs/problem-tree.svg)
+
+### 🎯 Who it's for
+
+**Undergraduates mid-semester who are carrying more than coursework** — classes, assignments, a part-time
+shift, and friends they have stopped seeing. Mid-semester is when the small things pile up.
+
+Every screen in the prototype runs on one of them. **Amira**, second-year Computer Science, week 10: four
+modules with an 80% attendance rule, a café shift on Mondays and Fridays, a group presentation she is
+dreading, and a friend who has been running on empty for eleven days.
+
+| Who else is affected | What burnout costs them | What Ballast gives them |
+|---|---|---|
+| 🎓 **The student** | Missed deadlines, attendance under the line, sleep traded for work | Warning 8 days out, and specific things to put down |
+| 👥 **Their friends** | Nobody asks, because everyone assumes everyone else is busier | Who is empty, how recent that is, and one evening that suits everyone |
+| 🧑‍🏫 **Tutors & employers** | Extension requests and shift swaps that arrive the night before | The same requests, a week earlier |
+| 🏫 **University wellbeing services** | Students who reach them at crisis point | A workload tool that works *before* that point — not a clinical one, and it says so |
 
 ### 🔍 What already exists, and where it stops
 
@@ -77,7 +102,8 @@ AI planner, a battery metaphor, a dread multiplier.
 came first, because if `time × dread` wasn't convincing, nothing on top of it would matter. Then capture,
 then the forecast, then everything that acts on it.
 
-**🔁 Iterate.** Then we used it for a fortnight — and replaced eight things (§2.4).
+**🔁 Iterate.** Two rounds. We used it for a fortnight and replaced eight things, then took it to a mentor,
+rebuilt the navigation and Friends around their feedback, and rethought the hardest decisions on the way (§2.4, §2.6).
 
 ### 2.2 🧠 Eight ideas, four survived
 
@@ -95,6 +121,8 @@ We didn't start from a feature list. Each one came from a specific moment we'd a
 
 The honest half of the process. Every row below is something we shipped, used, and then replaced.
 
+**Round 1 — using it for a fortnight**
+
 | # | We had | We have | Why it changed |
 |---|---|---|---|
 | 1 | One bucket per task | **Five dials per task** | Filing a group presentation under "mental" is how a week reads 60% while the person is finished. |
@@ -105,6 +133,15 @@ The honest half of the process. Every row below is something we shipped, used, a
 | 6 | Five fixed evening activities | **Add your own hobby** | The five we shipped were a guess about someone else's life. |
 | 7 | Two illustration styles | **One sticker set** | Two visual voices on one app reads as an accident. |
 | 8 | A battery pinned at 13% | **An ordinary week reads 47%** | There's no advice at 13% that differs from the advice at 4%. |
+
+**Round 2 — the mentor session (§2.6), and what rebuilding around it shook loose**
+
+| # | We had | We have | Why it changed |
+|---|---|---|---|
+| 9 | Tabs for Home · Plan · Areas · Tonight, with Friends inside *Areas* | **Home · Plan · Friends · You** | The one feature between people was a sub-screen. Home now only answers *how am I* and *what next*. |
+| 10 | Rebalance could only **drop** things | **A swap: keep one, drop the other** (§3.10) | The real question is *which of two*. Its first version offered to skip the post office (1.5 load) to free a birthday dinner — a trade now has to be worth 5. |
+| 11 | Every timetabled class counted as a hard deadline | **Attendance arithmetic decides** | A lecture you could afford to miss could never be traded. At 89% against an 80% rule you can miss one; at 78% you can't. |
+| 12 | A fixed priority formula | **A ranking that learns from one evening question** (§3.6) | Our weights were a guess by people who had never met the student. We designed it for an LLM reading free text, then kept the same decision as three taps that work on a train. |
 
 ### 2.5 🔄 How it is actually used
 
@@ -134,7 +171,7 @@ change a task and the forecast changes with it.
 
 **Four tabs, and Home stays out of the way.** 🏠 Home answers two questions — *how am I* and *what do I do
 next* — then hands you four doors. 📅 **Plan** owns the schedule. 👥 **Friends** is a tab because it is the one
-part of this app that is between people. 🙋 **You** holds everything about your own week beyond today.
+part of this app that is between people. 🙋 **You** holds the rest — check-in, recovery, Tonight, timetable and what to do first.
 
 **And every list is read-only.** Rows used to carry their own buttons — *Plan it*, *Progress*, *Move*,
 *Unschedule*, *Give it a time* — so three pieces of work put a dozen controls on a screen whose job was to
@@ -362,6 +399,7 @@ tomorrow beats a nine-hour job due next week. Everything in the next seven days 
 | **Deadline** | Today is **×3**; past a week, **below ×1** |
 | **Who you promised** | hard > soft > yourself |
 | **Can it still be finished?** | If not — **straight to the top** |
+| **Do you want to be there?** | Asked once at capture; how much it counts is learned (below) |
 
 - 6️⃣ **Six at a time**, rest behind a tap.
 - 🔘 **Every row has a button that does the next thing.**
@@ -380,6 +418,20 @@ message or move it to another day.
 offer you something it would then refuse to do.
 
 </td></tr></table>
+
+> ### 🌙 It learns *your* order, not ours
+>
+> Our ranking weights are a guess. So after 8pm, Home asks one question — **How was today?**
+>
+> | Answer | What changes |
+> |---|---|
+> | *Too full* | What you **want** to be at counts more |
+> | *Wrong order* | **Deadlines** count more |
+> | *That worked* | Weights drift back to neutral, so an old over-correction undoes itself |
+>
+> Weights are bounded, so one bad evening can't rewrite the ranking. And **keeping to your plan means it
+> asks less** — every few days if you keep 80% of your sittings, every evening only when you're drifting.
+> No streak, and skipping it costs nothing.
 
 ---
 
@@ -481,6 +533,25 @@ and the battery moves as you toggle. 🔒 **Hard deadlines can't be toggled at a
 whether the wall is actually gone.
 
 </td></tr><tr><td>
+<img src="docs/shots/swap.png" alt="A swap on Wednesday: keep the seminar, drop the café shift cover, 14 load back">
+</td><td>
+
+**⚖️ A swap, when the question is *which of two*.** A calendar can say a day is full. It can't say which
+thing to go to, because that takes three facts it doesn't hold:
+
+1. **Is it really mandatory?** For a class, that's arithmetic — after one more absence, are you still above
+   the attendance line?
+2. **Can it move?** Hard deadline, soft arrangement, or a promise to yourself.
+3. **Do you want to be there?** The one question capture asks (§3.4).
+
+*"Wednesday — keep the Distributed Systems seminar, drop the café shift you were covering for Amin. A soft
+arrangement, 14 load back."* One button makes it.
+
+🔒 **The refusals matter as much as the swaps.** The lecture that gives exam hints, and any class where one
+more absence takes you under the line, are never offered. When nothing can go, the card says so — with the
+reason under each item.
+
+</td></tr><tr><td>
 <img src="docs/shots/decline.png" alt="The decline drafter with three tones">
 </td><td>
 
@@ -500,17 +571,17 @@ around your choice instead of guilt-tripping you.
   <img src="docs/shots/welcome.png" width="150" alt="The intro: two tasks, two dread dials">
   <img src="docs/shots/recover.png" width="150" alt="The recovery ledger: eleven hours down">
   <img src="docs/shots/prescribe.png" width="150" alt="Matched recovery: a walk that fits">
-  <img src="docs/shots/checkin.png" width="150" alt="One check-in for all five areas">
+  <img src="docs/shots/plan.png" width="150" alt="Plan: fourteen days of load, next week at 41%, and eight days to move something">
   <img src="docs/shots/item.png" width="150" alt="One item, and every verb for it">
 </p>
 <p align="center">
-  <img src="docs/shots/find-friends.png" width="150" alt="Finding friends from your contacts">
+  <img src="docs/shots/you.png" width="150" alt="You: check-in, recovery, Tonight, timetable and what first">
   <img src="docs/shots/import.png" width="150" alt="Pasting a timetable in">
   <img src="docs/shots/tonight-book.png" width="150" alt="What tonight puts in your week">
   <img src="docs/shots/calm.png" width="150" alt="Calm mode on the worst weeks">
   <img src="docs/shots/widget.png" width="150" alt="Lock screen widget and the daily one-tap check-in">
 </p>
-<p align="center"><i>Intro · recovery ledger · matched rest · check in · one item · find friends · timetable import · booking a night · calm mode · lock screen</i></p>
+<p align="center"><i>Intro · recovery ledger · matched rest · the week in Plan · one item · the You tab · timetable import · booking a night · calm mode · lock screen</i></p>
 
 ---
 
@@ -525,11 +596,13 @@ around your choice instead of guilt-tripping you.
 | 5 | 🧱 **Clustering, not totals** | Everyone warns on volume. We slide a 72-hour window and flag **density**, eight days early. |
 | 6 | ✉️ **The decline drafter** | It doesn't just say what to cut — it writes the message, in three tones, and never sends it. |
 | 7 | 🌿 **Recovery in the same units as work** | Rest is a credit you're owed, in hours, carried forward. Booking it writes protected time in a gap that really exists. |
-| 8 | 👥 **Your friends' *capacity*, not their calendar** | A band, never a number — plus **how old that reading is**, so a three-day-old battery says so instead of pretending to be news. Then it finds the one evening that suits everybody. Nothing else tells you *who has room* before you ask. |
+| 8 | 👥 **Your friends' *capacity*, not their calendar** | A band and a charge — plus **how old that reading is**, so a three-day-old battery says so instead of pretending to be news. Free time is shared as windows with no titles, and it finds the evening that suits everybody. Nothing else tells you *who has room* before you ask. |
 | 9 | 💡 **Classes marked for *why* they matter** | A lecture is just an hour until it's the one giving exam hints. Flag it and the rebalancer refuses to move it, visibly. |
 | 10 | 🧘 **The interface gets simpler as the week gets worse** | Past the calm line it collapses to one number, one sentence, one button. Most apps add urgency when things get bad — that's backwards. |
 | 11 | 🎮 **Game feel without game pressure** | A character, a drawing on every screen, a face on every dial — and no streak, no score, no leaderboard. |
 | 12 | ♿ **Built for the worst day, not the demo day** | Every band is a colour **and** a word **and** a fill pattern, so nothing depends on colour alone. Every chart has a spoken sentence. 44pt targets, 200% dynamic type, reduced motion — nothing truncates. |
+| 13 | ⚖️ **Swap, don't just drop** | Keep what you want, drop what you're *allowed* to — decided by your attendance record, not by what's printed on a timetable. |
+| 14 | 🌙 **A ranking that learns from one tap** | One evening question retunes what "first" means for *you*, and asks less the better your plan is going. |
 
 ---
 
@@ -565,12 +638,12 @@ This is the destination. §5.3 is the first three weeks of it.
 | **Notifications** | **Firebase Cloud Messaging** | One message, eight days out, only for a genuine collision. Nothing at 11pm. |
 | **Jobs & cache** | **Redis** + a nightly cron worker | Runs the clustering detector server-side once a day, and rate-limits push. |
 | **Sync** | Local-first queue · last-write-wins per row | Writes land on the phone immediately and drain when there's signal. Per-row, so two devices editing different tasks never collide. |
-| **Friends** | A read-only `friend_view` — **band only** | Steady / busy / heavy, plus coarse free windows. Never your numbers, tasks or calendar. Per-friend and revocable. |
+| **Friends** | A read-only `friend_view` | Band, charge, when you last updated it, your own status line, and the free windows you chose to publish (§3.2). No column exists for a task, deadline or module. *Nothing* is one tap. |
 | **Timetable** | **Google Calendar API** + **ICS** subscription | Most portals publish an ICS URL, so the timetable updates itself. **Paste stays as the fallback that always works.** |
 | **Health** | **Apple HealthKit** / **Google Health Connect** | Sleep and steps stop being seeded. Read-only, on device; only the derived load ever syncs. |
 | **Optional AI** | **OpenAI API** (or Claude), two narrow jobs | Rewriting a decline message, and reading a messy sentence typed at 1am. **Opt-in, server-side, never on the critical path.** |
 | **Hosting** | **Docker** on **AWS** — ECS for the API, RDS for Postgres, S3 for files | Standard, well-documented, and cheap at this size. **Railway** or **Render** for the first month if we want to move faster. |
-| **CI/CD** | **GitHub Actions** → **Expo EAS Build** → TestFlight / Play internal | The four checks in §5.5 gate every merge. |
+| **CI/CD** | **GitHub Actions** → **Expo EAS Build** → TestFlight / Play internal | The five checks in §5.5 gate every merge. |
 | **Monitoring** | **Sentry** (crashes) + **Google Analytics for Firebase** | No personal data, no task text, no ad SDKs. |
 | **Compliance** | GDPR export + delete, data minimisation | A **workload tool, not a clinical one**. No diagnosis, no score — and we say so on screen. |
 
@@ -595,9 +668,9 @@ This is the destination. §5.3 is the first three weeks of it.
 
 ### 5.3 📅 Three weeks, if we go ahead
 
-**Already done:** the entire front end — load model, capture, forecast, rebalance, drafter, recovery,
-Tonight, five areas, timetable, owing work, priority, friends, accessibility. Live now, with 398 render and
-329 behaviour assertions passing on every deploy.
+**Already done:** the entire front end — load model, capture, forecast, rebalance, swap, drafter, recovery,
+Tonight, five areas, timetable, owing work, priority and the evening question, friends and sharing,
+accessibility. Live now, with **881 automated checks** passing (§5.5).
 
 We have **three weeks** of build time after the finals. That is not enough for everything in §5.2, so the
 plan is a scope decision rather than a wish list: **one vertical slice, finished**, instead of five things
@@ -610,10 +683,24 @@ every other feature already works offline, on the phone, today.
 |---|---|---|---|
 | **1** | 🗄️ **Data layer** | Express API in TypeScript, Postgres schema via Prisma, Firebase Auth (Google · Apple · email), `/sync` endpoint | A signed-in account can push and pull a week over HTTPS, and cannot read anyone else's |
 | **2** | 🔄 **Sync in the app** | Local-first write queue, pull-on-open, per-row conflict resolution, GDPR export and delete | A task added on a phone in aeroplane mode appears on the web after reconnecting — **and on no other account** |
-| **3** | 🚀 **Ship it** | Deploy to Railway, GitHub Actions running the four checks on every push, Sentry, TestFlight build, bug-fix buffer | Five testers install from TestFlight, use it for three days, and nothing is lost |
+| **3** | 🚀 **Ship it** | Deploy to Railway, GitHub Actions running the five checks on every push, Sentry, TestFlight build, bug-fix buffer | Five testers install from TestFlight, use it for three days, and nothing is lost |
 
 **Why this order.** Week 3 is deliberately half buffer. A three-week estimate with no slack is a two-week
 estimate with a bad ending, and the checks in §5.5 only protect us if they are actually wired into CI.
+
+**What it takes — skills, time and money**
+
+| Resource | What we need | Cost |
+|---|---|---|
+| **Skills** | TypeScript and React Native are already proven by the prototype. New for weeks 1–3: Express, Postgres/Prisma, Firebase Auth and CI — all in the language we already write. | — |
+| **Time** | Three weeks after finals, week 3 half buffer | — |
+| **Hosting** | Railway: the API and Postgres for the pilot | ≈ US$5–20 / month |
+| **Auth & push** | Firebase Authentication + Cloud Messaging | Free at pilot scale |
+| **Monitoring & CI** | Sentry free tier, GitHub Actions, Expo EAS free tier | Free |
+| **App stores** | Apple Developer Program · Google Play Console | US$99 / year · US$25 once |
+| **Pilot total** | | **≈ US$125 up front, then ≈ US$5–20 / month** |
+
+The expensive parts — AWS, the ICS feed, health data — wait until the pilot shows people keep using it.
 
 **Cut on purpose, and honest about it:** friends syncing between real accounts, push notifications, the ICS
 timetable feed, and health data. Each needs the data layer underneath it, so they are the natural week 4–8
@@ -628,7 +715,7 @@ it does — the three weeks add sync *behind* it, not features on top.
 |---|---|
 | Students stop logging after a week | The daily ask is **one tap**, and the app stays correct after a fortnight of silence. Timetable and repeating commitments are entered once, counted forever. |
 | Ceilings are guesses at first | They **recalibrate** — report two hard days below your line and the line comes down to meet you. |
-| Friend features feel like surveillance | Band only. Per-friend, revocable, enforced in the database. |
+| Friend features feel like surveillance | Battery and free windows only — never what fills them. *Nothing* is one tap, enforced in the database. |
 | University portals vary wildly | ICS first, paste always. The parser hands back any line it can't read rather than guessing. |
 | Anything resembling medical advice | No diagnosis, no clinical language, no score — stated in the app. |
 
@@ -647,12 +734,53 @@ reading a messy sentence typed at 1am. Both optional, both with the rule-based p
 
 ### 5.5 ✅ How we know it works
 
-No manual clicking. Four checks run before anything deploys, and `npm run deploy` refuses to publish if any
+No manual clicking. Five checks run before anything deploys, and `npm run deploy` refuses to publish if any
 of them fail.
 
 | Check | What it proves |
 |---|---|
+| `typecheck` | Strict TypeScript across the whole app — an impossible week doesn't compile |
 | `model:check` | **20** figures — the study's loads, and the calibration we set |
-| `behaviour:check` | **329** state changes — every button moves the state it claims to |
-| `render:check` | **398** strings across **31 pages**, and every screen has a way out |
+| `behaviour:check` | **436** state changes — every button moves the state it claims to |
+| `render:check` | **335** strings across **28 pages**, and all **26** routes have a way out |
 | `tokens:check` | **90** design tokens consistent across the whole app |
+
+**881 assertions**, all passing on the current build.
+
+---
+
+## 6. Impact & Reach
+
+### 6.1 📈 Before and after — one week for Amira
+
+| Moment | With a calendar | With Ballast |
+|---|---|---|
+| **Sunday night** | *"3 tasks today."* | 47% this week, **41% next** — and *"8 days to move something"* |
+| **Assignment due Thursday** | Appears on Thursday | On every day until done, sittings **already booked** |
+| **Too much on Wednesday** | Cancel whatever is easiest | *Keep the seminar, drop the shift cover* — **14 load back**, never a class she'd fail on |
+| **Saying no** | A message that waits four days | Written in three tones, ready to send |
+| **A friend running empty** | Nobody notices for eleven days | *"Aisyah — heavy for 11 days"*, with WhatsApp already open |
+| **Finding an evening** | Eleven messages | The windows that work for everyone, batteries beside each name |
+
+**How we'll know it works in the pilot.** The app already records what we need — no new tracking:
+
+- ⚠️ **Walls flagged vs. walls hit** — did a warning eight days out actually change the week?
+- ✅ **Sittings kept** — the share of self-booked work that got done.
+- 🌙 **"Too full" evenings** trending down over a fortnight.
+
+### 6.2 🌍 How it reaches more students
+
+| Stage | Reach | What makes it possible |
+|---|---|---|
+| **1 · A circle** | 4 friends | Contact matching and a WhatsApp invite — every new student brings their circle |
+| **2 · A cohort** | One course | A cohort shares a timetable; averages shown only where enough students opt in |
+| **3 · A university** | Every course | One ICS feed from the student portal; wellbeing services can point students to a tool that isn't clinical |
+| **4 · Any university** | Anywhere | Paste import reads any portal's format; iOS, Android and web from one codebase |
+
+**Why growth stays cheap.** The load model, forecast and planner run on the phone, so each new student
+adds a few synced rows — not server compute. It works offline, so it works on a bus, in a basement lecture
+theatre, or on a patchy connection.
+
+**And beyond students.** Nothing in `load = time × dread` is specific to a degree. Anyone fitting shifts,
+deadlines and people into the same week — apprentices, part-time workers studying on the side — has the
+same problem.
