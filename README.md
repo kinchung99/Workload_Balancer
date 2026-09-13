@@ -268,12 +268,13 @@ week: Tue 7pm–11pm · Wed 5pm–11pm."*
 
 | Level | What they see |
 |---|---|
-| 🚫 **Nothing** | Your battery. No times at all — and it is genuinely nothing, one tap from here. |
-| 🌙 **Evenings only** | Free evenings after 5pm. Nothing daytime. *The default.* |
-| 🗓️ **Free / busy** | When you are free, all day. Never what you are doing. |
+| 🚫 **Nothing** | Your battery. No times at all. |
+| 🌙 **Evenings only** | Free evenings after 5pm. *Default.* |
+| 🗓️ **Free / busy** | Free time, all day. Never what. |
 
-Your battery is always shared, and we say so on the screen rather than in a policy: **it is how they know
-to check on you**, and that is the one thing this feature exists for.
+*Nothing* is genuinely nothing, one tap from here. Your battery is always shared, and we say so on the
+screen rather than in a policy: **it is how they know to check on you**, and that is the one thing this
+feature exists for.
 
 </td></tr></table>
 
@@ -399,7 +400,7 @@ tomorrow beats a nine-hour job due next week. Everything in the next seven days 
 | **Deadline** | Today is **×3**; past a week, **below ×1** |
 | **Who you promised** | hard > soft > yourself |
 | **Can it still be finished?** | If not — **straight to the top** |
-| **Do you want to be there?** | Asked once at capture; how much it counts is learned (below) |
+| **Want to be there?** | Learned from you (below) |
 
 - 6️⃣ **Six at a time**, rest behind a tap.
 - 🔘 **Every row has a button that does the next thing.**
