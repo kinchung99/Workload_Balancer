@@ -16,7 +16,8 @@
     "deploy": "npm run preflight && expo export --platform web && eas deploy --prod",
     "preflight": "npm run typecheck && npm run tokens:check && npm run model:check && npm run behaviour:check && npm run render:check",
     "behaviour:check": "node scripts/check-behaviour.mjs",
-    "shots": "node scripts/screenshots.mjs"
+    "shots": "node scripts/screenshots.mjs",
+    "clips": "node scripts/clips.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
