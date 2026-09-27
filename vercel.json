@@ -4,10 +4,14 @@
   "buildCommand": null,
   "outputDirectory": "public",
   "functions": {
-    "api/index.ts": { "maxDuration": 15 }
+    "api/index.ts": {
+      "maxDuration": 15
+    }
   },
-  "//": "Everything reaches the function. Vercel checks the filesystem before applying rewrites, so public/ still serves, and rewrites are not applied recursively, so there is no loop to guard against. An earlier `(?!api/)` guard against that imaginary loop excluded every route under /api — which is the whole API — and Vercel answered those with its own 404 before the function ever ran.",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
   ]
 }

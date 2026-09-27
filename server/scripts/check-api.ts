@@ -379,6 +379,22 @@ section('The deployment routes every path to the function');
 
   check('and they all land on the one entry point',
     [...new Set(config.rewrites.map((r) => r.destination))], ['/api/index']);
+
+  /*
+   * Vercel validates this file against a schema and refuses unknown keys.
+   * A `"//"` comment is the obvious way to explain a config decision and it
+   * fails the build with `should NOT have additional property '//'` - a minute
+   * of deploy time to learn something a local check can say instantly.
+   */
+  const ALLOWED = new Set([
+    '$schema', 'buildCommand', 'cleanUrls', 'crons', 'devCommand', 'framework',
+    'functions', 'headers', 'ignoreCommand', 'images', 'installCommand',
+    'outputDirectory', 'public', 'redirects', 'regions', 'rewrites',
+    'trailingSlash', 'git', 'env', 'build',
+  ]);
+  const raw = JSON.parse(readFileSync(join(root, '..', 'vercel.json'), 'utf8')) as Record<string, unknown>;
+  check('vercel.json has no keys the schema would reject',
+    Object.keys(raw).filter((k) => !ALLOWED.has(k)), []);
 }
 
 /* ------------------------------------------------------------------ result */

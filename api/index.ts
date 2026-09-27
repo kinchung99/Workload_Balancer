@@ -15,6 +15,17 @@
  * platform kills it — `FUNCTION_INVOCATION_TIMEOUT`, with no stack trace and
  * nothing in the logs. `getRequestListener` removes the ambiguity by being
  * unmistakably a Node listener.
+ *
+ * **Every path reaches here**, via a single `/(.*)` rewrite in `vercel.json`.
+ * Vercel checks the filesystem before applying rewrites, so `public/` still
+ * serves, and rewrites are not recursive, so there is no loop to guard against.
+ * An earlier `(?!api/)` guard against that imaginary loop excluded every route
+ * under `/api` — the whole API — and Vercel answered those with its own 404
+ * before this function ever ran. `check-api.ts` asserts the routing now, because
+ * no other test could see it.
+ *
+ * That config file takes no comments: Vercel validates it against a schema and
+ * rejects unknown keys, including a `"//"` note. Which is why this is here.
  */
 import { getRequestListener } from '@hono/node-server';
 import type { IncomingMessage, ServerResponse } from 'node:http';
