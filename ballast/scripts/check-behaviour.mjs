@@ -86,6 +86,19 @@ writeFileSync(
 // __DEV__ is injected by Metro, not Node. False here: these checks are about the
 // model, and the dev-host fallback is a convenience for a laptop.
 globalThis.__DEV__ = false;
+
+/*
+ * This suite owns EXPO_PUBLIC_API_URL rather than inheriting it.
+ *
+ * `npm run deploy` is normally run as
+ * `EXPO_PUBLIC_API_URL=https://... npm run deploy`, and preflight is a child of
+ * that command - so the variable leaks in and two assertions about the
+ * *unconfigured* case started failing on a perfectly good build. A suite whose
+ * result depends on how the shell was invoked is worse than no suite, so both
+ * branches are set explicitly where they are asserted.
+ */
+const CONFIGURED_API = process.env.EXPO_PUBLIC_API_URL;
+delete process.env.EXPO_PUBLIC_API_URL;
 writeFileSync(join(tmp, 'package.json'), '{"type":"module"}');
 
 const { useStore, weekReading, liveCeiling, restOwedFrom, itemsOnDay, itemsInWeek, nextWeek } = await import(join(tmp, 'store.ts'));
@@ -1451,7 +1464,15 @@ console.log('\nSyncing without ever waiting for it');
   check('and it stops climbing', backoffFor(40), MAX_BACKOFF_MS);
 
   // Honest labels, the same rule the friends screen applies to other people.
+  // Both branches, each with the variable set the way it is being claimed.
+  delete process.env.EXPO_PUBLIC_API_URL;
   check('with no server it says so', syncLabel(emptySync()), 'On this device only');
+
+  process.env.EXPO_PUBLIC_API_URL = 'https://api.example.com';
+  check('with one, it reports the sync instead', syncLabel(emptySync()), 'Not synced yet');
+  check('and an offline run says offline, not signed out',
+    syncLabel({ ...emptySync(), status: 'offline' }), 'Offline — changes are saved here');
+  delete process.env.EXPO_PUBLIC_API_URL;
 }
 
 console.log('\nWhat a sync round trip leaves behind');

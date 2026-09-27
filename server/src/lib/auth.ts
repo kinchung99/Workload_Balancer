@@ -31,7 +31,23 @@ const isProduction = (process.env.BASE_URL ?? '').startsWith('https://');
  * `INVALID_ORIGIN` the first time the port moves — a 403 with no obvious cause,
  * from a config file nobody thinks to look at.
  */
-const configured = (process.env.TRUSTED_ORIGINS ?? 'https://load-balancer-ballast.expo.app')
+/*
+ * The app's own hosts, by default.
+ *
+ * EAS Hosting gives every deployment its own subdomain
+ * (`load-balancer-ballast--gvwh8actbr.expo.app`) alongside the stable alias, and
+ * those are different origins as far as a browser is concerned. Listing only the
+ * alias means sign-in works on the production link and fails with
+ * `INVALID_ORIGIN` on every preview - which looks like a broken build rather
+ * than a missing entry in an environment variable.
+ *
+ * The wildcard is scoped to this project's own subdomain prefix, not to
+ * `*.expo.app`, so it cannot be used by somebody else's Expo site.
+ */
+const configured = (process.env.TRUSTED_ORIGINS ?? [
+  'https://load-balancer-ballast.expo.app',
+  'https://load-balancer-ballast--*.expo.app',
+].join(','))
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);

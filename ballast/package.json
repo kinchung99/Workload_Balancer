@@ -12,7 +12,7 @@
     "tokens:check": "node scripts/verify-tokens.mjs",
     "model:check": "node scripts/check-model.mjs",
     "render:check": "node scripts/check-render.mjs",
-    "deploy": "npm run preflight && expo export --platform web && eas deploy --prod",
+    "deploy": "npm run preflight && expo export --platform web --clear && eas deploy --prod",
     "preflight": "npm run typecheck && npm run tokens:check && npm run model:check && npm run behaviour:check && npm run render:check",
     "behaviour:check": "node scripts/check-behaviour.mjs",
     "shots": "node scripts/screenshots.mjs",
