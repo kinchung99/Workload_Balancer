@@ -1,0 +1,3 @@
+# This host is the Ballast API, not the app. Nothing here to index.
+User-agent: *
+Disallow: /

@@ -1,0 +1,12 @@
+# Only the API ships to Vercel. Everything else is either a different deploy
+# target or a large file that would be uploaded for no reason.
+#
+# Without this, `ballast_final.mp4` alone is 88 MB of video in a serverless
+# bundle, and the Expo app's node_modules dwarfs the function itself.
+ballast/
+docs/
+video/
+*.mp4
+node_modules/
+.expo/
+.data/
