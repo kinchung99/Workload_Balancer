@@ -51,6 +51,20 @@ export function createApp(db: Database, auth: Auth = makeAuth(db)) {
   /** Liveness. Cheap on purpose - a health check that queries is a health check that pages you at 3am. */
   app.get('/health', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 
+  /*
+   * Somebody opened the API in a browser.
+   *
+   * Almost always the person who just deployed it, checking it worked. A bare
+   * 404 there reads as a broken deploy; this says what the thing is and where
+   * the app actually lives.
+   */
+  app.get('/', (c) => c.json({
+    service: 'ballast-api',
+    ok: true,
+    app: 'https://load-balancer-ballast.expo.app',
+    health: '/health',
+  }));
+
   // Better Auth owns everything under /api/auth: sign-up, sign-in, sessions, OAuth.
   app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
 

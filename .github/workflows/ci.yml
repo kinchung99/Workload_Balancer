@@ -20,28 +20,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: ballast/package-lock.json
-      - name: Install the contract
-        run: npm ci --prefix shared
+      # The shared contract is a workspace of the root package, so this installs
+      # it and the server in one pass.
+      - run: npm ci
       - run: npm ci
         working-directory: ballast
       - run: npm run preflight
         working-directory: ballast
 
   api:
-    name: api — 58 checks against real Postgres
+    name: api — 72 checks against real Postgres
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-      - name: Install the contract
-        run: npm ci --prefix shared
       - run: npm ci
-        working-directory: server
       - run: npm run preflight
         working-directory: server

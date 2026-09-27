@@ -252,32 +252,38 @@ someone else in a browser, add each other by email.
 
 ### Deploying — one link, no terminal, no app store
 
-The goal is a URL a judge can scan and use in ten seconds. Two free accounts,
-done once; after that the link works forever with nothing running locally.
+Two free accounts, once. After that the link works forever with nothing running
+locally. **Push to GitHub first** — Vercel deploys from the repo.
 
-**Step 1 — Database (Neon, ~3 min).** neon.tech → *Sign up with GitHub* → *New
-project*, name it `ballast`, region nearest you → copy the **pooled** connection
-string.
+**Step 1 — Database (Neon).** neon.tech → *Sign up with GitHub* → *Create
+project*, name it `ballast` → on the dashboard copy the **Pooled connection**
+string (it has `-pooler` in the hostname).
 
 ```bash
 cd server
-echo 'DATABASE_URL=<paste it here>' > .env
-echo "AUTH_SECRET=$(openssl rand -base64 32)" >> .env
-echo 'BASE_URL=https://ballast-api.vercel.app' >> .env
-echo 'TRUSTED_ORIGINS=https://load-balancer-ballast.expo.app' >> .env
-npx drizzle-kit push        # creates the tables
+printf 'DATABASE_URL=%s\n' '<paste the pooled string>' > .env
+printf 'AUTH_SECRET=%s\n' "$(openssl rand -base64 32)" >> .env
+npx drizzle-kit push          # creates the tables — say yes to any prompt
 ```
 
-**Step 2 — API (Vercel, ~4 min).** vercel.com → *Sign up with GitHub* → *Add New
-Project* → import this repo → set **Root Directory** to `server` → add three
-environment variables (`DATABASE_URL`, `AUTH_SECRET`, `BASE_URL`) → Deploy.
-Note the URL it gives you.
+**Step 2 — API (Vercel).** vercel.com → *Sign up with GitHub* → *Add New
+Project* → import this repo → **leave every setting alone** → before deploying,
+add three Environment Variables:
 
-`BASE_URL` must be the **https** URL of the API itself. That one value flips
-cookies into cross-site mode and locks trusted origins down to the list — get it
-wrong and sign-in silently fails.
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | the same pooled string |
+| `AUTH_SECRET` | the same generated secret |
+| `BASE_URL` | `https://<the-url-vercel-shows-you>` |
 
-**Step 3 — App (EAS Hosting, ~2 min).** Already your account, already your URL.
+`BASE_URL` is the one that matters: it flips session cookies into cross-site mode
+and locks trusted origins down. If it is wrong, sign-in appears to work and then
+silently does nothing. You will not know the URL until after the first deploy —
+so deploy, copy the URL, set `BASE_URL`, and **redeploy once**.
+
+Check it by opening the URL: it should answer with JSON, not a 404.
+
+**Step 3 — App.** Already your account, already your URL.
 
 ```bash
 cd ballast
@@ -285,10 +291,9 @@ npm run icons                                        # once
 EXPO_PUBLIC_API_URL=https://<your-api>.vercel.app npm run deploy
 ```
 
-**Step 4 — The QR code.** Point any QR generator at
-`https://load-balancer-ballast.expo.app` and put it on a slide. That is the whole
-distribution: scan, open, tap **Continue as guest**, and every social feature
-works on their own phone.
+**Step 4 — QR code.** Point any QR generator at
+`https://load-balancer-ballast.expo.app`. Scan it, tap **Continue as guest**, and
+every social feature works on that phone.
 
 ### Why not the app store
 

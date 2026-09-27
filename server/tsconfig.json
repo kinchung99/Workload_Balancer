@@ -9,8 +9,18 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node"],
-    "lib": ["ES2023"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2023"
+    ]
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "../shared/**/*.ts", "drizzle.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "../shared/**/*.ts",
+    "drizzle.config.ts",
+    "../api/**/*.ts"
+  ]
 }

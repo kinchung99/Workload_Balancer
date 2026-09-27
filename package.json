@@ -2,14 +2,18 @@
   "name": "ballast",
   "version": "1.0.0",
   "private": true,
-  "description": "Ballast — a stress and workload manager for students. Expo app, Hono API, shared contract.",
+  "description": "Ballast \u2014 a stress and workload manager for students. Expo app, Hono API, shared contract.",
   "scripts": {
-    "setup": "npm install --prefix shared && npm install --prefix ballast && npm install --prefix server",
+    "setup": "npm install && npm install --prefix ballast",
     "check": "npm run check:app && npm run check:api",
     "check:app": "npm --prefix ballast run preflight",
     "check:api": "npm --prefix server run preflight",
     "dev:api": "npm --prefix server run dev",
     "dev:app": "npm --prefix ballast start",
     "deploy:app": "npm --prefix ballast run deploy"
-  }
+  },
+  "workspaces": [
+    "shared",
+    "server"
+  ]
 }
