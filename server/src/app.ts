@@ -15,16 +15,16 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { eq } from 'drizzle-orm';
-import { initialsFrom, profileSchema, type MeDTO, type Visibility } from '../../shared/contract.ts';
-import { makeAuth, type Auth } from './lib/auth.ts';
-import { makeCode } from './lib/code.ts';
-import { profiles, user } from './db/schema.ts';
-import type { Database } from './db/client.ts';
-import type { Env } from './types.ts';
-import { circle } from './routes/circle.ts';
-import { invites } from './routes/invites.ts';
-import { sharing } from './routes/sharing.ts';
-import { sync } from './routes/sync.ts';
+import { initialsFrom, profileSchema, type MeDTO, type Visibility } from '../../shared/contract';
+import { makeAuth, type Auth } from './lib/auth';
+import { makeCode } from './lib/code';
+import { profiles, user } from './db/schema';
+import type { Database } from './db/client';
+import type { Env } from './types';
+import { circle } from './routes/circle';
+import { invites } from './routes/invites';
+import { sharing } from './routes/sharing';
+import { sync } from './routes/sync';
 
 export function createApp(db: Database, auth: Auth = makeAuth(db)) {
   const app = new Hono<Env>();

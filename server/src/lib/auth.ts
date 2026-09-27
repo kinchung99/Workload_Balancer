@@ -13,8 +13,8 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { anonymous } from 'better-auth/plugins/anonymous';
-import type { Database } from '../db/client.ts';
-import * as schema from '../db/schema.ts';
+import type { Database } from '../db/client';
+import * as schema from '../db/schema';
 
 /** HTTPS everywhere but a developer's laptop. */
 const isProduction = (process.env.BASE_URL ?? '').startsWith('https://');

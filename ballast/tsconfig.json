@@ -13,8 +13,7 @@
       "@shared/*": [
         "../shared/*"
       ]
-    },
-    "allowImportingTsExtensions": true
+    }
   },
   "include": [
     "**/*.ts",

@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
-import * as schema from './schema.ts';
+import * as schema from './schema';
 
 export type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 

@@ -15,10 +15,10 @@ import { and, eq, inArray } from 'drizzle-orm';
 import {
   friendActionSchema, friendRequestSchema, initialsFrom,
   type CircleMemberDTO, type PendingRequestDTO,
-} from '../../../shared/contract.ts';
-import { freeWindows, friendships, presence, profiles, user } from '../db/schema.ts';
-import { normaliseCode } from '../lib/code.ts';
-import type { Env } from '../types.ts';
+} from '../../../shared/contract';
+import { freeWindows, friendships, presence, profiles, user } from '../db/schema';
+import { normaliseCode } from '../lib/code';
+import type { Env } from '../types';
 
 export const circle = new Hono<Env>();
 
