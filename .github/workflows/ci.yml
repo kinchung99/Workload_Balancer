@@ -4,6 +4,11 @@
 # reasons: the app's suites are pure and fast, and the API's spin up Postgres in
 # WebAssembly. Neither needs a service, a container or a secret, which is why
 # this workflow costs nothing and never flakes on a provider being down.
+#
+# Node 24, not 22: the app's suites import `.ts` files directly and rely on
+# Node's native type stripping, which is only on by default from 23.6. On 22 they
+# fail with ERR_UNKNOWN_FILE_EXTENSION, which looks like a broken test rather
+# than a missing flag.
 name: checks
 
 on:
@@ -19,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       # The shared contract is a workspace of the root package, so this installs
       # it and the server in one pass.
       - run: npm ci
@@ -35,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - run: npm ci
       - run: npm run preflight
         working-directory: server

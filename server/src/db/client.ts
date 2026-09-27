@@ -133,8 +133,21 @@ export async function getDb(): Promise<Database> {
 
     const dir = join(projectRoot(), '.data');
     mkdirSync(dir, { recursive: true });
-    const { PGlite } = await import('@electric-sql/pglite');
-    const { drizzle } = await import('drizzle-orm/pglite');
+    /*
+     * Loaded through a variable so nothing can trace it.
+     *
+     * PGlite is 25 MB of WebAssembly and is only ever used for the local file
+     * database. A literal `import('@electric-sql/pglite')` is still followed by
+     * bundlers and by Vercel's dependency tracer even inside a branch that never
+     * runs there — which put 25 MB into every cold start of a function that
+     * talks to Neon over HTTP. A variable specifier is opaque to static
+     * analysis, so it resolves at runtime here and is simply absent from a
+     * deployment.
+     */
+    const pgliteId = '@electric-sql/pglite';
+    const drizzlePgliteId = 'drizzle-orm/pglite';
+    const { PGlite } = await import(pgliteId);
+    const { drizzle } = await import(drizzlePgliteId);
     const client = new PGlite(join(dir, 'ballast'));
     await migrateLocal(client);
     console.log('  database: local file (.data/ballast) — no cloud account needed');

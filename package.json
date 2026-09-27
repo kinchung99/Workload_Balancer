@@ -16,5 +16,8 @@
   "workspaces": [
     "shared",
     "server"
-  ]
+  ],
+  "engines": {
+    "node": ">=24"
+  }
 }
