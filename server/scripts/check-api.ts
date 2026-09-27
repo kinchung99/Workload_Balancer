@@ -350,6 +350,37 @@ section('Leaving');
     ((await (await call('/api/circle', {}, amira.cookie)).json()) as { circle: unknown[] }).circle.length, 0);
 }
 
+section('The deployment routes every path to the function');
+{
+  /*
+   * A guard against the failure that cost the most time.
+   *
+   * `vercel.json` decides which requests reach this code at all, and a mistake
+   * there is invisible to every other check in this file: the app answered
+   * `/health` perfectly while Vercel returned its own 404 for every `/api/*`
+   * route, because a rewrite excluded them. The tests all passed. Nothing
+   * worked.
+   */
+  const config = JSON.parse(readFileSync(join(root, '..', 'vercel.json'), 'utf8')) as {
+    rewrites: Array<{ source: string; destination: string }>;
+  };
+
+  const reaches = (path: string): boolean =>
+    config.rewrites.some((r) => new RegExp(`^${r.source}$`).test(path));
+
+  for (const path of [
+    '/', '/health',
+    '/api/auth/sign-up/email', '/api/auth/sign-in/anonymous', '/api/auth/sign-out',
+    '/api/me', '/api/sync', '/api/circle', '/api/circle/request',
+    '/api/sharing/presence', '/api/invites',
+  ]) {
+    check(`${path} reaches the function`, reaches(path), true);
+  }
+
+  check('and they all land on the one entry point',
+    [...new Set(config.rewrites.map((r) => r.destination))], ['/api/index']);
+}
+
 /* ------------------------------------------------------------------ result */
 
 console.log(`\n  ${checks} checks`);
