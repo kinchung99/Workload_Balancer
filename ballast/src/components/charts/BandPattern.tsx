@@ -18,6 +18,7 @@ import { memo } from 'react';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { color } from '@design/tokens';
 import type { BandName } from '@/lib/types';
+import { DECORATIVE } from './decorative';
 
 export const BAND_FILL: Record<BandName, string> = {
   steady: color.band.steady.fill,
@@ -80,7 +81,7 @@ export const PatternFill = memo(function PatternFill({ band, width, height, radi
   const r = Math.min(radius, height / 2, width / 2);
 
   return (
-    <Svg width={width} height={height} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={width} height={height} {...DECORATIVE}>
       <Defs>
         <PatternDef band={band} id={id} fill={paint} />
       </Defs>

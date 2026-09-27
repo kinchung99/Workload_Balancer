@@ -2,10 +2,9 @@ import { useMemo, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
+  Avatar, Button, Card, Chip, Screen, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
-import { SCREEN } from '@design/screens';
 import { BAND_WORD, isStale, lastSeen } from '@/lib/circle';
 import { CHECK_IN_MESSAGE, PLAN_MESSAGE, busyFrom, freeOn, whatsapp } from '@/lib/sharing';
 import { DAY_END, DAY_START, formatHour, slotHours, weekDays } from '@/lib/schedule';
@@ -88,23 +87,55 @@ export default function FriendDay() {
       }
     >
       <Stack gap={5} className="pt-2">
-        <PageHeader
-          {...SCREEN.friendDay}
-          eyebrow={stale ? `Last checked in ${lastSeen(person)}` : `Updated ${lastSeen(person)}`}
-          title={person.name}
-        />
+        {/*
+          Their profile, in the same shape as yours.
+          
+          Avatar, name, the line they wrote, then their numbers. A friend's page
+          reading like your own is what makes the circle feel like one place
+          rather than a list of readouts.
+        */}
+        <Card tone={stale ? 'sunken' : band} gap={5} align="center">
+          <Avatar initials={person.initials} band={stale ? undefined : band} stale={stale} size={96} charge={charge} />
 
-        {/* Who you would be asking. One reading, one line they wrote. */}
-        <Card tone={stale ? 'sunken' : band} gap={3}>
-          <Stack direction="row" gap={4} align="center">
-            <Text variant="display" tone={stale ? 'subtle' : TONE[band]}>{charge}%</Text>
-            <Stack gap={1} grow>
-              <Text variant="heading">{BAND_WORD[band]}</Text>
-              {person.status ? <Text variant="footnote" tone="muted">“{person.status}”</Text> : null}
-            </Stack>
-            <Sticker name={band === 'heavy' ? 'cloud' : 'sun'} size={38} />
+          <Stack gap={2} align="center">
+            <Text variant="title" accessibilityRole="header">{person.name}</Text>
+            <Text variant="micro" tone={stale ? 'subtle' : TONE[band]}>
+              {stale ? `Last checked in ${lastSeen(person)}` : `${BAND_WORD[band]} · ${lastSeen(person)}`}
+            </Text>
+            {person.status ? (
+              <Text variant="callout" tone="muted" className="text-center">“{person.status}”</Text>
+            ) : null}
+          </Stack>
+
+          {/* Three numbers, the same row your own profile opens with. */}
+          <Stack direction="row" gap={3}>
+            {[
+              { value: `${charge}%`, label: 'battery' },
+              { value: String(shared.filter((d) => d.free.length).length), label: 'free' },
+              { value: stale ? 'stale' : 'fresh', label: 'reading' },
+            ].map((stat) => (
+              <Stack key={stat.label} gap={1} align="center" className="flex-1 rounded-md bg-raised px-2 py-3">
+                <Text variant="callout" weight="bold" tone={stale ? 'subtle' : 'default'}>{stat.value}</Text>
+                <Text variant="micro" tone="subtle">{stat.label}</Text>
+              </Stack>
+            ))}
           </Stack>
         </Card>
+
+        {/* A reading nobody has confirmed is not news, and the app says so. */}
+        {stale ? (
+          <Card tone="sunken" gap={2}>
+            <Stack direction="row" gap={3} align="center">
+              <Sticker name="cloud" size={28} />
+              <Text variant="footnote" weight="semibold" className="flex-1">
+                This may be out of date.
+              </Text>
+            </Stack>
+            <Text variant="micro" tone="muted">
+              {person.name.split(' ')[0]} has not updated since {lastSeen(person)}.
+            </Text>
+          </Card>
+        ) : null}
 
         {/* The published week. Filled is theirs to give, empty is only "taken". */}
         <Stack gap={3}>

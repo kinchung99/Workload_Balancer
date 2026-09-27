@@ -1,35 +1,48 @@
-import { View } from 'react-native';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { Battery, Button, Card, PageHeader, Screen, Stack, Sticker, Text, type StickerName } from '@/components';
+import {
+  Avatar, Card, PageHeader, Screen, Stack, Sticker, Text, type StickerName,
+} from '@/components';
 import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { bandFor } from '@/lib/load';
+import { VISIBILITY_SHORT } from '@/lib/sharing';
 import { restOwedFrom, useStore } from '@/state/store';
-import { useReading } from '@/state/selectors';
-import { useItemsWithLogs } from '@/state/selectors';
+import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { prioritise } from '@/lib/priority';
 import { tapFeedback } from '@/lib/haptics';
 
-const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
+const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
 
 /**
- * You — everything about your own week that is not today.
+ * You — a profile, in the shape every social app has taught people to read.
  *
- * Areas, Tonight, Recovery and the timetable were all tabs at one point, which
- * made a four-item bar carry seven destinations badly. They are one list here,
- * and the bar goes back to four things a student can name.
+ * Avatar, name, the line you wrote, then a row of numbers, then the things you
+ * can do. Instagram, TikTok and RedNote all put identity at the top for the same
+ * reason: it answers "is this me?" before you have read anything, and it gives
+ * the screen a centre.
+ *
+ * The one thing ours does differently is the **ring around the avatar**. It is
+ * your band, so your own face carries your week — and it is the same component
+ * that draws your friends, so the visual language is identical on both sides.
+ * Learning to read one circle teaches you the whole app.
  */
 export default function You() {
   const router = useRouter();
-  const { recovery, reset } = useStore();
+  const { recovery, account, circle, requests, sharing, status, mode } = useStore();
   const reading = useReading();
   const items = useItemsWithLogs();
   const { first } = prioritise(items, useStore.getState().today);
+
   const band = bandFor(reading.overall);
   const owed = restOwedFrom(recovery);
+  const friends = circle.filter((p) => !p.isYou).length;
+  const waiting = requests.filter((r) => r.direction === 'incoming').length;
 
-  const rows: Array<{ sticker: StickerName; wash: string; title: string; sub: string; to: Href }> = [
+  const name = account?.name ?? 'You';
+  const initials = account?.initials ?? 'Y';
+
+  const rows: Array<{ sticker: StickerName; wash: string; title: string; sub: string; to: Href; badge?: number }> = [
     { sticker: 'sun', wash: color.decor.lemon, title: 'Check in', sub: 'Mood, sleep, food, good things', to: '/checkin' },
     { sticker: 'battery', wash: color.decor.mint, title: 'Recovery', sub: `${owed}h owed`, to: '/recover' },
     { sticker: 'moon', wash: color.decor.sky, title: 'Tonight', sub: 'Plan an evening', to: '/tonight/night' },
@@ -40,22 +53,104 @@ export default function You() {
   return (
     <Screen>
       <Stack gap={5} className="pt-2">
-        <PageHeader {...SCREEN.you} eyebrow="Week 10" title="You" />
+        {/* Identity first, and a way into settings from the corner. */}
+        <Stack direction="row" align="center" justify="between">
+          <PageHeader {...SCREEN.you} eyebrow="Your profile" title="You" />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={() => { tapFeedback(); router.push('/settings'); }}
+            className="min-h-min items-center justify-center rounded-pill bg-sunken active:opacity-70"
+            style={{ width: 44, height: 44 }}
+          >
+            <Text variant="heading">⚙</Text>
+          </Pressable>
+        </Stack>
 
-        <Card tone={band} gap={4}>
+        {/* The profile card: who you are, how you are, and what you share. */}
+        <Card tone={band} gap={5}>
           <Stack direction="row" gap={5} align="center">
-            <Battery
-              charge={reading.charge}
-              loadPercent={reading.overall}
-              width={84}
-              height={42}
-              label={`${reading.charge} percent left`}
-            />
-            <Text variant="display" tone={TONE[band]}>{reading.charge}%</Text>
+            <Avatar initials={initials} band={band} size={84} charge={reading.charge} />
+            <Stack gap={1} grow>
+              <Text variant="title">{name}</Text>
+              {account ? (
+                <Text variant="micro" tone="muted">{account.email}</Text>
+              ) : (
+                <Text variant="micro" tone="muted">Not signed in</Text>
+              )}
+              {status ? (
+                <Text variant="footnote" tone={TONE[band]}>“{status}”</Text>
+              ) : (
+                <Text variant="footnote" tone="subtle">No status yet</Text>
+              )}
+            </Stack>
+          </Stack>
+
+          {/* Three numbers, the way a profile always opens. */}
+          <Stack direction="row" gap={3}>
+            {[
+              { value: `${reading.charge}%`, label: 'battery', to: '/checkin' as Href },
+              { value: String(friends), label: friends === 1 ? 'friend' : 'friends', to: '/friends' as Href },
+              { value: VISIBILITY_SHORT[sharing], label: 'sharing', to: '/sharing' as Href },
+            ].map((stat) => (
+              <Pressable
+                key={stat.label}
+                accessibilityRole="button"
+                accessibilityLabel={`${stat.value} ${stat.label}`}
+                onPress={() => { tapFeedback(); router.push(stat.to); }}
+                className="min-h-min flex-1 items-center gap-1 rounded-md bg-raised px-2 py-3 active:opacity-70"
+              >
+                <Text variant="callout" weight="bold">{stat.value}</Text>
+                <Text variant="micro" tone="subtle">{stat.label}</Text>
+              </Pressable>
+            ))}
+          </Stack>
+
+          <Stack direction="row" gap={3}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              onPress={() => { tapFeedback(); router.push('/profile'); }}
+              className="min-h-row flex-1 items-center justify-center rounded-pill border-2 border-inverse bg-inverse active:opacity-70"
+            >
+              <Text variant="caption" weight="bold" tone="inverse">Edit profile</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={account ? 'Your circle' : 'Sign in'}
+              onPress={() => { tapFeedback(); router.push(account ? '/friends' : '/account'); }}
+              className="min-h-row flex-1 items-center justify-center rounded-pill border-2 border-line-strong bg-raised active:opacity-70"
+            >
+              <Text variant="caption" weight="bold">{account ? 'Your circle' : 'Sign in'}</Text>
+            </Pressable>
           </Stack>
         </Card>
 
+        {/* Somebody is waiting on you. The one thing worth interrupting a profile for. */}
+        {waiting ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${waiting} friend ${waiting === 1 ? 'request' : 'requests'} waiting on you`}
+            onPress={() => { tapFeedback(); router.push('/find-friends'); }}
+            className="active:opacity-70"
+          >
+            <Card tone="recovery" gap={3}>
+              <Stack direction="row" gap={4} align="center">
+                <Sticker name="people" size={38} wiggle />
+                <Stack gap={1} grow>
+                  <Text variant="heading">
+                    {waiting} {waiting === 1 ? 'person wants' : 'people want'} to be in your circle
+                  </Text>
+                  <Text variant="micro" tone="muted">Tap to answer</Text>
+                </Stack>
+                <Text variant="heading" tone="recovery">›</Text>
+              </Stack>
+            </Card>
+          </Pressable>
+        ) : null}
+
         <Stack gap={3}>
+          <Text variant="micro" tone="subtle">YOUR WEEK</Text>
           {rows.map((row) => (
             <Pressable
               key={row.title}
@@ -76,11 +171,11 @@ export default function You() {
           ))}
         </Stack>
 
-        {/* A demo has to be resettable and the intro rewatchable. Nothing else. */}
-        <Stack direction="row" gap={3}>
-          <Button label="Replay intro" kind="quiet" onPress={() => router.push('/welcome')} className="flex-1" />
-          <Button label="Reset" kind="quiet" onPress={() => { reset(); router.replace('/'); }} className="flex-1" />
-        </Stack>
+        {mode === 'demo' ? (
+          <Text variant="footnote" tone="subtle">
+            This is the sample week. Sign in for your own.
+          </Text>
+        ) : null}
 
         <View className="h-4" />
       </Stack>

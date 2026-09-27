@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
+  Avatar, Battery, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
@@ -212,14 +212,8 @@ function FriendRow({
         className="active:opacity-70"
       >
         <Stack direction="row" gap={4} align="center">
-          <View
-            className="items-center justify-center rounded-pill"
-            style={{ width: 44, height: 44, borderWidth: 2.5, borderColor: stale ? color.line.strong : RING[person.band] }}
-          >
-            <Text variant="footnote" weight="semibold" tone={stale ? 'subtle' : TONE[person.band]}>
-              {person.initials}
-            </Text>
-          </View>
+          {/* The same circle the profile draws, so one visual language covers both. */}
+          <Avatar initials={person.initials} band={person.band} stale={stale} size={44} />
           <Stack gap={1} grow>
             <Stack direction="row" gap={3} align="center">
               <Text variant="body" weight="semibold">{person.name}</Text>

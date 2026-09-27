@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Ballast — rehearsal player</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #14161A; color: #F7F6F2; font: 15px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
+         display: grid; grid-template-columns: 430px 1fr; gap: 28px; padding: 22px; min-height: 100vh; }
+  .stage { position: sticky; top: 22px; align-self: start; }
+  .phone { width: 390px; height: 844px; border-radius: 34px; overflow: hidden;
+           border: 3px solid #3A3D42; background: #000; position: relative; }
+  .phone img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .card { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px;
+          padding: 34px; background: #1C1F24; }
+  .card .k { font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: #FFD37A; font-weight: 700; }
+  .card h2 { margin: 0; font-size: 26px; line-height: 1.2; }
+  .card p { margin: 0; color: #A8ABB2; font-size: 14px; }
+  .bar { height: 6px; background: #2A2E34; border-radius: 99px; margin-top: 14px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: #FFD37A; width: 0; }
+  .hud { display: flex; align-items: baseline; gap: 14px; margin-top: 12px; }
+  .clock { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .clock.over { color: #E4607D; }
+  .of { color: #6B7079; font-size: 14px; }
+  .hint { color: #6B7079; font-size: 12px; margin-top: 8px; }
+  button { background: #FFD37A; color: #14161A; border: 0; border-radius: 99px; padding: 9px 20px;
+           font-weight: 700; font-size: 14px; cursor: pointer; }
+  button.ghost { background: #2A2E34; color: #F7F6F2; }
+  .controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .script { max-width: 720px; }
+  .script h1 { font-size: 19px; margin: 0 0 4px; }
+  .sub { color: #6B7079; font-size: 13px; margin-bottom: 18px; }
+  .scene { border-left: 3px solid #2A2E34; padding: 10px 0 10px 16px; margin-bottom: 10px; cursor: pointer; opacity: .45; }
+  .scene.on { opacity: 1; border-left-color: #FFD37A; }
+  .scene.done { opacity: .3; }
+  .scene .h { display: flex; align-items: baseline; gap: 10px; }
+  .scene .t { font-weight: 700; font-size: 15px; }
+  .scene .d { color: #6B7079; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .scene .say { white-space: pre-wrap; margin-top: 6px; font-size: 15px; line-height: 1.62; }
+  .scene.on .say { font-size: 19px; line-height: 1.6; }
+  .scene .shot { color: #A8ABB2; font-size: 12.5px; margin-top: 5px; font-style: italic; }
+  .beats { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .beats b { font-weight: 600; font-size: 10.5px; padding: 2px 7px; border-radius: 99px; background: #2A2E34; color: #A8ABB2; }
+  .beats b.on { background: #FFD37A; color: #14161A; }
+</style></head><body>
+
+<div class="stage">
+  <div class="phone" id="phone"></div>
+  <div class="bar"><i id="prog"></i></div>
+  <div class="hud"><span class="clock" id="clock">0:00</span><span class="of" id="of"></span></div>
+  <div class="controls">
+    <button id="play">Play</button>
+    <button class="ghost" id="back">&larr; Scene</button>
+    <button class="ghost" id="next">Scene &rarr;</button>
+    <button class="ghost" id="reset">Restart</button>
+  </div>
+  <p class="hint">Space play / pause &middot; &larr; &rarr; jump a scene &middot; click any scene to rehearse it alone</p>
+</div>
+
+<div class="script">
+  <h1>Read this aloud while it plays</h1>
+  <p class="sub">If you finish a scene before its bar does, you are too fast. If the clock turns red, the video is over five minutes.</p>
+  <div id="list"></div>
+</div>
+
+<script>
+const M = {"fps":5,"width":390,"height":844,"total":277,"scenes":[{"n":1,"secs":14,"kind":"camera","title":"Drama — Sunday, 01:47","say":"First five seconds: no narration, room tone only.\n\n\"It’s Sunday night. Your planner says three tasks.\n\nIt doesn’t say one of them is a presentation you’ve dreaded all week. It doesn’t know you’re the only one who hasn’t seen anybody in a fortnight.\"","shot":"Desk, night. Clock close-up · blank doc over-shoulder · wide of stillness.","beats":[]},{"n":2,"secs":20,"kind":"camera","title":"Presenter — the flaw, the idea","say":"\"I’m [NAME]. Every planner ever made counts hours.\n\nBut an hour of laundry is not an hour of a group presentation. So Ballast counts hours times dread — and that one change makes four things possible.\n\nYour timetable. Your assignments. What to do first. And your friends.\"","shot":"Outdoor / plain wall, daylight. Mid-shot, eyes on the lens.","beats":[]},{"n":3,"secs":40,"kind":"demo","title":"🎓 Timetable","say":"\"Start with the biggest thing in a student’s week — and the thing every planner makes you type by hand.\n\nPaste your timetable straight from your portal. Any format. Anything it can’t read, it hands back rather than quietly dropping.\n\nThen flag the lectures that matter more. This one gives exam tips. This one takes a register.\n\nBecause a lecture is just an hour in a box until it’s the one where the hints get given. Flag it, and nothing here will ever move it.\n\nAnd the arithmetic runs underneath: you’re on seventy-eight percent. You need eighty.\"","shot":null,"beats":[{"id":"a","secs":10,"kind":"demo","label":"paste the timetable","frames":["f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0000.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg","f0001.jpg"]},{"id":"b","secs":14,"kind":"demo","label":"flag the two lectures","frames":["f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0002.jpg","f0003.jpg","f0004.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0005.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0006.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg","f0007.jpg"]},{"id":"c","secs":10,"kind":"demo","label":"the 78% card","frames":["f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg","f0008.jpg"]},{"id":"d","secs":6,"kind":"demo","label":"view these in my week","frames":["f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg"]}]},{"n":4,"secs":45,"kind":"demo","title":"📄 Owing","say":"\"Here’s what every to-do list gets wrong. An assignment due Thursday isn’t a task on Thursday. It’s nine hours spread across the days before Thursday.\n\nSo it sits on every single day until it’s done. It can’t hide at the bottom of a list.\n\nAnd it tracks three things, because they’re genuinely different: hours finished, hours booked, and hours still loose. Loose hours are the ones that become a Wednesday night.\n\nThen this. It books your sittings for you — two hours at a time, into gaps that actually exist. Never on top of a lecture.\n\nAnd it tells you the hours it can’t fit.\"","shot":null,"beats":[{"id":"a","secs":10,"kind":"demo","label":"the owing band","frames":["f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0009.jpg","f0010.jpg","f0011.jpg","f0012.jpg","f0013.jpg","f0014.jpg","f0015.jpg","f0016.jpg","f0017.jpg","f0018.jpg","f0019.jpg","f0020.jpg","f0021.jpg","f0022.jpg","f0023.jpg","f0024.jpg","f0025.jpg","f0026.jpg","f0027.jpg","f0028.jpg","f0029.jpg","f0030.jpg","f0031.jpg","f0032.jpg","f0033.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg"]},{"id":"b","secs":10,"kind":"demo","label":"done · booked · loose","frames":["f0035.jpg","f0036.jpg","f0037.jpg","f0038.jpg","f0039.jpg","f0040.jpg","f0041.jpg","f0042.jpg","f0043.jpg","f0044.jpg","f0045.jpg","f0046.jpg","f0047.jpg","f0048.jpg","f0049.jpg","f0050.jpg","f0051.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg","f0034.jpg"]},{"id":"c","secs":8,"kind":"demo","label":"open the assignment","frames":["f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg","f0052.jpg"]},{"id":"d","secs":12,"kind":"demo","label":"book 2 sittings for me","frames":["f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0053.jpg","f0054.jpg","f0055.jpg","f0056.jpg","f0057.jpg","f0058.jpg","f0059.jpg","f0060.jpg","f0061.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg","f0062.jpg"]},{"id":"e","secs":5,"kind":"demo","label":"did some without booking it","frames":["f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg","f0063.jpg"]}]},{"n":5,"secs":45,"kind":"demo","title":"⭐ What to do first","say":"\"Twelve things, no idea where to start. A list sorts by what you typed first. A calendar sorts by the clock. Neither of those is importance.\n\nSo everything goes on one scale — how close the deadline is, who you promised, and whether it can still be finished at all. And every row says why it’s there.\n\nThen the half nobody asks: what are you actually allowed to move?\n\nAnd once a day, late, it asks one question. Say your days were too full often enough, and the ranking itself changes.\n\nKeep to your plan and it asks less often. It has to earn the interruption.\"","shot":null,"beats":[{"id":"a","secs":12,"kind":"demo","label":"the ranked list","frames":["f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0065.jpg","f0066.jpg","f0067.jpg","f0068.jpg","f0069.jpg","f0070.jpg","f0071.jpg","f0072.jpg","f0073.jpg","f0074.jpg","f0075.jpg","f0076.jpg","f0077.jpg","f0078.jpg","f0079.jpg","f0080.jpg","f0081.jpg","f0082.jpg","f0083.jpg","f0084.jpg","f0085.jpg","f0086.jpg","f0087.jpg","f0088.jpg","f0089.jpg","f0090.jpg","f0091.jpg","f0092.jpg","f0093.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg","f0094.jpg"]},{"id":"b","secs":10,"kind":"demo","label":"row one","frames":["f0095.jpg","f0096.jpg","f0097.jpg","f0098.jpg","f0099.jpg","f0100.jpg","f0101.jpg","f0102.jpg","f0103.jpg","f0104.jpg","f0105.jpg","f0106.jpg","f0107.jpg","f0108.jpg","f0109.jpg","f0110.jpg","f0111.jpg","f0112.jpg","f0113.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg","f0114.jpg"]},{"id":"c","secs":10,"kind":"demo","label":"could move","frames":["f0115.jpg","f0116.jpg","f0117.jpg","f0079.jpg","f0118.jpg","f0119.jpg","f0120.jpg","f0094.jpg","f0121.jpg","f0122.jpg","f0123.jpg","f0124.jpg","f0125.jpg","f0126.jpg","f0127.jpg","f0128.jpg","f0129.jpg","f0130.jpg","f0131.jpg","f0132.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg"]},{"id":"d","secs":13,"kind":"demo","label":"the evening question","frames":["f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0134.jpg","f0135.jpg","f0136.jpg","f0137.jpg","f0138.jpg","f0139.jpg","f0140.jpg","f0141.jpg","f0142.jpg","f0143.jpg","f0144.jpg","f0145.jpg","f0146.jpg","f0147.jpg","f0148.jpg","f0149.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0150.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0064.jpg","f0151.jpg","f0152.jpg","f0153.jpg","f0154.jpg","f0155.jpg","f0156.jpg","f0132.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg","f0133.jpg"]}]},{"n":6,"secs":65,"kind":"demo","title":"👥 Friends","say":"\"And then the one that isn’t about work at all.\n\nNobody sees their friends in week ten, because everyone assumes everyone else is busier. So nobody asks.\n\nFour people, four batteries — and how old each reading is. Jo at twenty-four percent three days ago is not the same claim as twenty-four percent this morning.\n\nOne person to check on. Ever. Aisyah has been running empty for eleven days — so it writes the message and opens WhatsApp.\n\nTap anyone and you see their week — but only the free parts. Filled blocks are time they chose to give you. Empty ones just say ‘taken’. There’s no field for what they’re doing.\n\nAnd this is your side of it. This is exactly what Ravi sees. ‘Nothing’ means nothing.\n\nThen it finds the evenings that work for everybody.\n\nFound from your contacts, matched on your phone.\"","shot":null,"beats":[{"id":"a","secs":8,"kind":"camera","label":"drama — the deleted message","shot":"Desk, night. STUDENT A types \"you free this week?\" into a group chat, hovers, deletes it.","frames":[]},{"id":"b","secs":12,"kind":"demo","label":"the circle","frames":["f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0157.jpg","f0158.jpg","f0159.jpg","f0160.jpg","f0161.jpg","f0162.jpg","f0163.jpg","f0164.jpg","f0165.jpg","f0166.jpg","f0167.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg","f0168.jpg"]},{"id":"c","secs":7,"kind":"demo","label":"the one nudge","frames":["f0169.jpg","f0170.jpg","f0171.jpg","f0172.jpg","f0173.jpg","f0162.jpg","f0174.jpg","f0175.jpg","f0176.jpg","f0177.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg","f0178.jpg"]},{"id":"d","secs":14,"kind":"demo","label":"a friend’s published week","frames":["f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0179.jpg","f0180.jpg","f0181.jpg","f0182.jpg","f0183.jpg","f0184.jpg","f0185.jpg","f0186.jpg","f0187.jpg","f0188.jpg","f0189.jpg","f0190.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg","f0191.jpg"]},{"id":"e","secs":12,"kind":"demo","label":"what they see of you","frames":["f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0193.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg","f0192.jpg"]},{"id":"f","secs":8,"kind":"demo","label":"three shared evenings","frames":["f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0195.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg","f0194.jpg"]},{"id":"g","secs":4,"kind":"demo","label":"find friends","frames":["f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg","f0196.jpg"]}]},{"n":7,"secs":30,"kind":"camera","title":"Presenter — how it gets built","say":"\"Everything you just saw is live today, works with no network, and passes eight hundred and eighty-one automated checks.\n\nWhat it doesn’t have is accounts. So the three weeks after finals are one thing only — a Node and Postgres API, Firebase sign-in, and local-first sync.\n\nThen weeks four to eight: the timetable feed, notifications, and friends syncing between real accounts.\"","shot":"Laptop / desk, daylight. a) live URL + preflight green  b) the three-week graphic  c) weeks 4–8, back to presenter.","beats":[]},{"n":8,"secs":18,"kind":"camera","title":"Presenter — the close","say":"\"Every wellbeing app tells a drowning student to breathe. Ballast tells them which three things to put down — then asks when they last saw their friends.\n\nNothing else does both.\n\nBallast. The weight you carry on purpose.\"","shot":"Wall, tighter than scene 2, then cut to the desk. Last 3s is the end card in silence.","beats":[]}]};
+const LIMIT = 300;
+
+// Flatten to one timeline of frames, one slot per 1/fps of a second.
+const slots = [];
+const marks = [];
+for (const sc of M.scenes) {
+  marks.push({ n: sc.n, at: slots.length / M.fps, secs: sc.secs });
+  if (sc.kind === 'camera') {
+    for (let i = 0; i < sc.secs * M.fps; i++) slots.push({ scene: sc.n, card: true });
+  } else {
+    for (const b of sc.beats) {
+      const n = b.secs * M.fps;
+      for (let i = 0; i < n; i++) {
+        slots.push(b.kind === 'camera'
+          ? { scene: sc.n, beat: b.id, card: true, shot: b.shot, label: b.label }
+          : { scene: sc.n, beat: b.id, src: 'frames/' + (b.frames[Math.min(i, b.frames.length - 1)] || b.frames[b.frames.length - 1]) });
+      }
+    }
+  }
+}
+
+const phone = document.getElementById('phone');
+const clock = document.getElementById('clock');
+const prog = document.getElementById('prog');
+const of = document.getElementById('of');
+const list = document.getElementById('list');
+
+of.textContent = 'of ' + fmt(M.total);
+function fmt(s) { s = Math.round(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+for (const sc of M.scenes) {
+  const el = document.createElement('div');
+  el.className = 'scene'; el.dataset.n = sc.n;
+  const beats = (sc.beats || []).filter(b => b.id).map(b => '<b data-b="' + b.id + '">' + b.id + ' &middot; ' + b.label + '</b>').join('');
+  el.innerHTML = '<div class="h"><span class="t">' + sc.n + ' &middot; ' + sc.title + '</span><span class="d">' + sc.secs + 's</span></div>'
+    + (sc.shot ? '<div class="shot">' + sc.shot + '</div>' : '')
+    + '<div class="say">' + (sc.say || '') + '</div>'
+    + (beats ? '<div class="beats">' + beats + '</div>' : '');
+  el.onclick = () => { const m = marks.find(x => x.n === sc.n); seek(m.at); stop(); draw(); };
+  list.appendChild(el);
+}
+
+let t = 0, timer = null;
+const img = document.createElement('img');
+
+function draw() {
+  const i = Math.min(slots.length - 1, Math.floor(t * M.fps));
+  const s = slots[i] || {};
+  if (s.card) {
+    const sc = M.scenes.find(x => x.n === s.scene);
+    phone.innerHTML = '<div class="card"><div class="k">' + (s.beat ? 'Scene ' + s.scene + s.beat + ' &middot; camera' : 'Scene ' + s.scene + ' &middot; camera') + '</div>'
+      + '<h2>' + (s.label || sc.title) + '</h2><p>' + (s.shot || sc.shot || '') + '</p></div>';
+  } else {
+    if (phone.firstChild !== img) { phone.innerHTML = ''; phone.appendChild(img); }
+    if (!img.src.endsWith(s.src)) img.src = s.src;
+  }
+  clock.textContent = fmt(t);
+  clock.className = 'clock' + (t > LIMIT ? ' over' : '');
+  prog.style.width = (t / M.total * 100) + '%';
+  document.querySelectorAll('.scene').forEach(el => {
+    const n = +el.dataset.n;
+    el.className = 'scene' + (n === s.scene ? ' on' : (n < s.scene ? ' done' : ''));
+    el.querySelectorAll('.beats b').forEach(b => { b.className = (n === s.scene && b.dataset.b === s.beat) ? 'on' : ''; });
+  });
+  if (document.querySelector('.scene.on')) document.querySelector('.scene.on').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function step() { t += 1 / M.fps; if (t >= M.total) { t = M.total; stop(); } draw(); }
+function play() { if (timer) return; if (t >= M.total) t = 0; timer = setInterval(step, 1000 / M.fps); document.getElementById('play').textContent = 'Pause'; }
+function stop() { clearInterval(timer); timer = null; document.getElementById('play').textContent = 'Play'; }
+function seek(x) { t = Math.max(0, Math.min(M.total, x)); draw(); }
+
+document.getElementById('play').onclick = () => (timer ? stop() : play());
+document.getElementById('reset').onclick = () => { stop(); seek(0); };
+document.getElementById('next').onclick = () => { const m = marks.find(x => x.at > t + .01); seek(m ? m.at : M.total); };
+document.getElementById('back').onclick = () => { const p = [...marks].reverse().find(x => x.at < t - .5); seek(p ? p.at : 0); };
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); timer ? stop() : play(); }
+  if (e.code === 'ArrowRight') document.getElementById('next').click();
+  if (e.code === 'ArrowLeft') document.getElementById('back').click();
+});
+
+// Warm the cache so the first play does not stutter.
+[...new Set(slots.filter(s => s.src).map(s => s.src))].forEach(src => { const i = new Image(); i.src = src; });
+
+/*
+ * #t=200 opens part-way in, #scene=6 opens on a scene, #play starts it rolling.
+ * Rehearsing one beat twenty times should not mean scrubbing to it twenty times.
+ *
+ * Read from the hash as well as the query, because this page is normally opened
+ * straight off disk and Chrome will not load a file:// URL that carries a query
+ * string - it looks for a file with the "?" in its name and gives you a blank
+ * page instead.
+ */
+const q = new URLSearchParams(location.search.slice(1) + '&' + location.hash.slice(1));
+if (q.has('scene')) { const m = marks.find(x => x.n === +q.get('scene')); if (m) t = m.at; }
+if (q.has('t')) t = Math.max(0, Math.min(M.total, +q.get('t')));
+draw();
+if (q.has('play')) play();
+</script>
+</body></html>

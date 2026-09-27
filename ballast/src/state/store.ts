@@ -14,6 +14,9 @@ import type {
   RecoveryEntry, SimAction, Trade, Mix,
 } from '@/lib/types';
 import type { PhoneContact, Visibility } from '@/lib/sharing';
+import type { Collection, MeDTO, PendingRequestDTO } from '@shared/contract';
+import { DEFAULT_CEILINGS, DEFAULT_OVERALL_CEILING } from '@/lib/load';
+import { mergeInto } from './snapshot';
 import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
 import { completionCredit } from '@/lib/errands';
@@ -76,6 +79,40 @@ interface State {
   phoneContacts: PhoneContact[];
   /** How much of your week your circle can see. Yours, changeable, off included. */
   sharing: Visibility;
+  /**
+   * The signed-in account, or null.
+   *
+   * Null is a first-class state, not an error: everything in this app works
+   * without one. Signing in adds sync and the circle; it is never a gate in
+   * front of the week.
+   */
+  account: MeDTO | null;
+  /**
+   * Whose week this is.
+   *
+   * `demo` is the seeded semester — the interface study, the thing the public
+   * link has always shown, and what every check in `npm run preflight` asserts.
+   * `live` is a real person's own data, which starts empty and fills as they use
+   * it. Signing in switches modes; signing out switches back.
+   *
+   * Keeping both is what lets the demo survive the product being real.
+   */
+  mode: 'demo' | 'live';
+  /**
+   * One line you wrote about how you are.
+   *
+   * The only free text anybody else ever sees. Never generated, never inferred
+   * from your week - the app has a battery for that, and a sentence a person
+   * chose says something a number cannot.
+   */
+  status: string | null;
+  /**
+   * Friend requests waiting on an answer, in live mode.
+   *
+   * Held in the store rather than fetched per screen so the count can sit on a
+   * door without every screen that shows it making its own request.
+   */
+  requests: PendingRequestDTO[];
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
@@ -83,6 +120,14 @@ interface State {
   dropSwap: (id: string) => void;
   addFriend: (contactId: string) => void;
   setSharing: (visibility: Visibility) => void;
+  setAccount: (account: MeDTO | null) => void;
+  setStatus: (status: string | null) => void;
+  goLive: (account: MeDTO, today: string) => void;
+  /** The circle as the server last reported it. Seeded in demo, fetched in live. */
+  setCircle: (circle: CircleMember[]) => void;
+  setRequests: (requests: PendingRequestDTO[]) => void;
+  goDemo: () => void;
+  hydrate: (upserts: Map<Collection, Array<{ id: string; data: unknown }>>, deletes: Map<Collection, string[]>) => void;
   setShowEverything: (value: boolean) => void;
   setMinimumViableWeek: (value: boolean) => void;
   finishOnboarding: () => void;
@@ -165,6 +210,10 @@ export const useStore = create<State>()(
   // Free evenings by default, which is what makes the planning side work at all.
   // Off is one tap away and is genuinely off, not "off but still discoverable".
   sharing: 'evenings',
+  account: null,
+  mode: 'demo',
+  requests: [],
+  status: null,
 
   addItem: (item) =>
     set((state) => {
@@ -249,6 +298,91 @@ export const useStore = create<State>()(
     }),
 
   setSharing: (visibility) => set({ sharing: visibility }),
+
+  /** Signing in or out. Deliberately not cleared by `reset`, which is about the week. */
+  setAccount: (account) => set({ account }),
+
+  /**
+   * Become a real account.
+   *
+   * Everything seeded goes. A new student opening this should see their own
+   * empty week and today's real date — not Amira's Monday in week ten, however
+   * good a demo it is. The ceilings start at the generic defaults and move as
+   * they report hard days, which is the same calibration the seeded week had
+   * already been through.
+   */
+  goLive: (account, today) =>
+    set({
+      mode: 'live', account, today,
+      items: [], errands: [], modules: [], moods: [], meals: [], moments: [],
+      recovery: [], contacts: [], dayReports: [], booked: [], invites: [],
+      circle: [], phoneContacts: [], customActions: [], requests: [], status: null,
+      sleepHours: null, showEverythingAnyway: false, minimumViableWeek: false,
+      ceilings: DEFAULT_CEILINGS, overallCeiling: DEFAULT_OVERALL_CEILING,
+      sharing: 'evenings', offHour: 17,
+    }),
+
+  /** Back to the interface study. What the public link shows, and what the checks assert. */
+  setStatus: (status) => set({ status: status && status.trim() ? status.trim() : null }),
+  setCircle: (circle) => set({ circle }),
+  setRequests: (requests) => set({ requests }),
+
+
+  goDemo: () =>
+    set({
+      mode: 'demo', account: null, today: TODAY,
+      items: seedItems, moods: moodHistory, meals: seedMeals, errands: seedErrands,
+      contacts: seedContacts, recovery: recoveryLedger, modules: seedModules,
+      circle: seedCircle, phoneContacts: seedPhoneContacts, customActions: seedCustomActions,
+      requests: [], booked: [], dayReports: [], invites: [], moments: [], sleepHours: null, status: null,
+      showEverythingAnyway: false, minimumViableWeek: false,
+      ceilings: CEILINGS, overallCeiling: OVERALL_CEILING, sharing: 'evenings', offHour: 17,
+    }),
+
+  /**
+   * Fold what the server sent into what is already here.
+   *
+   * Rows arriving here have already been through last-write-wins on the server,
+   * so they are the agreed answer and win. Local rows the server has never heard
+   * of are kept — those are writes still waiting in the queue, not deletions.
+   */
+  hydrate: (upserts, deletes) =>
+    set((state) => {
+      const patch: Partial<State> = {};
+      const up = (name: Collection) => upserts.get(name) ?? [];
+      const gone = (name: Collection) => deletes.get(name) ?? [];
+
+      if (upserts.has('items') || deletes.has('items')) patch.items = mergeInto(state.items, up('items'), gone('items'));
+      if (upserts.has('errands') || deletes.has('errands')) patch.errands = mergeInto(state.errands, up('errands'), gone('errands'));
+      if (upserts.has('modules') || deletes.has('modules')) patch.modules = mergeInto(state.modules, up('modules'), gone('modules'));
+      if (upserts.has('moods') || deletes.has('moods')) patch.moods = mergeInto(state.moods, up('moods'), gone('moods'));
+      if (upserts.has('meals') || deletes.has('meals')) patch.meals = mergeInto(state.meals, up('meals'), gone('meals'));
+      if (upserts.has('moments') || deletes.has('moments')) patch.moments = mergeInto(state.moments, up('moments'), gone('moments'));
+      if (upserts.has('recovery') || deletes.has('recovery')) patch.recovery = mergeInto(state.recovery, up('recovery'), gone('recovery'));
+      if (upserts.has('contacts') || deletes.has('contacts')) patch.contacts = mergeInto(state.contacts, up('contacts'), gone('contacts'));
+
+      // Day reports key on the date rather than an id, so they merge by hand.
+      if (upserts.has('dayReports')) {
+        const incoming = new Map(up('dayReports').map((d) => [d.id, d.data as State['dayReports'][number]]));
+        const kept = state.dayReports.filter((r) => !incoming.has(r.date));
+        patch.dayReports = [...kept, ...incoming.values()].sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      // One document holding every preference, unpacked back into its fields.
+      const settings = up('settings').find((d) => d.id === 'settings')?.data as Record<string, unknown> | undefined;
+      if (settings) {
+        if (settings.ceilings) patch.ceilings = settings.ceilings as State['ceilings'];
+        if (typeof settings.overallCeiling === 'number') patch.overallCeiling = settings.overallCeiling;
+        if (typeof settings.offHour === 'number') patch.offHour = settings.offHour;
+        if (settings.sleepHours === null || typeof settings.sleepHours === 'number') patch.sleepHours = settings.sleepHours as number | null;
+        if (Array.isArray(settings.booked)) patch.booked = settings.booked as string[];
+        if (typeof settings.sharing === 'string') patch.sharing = settings.sharing as State['sharing'];
+        if (Array.isArray(settings.customActions)) patch.customActions = settings.customActions as State['customActions'];
+        if (typeof settings.onboarded === 'boolean') patch.onboarded = settings.onboarded;
+      }
+
+      return patch;
+    }),
 
   setShowEverything: (value) => set({ showEverythingAnyway: value }),
   setMinimumViableWeek: (value) => set({ minimumViableWeek: value }),

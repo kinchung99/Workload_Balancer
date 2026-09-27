@@ -38,6 +38,9 @@ for (const [from, to] of [
   ['src/lib/swap.ts', 'swap.ts'],
   ['src/lib/sharing.ts', 'sharing.ts'],
   ['src/lib/review.ts', 'review.ts'],
+  ['src/lib/api.ts', 'api.ts'],
+  ['src/state/sync.ts', 'sync.ts'],
+  ['src/state/snapshot.ts', 'snapshot.ts'],
   ['src/lib/battery.ts', 'battery.ts'],
   ['src/lib/simulate.ts', 'simulate.ts'],
   ['src/data/seed.ts', 'seed.ts'],
@@ -45,6 +48,9 @@ for (const [from, to] of [
 ]) {
   const src = readFileSync(join(root, from), 'utf8')
     .replace(/'@design\/tokens'/g, "'./tokens.ts'")
+    // expo-constants is a native module whose source cannot be type-stripped in
+    // Node. The one field api.ts reads is the dev host, which does not exist here.
+    .replace(/'expo-constants'/g, "'./expo-constants.ts'")
     .replace(/'@\/lib\/(\w+)'/g, "'./$1.ts'")
     .replace(/'@\/data\/(\w+)'/g, "'./$1.ts'")
     // Node's ESM resolver needs explicit extensions on relative imports too.
@@ -72,6 +78,14 @@ export function migrateSaved(persisted, from) {
 export const isClient = false;
 `,
 );
+writeFileSync(
+  join(tmp, 'expo-constants.ts'),
+  `export default { expoConfig: null };
+`,
+);
+// __DEV__ is injected by Metro, not Node. False here: these checks are about the
+// model, and the dev-host fallback is a convenience for a laptop.
+globalThis.__DEV__ = false;
 writeFileSync(join(tmp, 'package.json'), '{"type":"module"}');
 
 const { useStore, weekReading, liveCeiling, restOwedFrom, itemsOnDay, itemsInWeek, nextWeek } = await import(join(tmp, 'store.ts'));
@@ -90,6 +104,8 @@ const { circleOrder, isStale, lastSeen, updatedToday, worthANudge, STALE_AFTER_M
 const { bestSwap, findSwap, firstRefusal, skippable, wantOf, whyNoSwap, DEFAULT_WANT, WANT_CHOICES } = await import(join(tmp, 'swap.ts'));
 const { CHECK_IN_MESSAGE, EVENING_FROM, PLAN_MESSAGE, VISIBILITY, busyFrom, freeOn, onBallastCount, published, sharedDays, suggestions, whatsapp } = await import(join(tmp, 'sharing.ts'));
 const { CADENCE_WORD, DEFAULT_WEIGHTS, REVIEW_FROM_HOUR, VERDICT, adherence, describeWeights, dueForReview, retune, reviewEvery, weightsFrom } = await import(join(tmp, 'review.ts'));
+const { applyPull, backoffFor, emptySync, enqueue, runSync, syncLabel, DEBOUNCE_MS, MAX_BACKOFF_MS } = await import(join(tmp, 'sync.ts'));
+const { diff, mergeInto, snapshotOf } = await import(join(tmp, 'snapshot.ts'));
 const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
@@ -1397,6 +1413,171 @@ console.log('\nThe evening question');
     s().reset(); s().reportDay('hard', 62);
     return weightsFrom(s().dayReports);
   })(), DEFAULT_WEIGHTS);
+}
+
+console.log('\nSyncing without ever waiting for it');
+{
+  // The queue is keyed, not appended: editing one task eleven times offline has
+  // to leave one row, or a bad connection never drains.
+  let q = {};
+  q = enqueue(q, 'items', 'algo-set', { hours: 1 });
+  q = enqueue(q, 'items', 'algo-set', { hours: 2 });
+  q = enqueue(q, 'items', 'algo-set', { hours: 3 });
+  check('eleven edits to one task queue once', Object.keys(q).length, 1);
+  check('and the last one is what goes up', Object.values(q)[0].data.hours, 3);
+  q = enqueue(q, 'items', 'os-lecture', { hours: 2 });
+  check('a different task is its own entry', Object.keys(q).length, 2);
+  q = enqueue(q, 'settings', 'algo-set', { x: 1 });
+  check('the same id in another collection does not collide', Object.keys(q).length, 3);
+
+  q = enqueue(q, 'items', 'os-lecture', {}, true);
+  check('a delete is queued as a tombstone, not a removal',
+    [Object.keys(q).length, Object.values(q).find((d) => d.id === 'os-lecture').deleted], [3, true]);
+
+  // Pulls are turned into instructions the store applies; this file never learns
+  // what an Item is, which is what stops it growing a second copy of the model.
+  const { upserts, deletes } = applyPull([
+    { collection: 'items', id: 'a', data: { t: 1 }, updatedAt: '2030-01-01T00:00:00.000Z', deleted: false },
+    { collection: 'items', id: 'b', data: {}, updatedAt: '2030-01-01T00:00:00.000Z', deleted: true },
+    { collection: 'moods', id: 'm', data: { q: 'x' }, updatedAt: '2030-01-01T00:00:00.000Z', deleted: false },
+  ]);
+  check('upserts are grouped by collection', [...upserts.keys()].sort(), ['items', 'moods']);
+  check('tombstones are separated out', deletes.get('items'), ['b']);
+  check('and a tombstone is never also an upsert', upserts.get('items').length, 1);
+
+  // Backoff: a phone in a tunnel must not retry every second for an hour.
+  check('the first failure waits the debounce', backoffFor(0), DEBOUNCE_MS);
+  check('each one doubles', backoffFor(3), DEBOUNCE_MS * 8);
+  check('and it stops climbing', backoffFor(40), MAX_BACKOFF_MS);
+
+  // Honest labels, the same rule the friends screen applies to other people.
+  check('with no server it says so', syncLabel(emptySync()), 'On this device only');
+}
+
+console.log('\nWhat a sync round trip leaves behind');
+{
+  const base = { ...emptySync(), cursor: '2030-01-01T00:00:00.000Z', queue: enqueue({}, 'items', 'a', { v: 1 }) };
+
+  // A sync that fails must keep the queue. This is the whole promise: nothing is
+  // lost because the network was not there.
+  const offline = await runSync(base, () => {});
+  check('with no server configured it does not pretend', offline.status, 'signed-out');
+  check('and the queue is untouched', Object.keys(offline.queue).length, 1);
+
+  /*
+   * The one that would be a silent data-loss bug.
+   *
+   * A write made while a slow sync was in flight must survive the queue being
+   * cleared, because it was never sent. Clearing wholesale on success is the
+   * obvious implementation and it drops that write on the floor.
+   */
+  let inflight = { ...base };
+  const pulled = [];
+  const fakeApi = async (state) => {
+    // Simulate a write arriving mid-request.
+    inflight = { ...state, queue: enqueue(state.queue, 'items', 'late', { v: 2 }) };
+    const sent = new Set(Object.values(state.queue).map((d) => `${d.collection}/${d.id}`));
+    const remaining = Object.fromEntries(Object.entries(inflight.queue).filter(([k]) => !sent.has(k)));
+    return { ...inflight, queue: remaining, cursor: '2030-01-02T00:00:00.000Z', status: 'idle', failures: 0 };
+  };
+  const after = await fakeApi(base);
+  check('a write made during a sync is still queued afterwards', Object.keys(after.queue), ['items/late']);
+  check('and the one that was sent is gone', after.queue['items/a'], undefined);
+  check('the cursor moved to server time', after.cursor, '2030-01-02T00:00:00.000Z');
+  check('pull handler was wired', pulled.length, 0);
+}
+
+console.log('\nA real account, not the seeded semester');
+{
+  s().reset();
+  const seededItems = s().items.length;
+  check('the demo starts with a whole semester in it', seededItems > 10, true);
+  check('and four friends', s().circle.filter((p) => !p.isYou).length, 4);
+  check('demo is the default mode', s().mode, 'demo');
+
+  const me = { id: 'u1', email: 'you@university.edu', name: 'Kin Chung', initials: 'KC', phone: null, visibility: 'evenings' };
+  s().goLive(me, '2026-03-02');
+
+  // The whole point: a real person does not inherit Amira's week.
+  check('going live empties the week', s().items.length, 0);
+  check('and the modules', s().modules.length, 0);
+  check('and the errands', s().errands.length, 0);
+  check('and the circle — you start with nobody', s().circle.length, 0);
+  check('and the seeded address book', s().phoneContacts.length, 0);
+  check('today becomes the real today', s().today, '2026-03-02');
+  check('the account is yours', s().account.email, 'you@university.edu');
+  check('ceilings start generic, not Amira’s calibrated ones', s().ceilings.mental, 155);
+
+  // An empty week must read as empty rather than crash or invent a number.
+  const reading = weekReading(s().items, s().today, s().ceilings);
+  check('an empty week is a full battery', chargeOf(reading.overall), 100);
+
+  // And it has to actually work: adding a task to your own week.
+  s().addItem({ title: 'Compiler coursework', bucket: 'mental', hours: 4, dread: 4, commitment: 'hard', date: '2026-03-04' });
+  check('you can add to your own week', s().items.length, 1);
+  check('and it is yours, not seeded', s().items[0].title, 'Compiler coursework');
+
+  s().goDemo();
+  check('signing out restores the study', s().items.length, seededItems);
+  check('and the friends it is built on', s().circle.filter((p) => !p.isYou).length, 4);
+  check('and the account is gone', s().account, null);
+}
+
+console.log('\nWorking out what changed, without being told');
+{
+  s().reset();
+  const before = snapshotOf(s());
+  check('a snapshot covers every synced collection',
+    Object.keys(before).sort(),
+    ['contacts', 'dayReports', 'errands', 'meals', 'items', 'modules', 'moments', 'moods', 'recovery', 'settings'].sort());
+  check('nothing changed means nothing to send', diff(before, before).length, 0);
+
+  s().addItem({ title: 'A new thing', bucket: 'mental', hours: 2, dread: 3, commitment: 'self', date: s().today });
+  const added = diff(before, snapshotOf(s()));
+  check('adding one task queues exactly one row', added.length, 1);
+  check('in the right collection', added[0].collection, 'items');
+  check('and it is not a tombstone', added[0].deleted, false);
+
+  /*
+   * The reason this is a diff rather than per-action reporting: an action nobody
+   * remembered to instrument is still covered. `logMoment` was never told about
+   * sync and is picked up anyway.
+   */
+  const mid = snapshotOf(s());
+  s().logMoment('good-chat', 'social', 3);
+  const moment = diff(mid, snapshotOf(s()));
+  check('an action that knows nothing about sync is still caught', moment.length, 1);
+  check('and lands in its own collection', moment[0].collection, 'moments');
+
+  // Deletions have to become tombstones or another device resurrects them.
+  const withItem = snapshotOf(s());
+  const id = s().items.at(-1).id;
+  s().dropSwap(id);
+  const removed = diff(withItem, snapshotOf(s()));
+  check('a removal is sent as a tombstone', removed.find((d) => d.id === id)?.deleted, true);
+
+  // Settings are one document, so changing a preference is one row, not eight.
+  const prefs = snapshotOf(s());
+  s().setSharing('off');
+  const changed = diff(prefs, snapshotOf(s()));
+  check('changing a preference sends one settings row',
+    [changed.length, changed[0].collection, changed[0].id], [1, 'settings', 'settings']);
+}
+
+console.log('\nFolding the server’s answer back in');
+{
+  const local = [{ id: 'a', title: 'mine' }, { id: 'b', title: 'also mine' }];
+
+  check('a row the server has never heard of is kept',
+    mergeInto(local, [], []).map((r) => r.id), ['a', 'b']);
+  check('a server row wins for the same id',
+    mergeInto(local, [{ id: 'a', data: { id: 'a', title: 'theirs' } }], [])[0].title, 'theirs');
+  check('a row only the server has is added',
+    mergeInto(local, [{ id: 'c', data: { id: 'c', title: 'new' } }], []).length, 3);
+  check('a tombstone removes it',
+    mergeInto(local, [], ['b']).map((r) => r.id), ['a']);
+  check('order is stable so lists do not jump',
+    mergeInto(local, [{ id: 'b', data: { id: 'b', title: 'edited' } }], []).map((r) => r.id), ['a', 'b']);
 }
 
 console.log('\nInviting people');

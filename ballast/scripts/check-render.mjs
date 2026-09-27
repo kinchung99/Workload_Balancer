@@ -202,6 +202,21 @@ const EXPECTATIONS = [
     'WHEN EVERYONE IS FREE',                   // the windows that work for all of you
     'Wed 12 Nov', '6pm – 8pm', 'Pick a time',
   ]],
+  /*
+   * The public prototype ships with no API URL, so this is the branch it shows -
+   * and asserting it is the point. A build with no server must still open every
+   * screen and say so plainly rather than erroring or hanging on a fetch.
+   */
+  /*
+   * The first paint, before the health check answers.
+   *
+   * A static export has no server to find, so this is what the public prototype
+   * shows for an instant and then settles on "On this device". Asserting the
+   * first frame is what proves the screen never blocks on a network call.
+   */
+  ['account.html', 'Account', [
+    'ACCOUNT', 'One moment', 'Looking for your server',
+  ]],
   ['sharing.html', 'Sharing', [
     'YOUR PRIVACY', 'What they see',
     'Your battery \u00b7 47%', 'Always shared. It is how they know to check on you.',
@@ -221,7 +236,10 @@ const EXPECTATIONS = [
     'Matching happens on your phone.', 'Your contacts are never uploaded.',
   ]],
   ['friend/ravi.html', 'A friend\u2019s week', [
-    'UPDATED 2H AGO', 'Ravi', '71%', 'doing fine',
+    'Ravi', '71%', 'doing fine', '2h ago',
+    // The avatar: the same circle the profile draws, so one language covers both.
+    'R',
+    'battery', 'free', 'reading',               // their profile stats row
     'Free most of this week',                   // a line they wrote themselves
     'THIS WEEK, AS THEY SHARE IT',
     'Wednesday, free 5pm to 11pm',              // published windows, spoken
@@ -230,9 +248,28 @@ const EXPECTATIONS = [
     'Ask about Saturday',                       // the longest window, as one tap
   ]],
   ['you.html', 'You', [
-    'You', '47%',
+    'YOUR PROFILE', 'You', '47%',
+    // A profile opens with identity and a row of numbers, the way every social
+    // app has taught people to read one.
+    'battery', 'friends', 'sharing',
+    'Edit profile',
+    'YOUR WEEK',
     'Check in', 'Recovery', 'Tonight', 'Timetable', 'What to do first',
-    'Replay intro', 'Reset',
+  ]],
+  ['profile.html', 'Edit profile', [
+    'EDIT PROFILE', 'How you appear',
+    'WHAT YOUR FRIENDS SEE',                    // the live preview of your own row
+    'NAME', 'INITIALS', 'STATUS',
+    'Deadline week', 'Finally handed it in',    // suggestions, because a blank box stays blank
+    'PHONE (OPTIONAL)',
+    'Only used to open WhatsApp from this phone.',
+  ]],
+  ['settings.html', 'Settings', [
+    'SETTINGS', 'Settings',
+    'ACCOUNT', 'Edit profile', 'Your circle', 'Find friends',
+    'PRIVACY', 'What your circle sees',
+    'YOUR DATA', 'Your tasks are never read by the server.',
+    'Replay intro',
   ]],
   ['item/algo-set.html', 'One item', [
     'DUE THU 13 NOV', 'Algorithms problem set',
@@ -282,6 +319,9 @@ const EXITS = [
   ['checkin.html', 'You'],
   ['plan-together.html', 'Friends'],
   ['sharing.html', 'Friends'],
+  ['account.html', 'You'],
+  ['profile.html', 'You'],
+  ['settings.html', 'You'],
   ['find-friends.html', 'Friends'],
   ['friend/ravi.html', 'Friends'],
   ['item/algo-set.html', 'Plan'],

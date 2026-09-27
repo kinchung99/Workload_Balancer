@@ -1,7 +1,6 @@
 /**
  * The component library, one export per Figma component.
  *
- * See src/design/figma.ts for the name each of these carries in the design file.
  */
 export { Stack } from './primitives/Stack';
 export { Text } from './primitives/Text';
@@ -19,6 +18,7 @@ export { AreaTile } from './primitives/AreaTile';
 export { DatePicker } from './primitives/DatePicker';
 export { Reveal } from './primitives/Reveal';
 export { AreaIcon } from './primitives/AreaIcon';
+export { Avatar } from './primitives/Avatar';
 export { AreaDial, DialStepper, DrainFace } from './primitives/AreaDial';
 export { Sticker, type StickerName } from './primitives/Sticker';
 export { StepDots } from './primitives/StepDots';

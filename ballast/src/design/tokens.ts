@@ -1,7 +1,7 @@
 /**
  * Ballast design tokens.
  *
- * SOURCE OF TRUTH: figma/tokens.json (W3C DTCG). This file is its typed mirror
+ * SOURCE OF TRUTH: src/design/tokens.json (W3C DTCG). This file is its typed mirror
  * for app code. `npm run tokens:check` walks both and fails if they drift, so
  * you can edit either one and the other is provably still in sync.
  *

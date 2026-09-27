@@ -15,6 +15,7 @@ import { color, motion, radius } from '@design/tokens';
 import { bandFor } from '@/lib/load';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { PatternFill } from './BandPattern';
+import { DECORATIVE } from './decorative';
 
 export interface BatterySegment {
   key: string;
@@ -149,7 +150,7 @@ export function BatteryMini({ charge, loadPercent }: { charge: number; loadPerce
   const filled = Math.max(charge > 0 ? 3 : 0, (charge / 100) * innerW);
 
   return (
-    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View {...DECORATIVE}>
       <Svg width={w + 4} height={h}>
         <Rect x={0} y={0} width={w} height={h} rx={5} ry={5} fill="none" stroke={color.line.strong} strokeWidth={1.5} />
         <Rect x={w + 1} y={h / 2 - 3} width={3} height={6} rx={1.5} fill={color.line.strong} />

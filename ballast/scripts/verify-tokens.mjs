@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Fails if figma/tokens.json and src/design/tokens.ts have drifted.
+ * Fails if src/design/tokens.json and src/design/tokens.ts have drifted.
  *
  * tokens.json is what Figma imports; tokens.ts is what the app renders. If a
  * designer changes a variable in Figma and exports, or an engineer edits the TS,
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const dtcg = JSON.parse(readFileSync(join(root, 'figma/tokens.json'), 'utf8'));
+const dtcg = JSON.parse(readFileSync(join(root, 'src/design/tokens.json'), 'utf8'));
 const ts = readFileSync(join(root, 'src/design/tokens.ts'), 'utf8');
 
 /** Walk the DTCG tree and yield [dottedPath, value] for every leaf token. */
@@ -55,7 +55,7 @@ for (const hex of ts.match(/#[0-9A-Fa-f]{6}/g) ?? []) {
 if (problems.length) {
   console.error(`\n  tokens out of sync (${problems.length} problem${problems.length > 1 ? 's' : ''}):\n`);
   for (const p of problems) console.error(`    - ${p}`);
-  console.error('\n  Fix both figma/tokens.json and src/design/tokens.ts, then re-run.\n');
+  console.error('\n  Fix both src/design/tokens.json and src/design/tokens.ts, then re-run.\n');
   process.exit(1);
 }
 

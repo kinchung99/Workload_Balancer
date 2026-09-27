@@ -1,12 +1,12 @@
 /**
  * Tailwind theme, read straight out of the tokens Figma imports.
  *
- * This file parses figma/tokens.json (W3C DTCG) at config time, so a Tailwind
+ * This file parses src/design/tokens.json (W3C DTCG) at config time, so a Tailwind
  * class in a screen and a variable in Figma are literally the same decision.
  * src/design/tokens.ts is the typed mirror for app code and
  * `npm run tokens:check` proves the two have not drifted.
  */
-const tokens = require('./figma/tokens.json');
+const tokens = require('./src/design/tokens.json');
 
 /** DTCG leaves are `{ $type, $value }`. Collapse a group down to plain values. */
 const flat = (node, transform = (v) => v) =>

@@ -43,6 +43,19 @@ export const VISIBILITY_WORD = (v: Visibility): string =>
   VISIBILITY.find((option) => option.value === v)!.word;
 
 /**
+ * One word, for a stat tile.
+ *
+ * "Evenings only" wraps onto two lines in a third of a phone's width and drags
+ * its label out of line with the tiles beside it. A stat row only works when
+ * every value is one line.
+ */
+export const VISIBILITY_SHORT: Record<Visibility, string> = {
+  off: 'Private',
+  evenings: 'Evenings',
+  busy: 'Free/busy',
+};
+
+/**
  * Your own free windows on a day, cut down to what you have chosen to publish.
  *
  * Derived from the same `freeSlots` the booking pickers use, so what friends see

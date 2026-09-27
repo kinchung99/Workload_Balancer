@@ -10,6 +10,7 @@ import { View } from 'react-native';
 import { bar as barToken, color, frame, space } from '@design/tokens';
 import type { BandName } from '@/lib/types';
 import { PatternFill } from './BandPattern';
+import { DECORATIVE } from './decorative';
 
 export interface BarProps {
   band: BandName;
@@ -31,9 +32,7 @@ export function Bar({ band, percent, height = barToken.bucket, greyscale }: BarP
     <View
       className="w-full overflow-hidden rounded-pill bg-track"
       style={{ height }}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)} {...DECORATIVE}
     >
       {width > 0 ? (
         <View className="flex-row items-center">

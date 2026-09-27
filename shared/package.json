@@ -1,0 +1,12 @@
+{
+  "name": "@ballast/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The wire contract. Imported by both the Expo app and the API so the two cannot drift.",
+  "main": "contract.ts",
+  "types": "contract.ts",
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

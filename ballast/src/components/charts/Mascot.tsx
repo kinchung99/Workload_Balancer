@@ -17,6 +17,7 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 
 import { color, motion, radius } from '@design/tokens';
 import { bandFor } from '@/lib/load';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { DECORATIVE } from './decorative';
 
 export type Mood = 'great' | 'good' | 'tired' | 'spent';
 
@@ -76,7 +77,7 @@ export function Mascot({
   const tint = FILL[mood];
 
   return (
-    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View {...DECORATIVE}>
       <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         <Defs>
           <LinearGradient id="mascot-fill" x1="0" y1="1" x2="0" y2="0">
