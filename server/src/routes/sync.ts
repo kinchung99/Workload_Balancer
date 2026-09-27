@@ -18,9 +18,9 @@
  */
 import { Hono } from 'hono';
 import { and, eq, gt, sql } from 'drizzle-orm';
-import { syncRequestSchema, type SyncDoc, type SyncResponse } from '../../../shared/contract';
-import { documents } from '../db/schema';
-import type { Env } from '../types';
+import { syncRequestSchema, type SyncDoc, type SyncResponse } from '../../../shared/contract.js';
+import { documents } from '../db/schema.js';
+import type { Env } from '../types.js';
 
 /** One page. Big enough that a fortnight offline is one round trip. */
 const PAGE = 500;

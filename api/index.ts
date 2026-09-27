@@ -11,8 +11,8 @@
  * the test harness (PGlite, in-process). One application, three ways in.
  */
 import type { Hono } from 'hono';
-import { createApp } from '../server/src/app';
-import { ConfigError, getDb } from '../server/src/db/client';
+import { createApp } from '../server/src/app.js';
+import { ConfigError, getDb } from '../server/src/db/client.js';
 
 export const config = { runtime: 'nodejs' };
 

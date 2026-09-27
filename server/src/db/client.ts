@@ -20,15 +20,23 @@
  * an in-memory PGlite — so what CI runs is the same SQL that runs in production.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
-import * as schema from './schema';
+import * as schema from './schema.js';
 
 export type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+/*
+ * Where `.env` and the migrations live, found without `import.meta.url`.
+ *
+ * That expression is a *parse* error in a CommonJS module, so a bundler that
+ * emits CJS takes the whole function down at load time — before any handler
+ * runs, which means no error page and no useful log. `process.cwd()` is legal in
+ * both module systems, and both paths below are only read on the local-file
+ * database path, which a deployment never takes.
+ */
+const projectRoot = (): string => process.cwd();
 
 let cached: Database | null = null;
 
@@ -58,7 +66,7 @@ export class ConfigError extends Error {
  * is absent, because the whole point is that it is optional.
  */
 function loadEnv(): void {
-  const file = join(root, '.env');
+  const file = join(projectRoot(), '.env');
   if (!existsSync(file)) return;
   try {
     process.loadEnvFile(file);
@@ -77,7 +85,7 @@ function loadEnv(): void {
  * a server that will one day silently alter production on boot.
  */
 async function migrateLocal(client: { exec: (sql: string) => Promise<unknown> }): Promise<void> {
-  const dir = join(root, 'drizzle');
+  const dir = join(projectRoot(), 'drizzle');
   if (!existsSync(dir)) throw new Error('No migrations found. Run `npm run db:generate`.');
 
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
@@ -123,7 +131,7 @@ export async function getDb(): Promise<Database> {
       );
     }
 
-    const dir = join(root, '.data');
+    const dir = join(projectRoot(), '.data');
     mkdirSync(dir, { recursive: true });
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');

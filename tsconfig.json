@@ -2,15 +2,26 @@
   "//": "Root config so Vercel compiles the function the same way the server does. Without one it falls back to defaults that reject this codebase's import style.",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "types": ["node"],
-    "lib": ["ES2023"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2023"
+    ]
   },
-  "include": ["api/**/*.ts", "server/src/**/*.ts", "shared/**/*.ts"],
-  "exclude": ["node_modules", "ballast"]
+  "include": [
+    "api/**/*.ts",
+    "server/src/**/*.ts",
+    "shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "ballast"
+  ]
 }

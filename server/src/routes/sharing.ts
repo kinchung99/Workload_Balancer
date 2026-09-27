@@ -13,10 +13,10 @@
  */
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { presenceSchema, publishSchema } from '../../../shared/contract';
-import { freeWindows, presence, profiles } from '../db/schema';
-import { makeCode } from '../lib/code';
-import type { Env } from '../types';
+import { presenceSchema, publishSchema } from '../../../shared/contract.js';
+import { freeWindows, presence, profiles } from '../db/schema.js';
+import { makeCode } from '../lib/code.js';
+import type { Env } from '../types.js';
 
 /** Evening starts here, matching the client's own EVENING_FROM. */
 const EVENING_FROM = 17;

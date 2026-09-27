@@ -1,6 +1,6 @@
 /** What every handler can reach for, put there by the middleware in app.ts. */
-import type { Database } from './db/client';
-import type { Auth } from './lib/auth';
+import type { Database } from './db/client.js';
+import type { Auth } from './lib/auth.js';
 
 export interface Env {
   Variables: {

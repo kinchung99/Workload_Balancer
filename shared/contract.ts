@@ -224,7 +224,7 @@ export interface MeDTO {
 }
 
 /** Initials from a name, the same way on both sides of the wire. */
-export { initialsFrom } from './initials';
+export { initialsFrom } from './initials.js';
 
 /* -------------------------------------------------------------------- misc */
 

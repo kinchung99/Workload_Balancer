@@ -18,10 +18,10 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp } from '../src/app';
-import { makeAuth } from '../src/lib/auth';
-import * as schema from '../src/db/schema';
-import type { Database } from '../src/db/client';
+import { createApp } from '../src/app.js';
+import { makeAuth } from '../src/lib/auth.js';
+import * as schema from '../src/db/schema.js';
+import type { Database } from '../src/db/client.js';
 
 process.env.NODE_ENV = 'test';
 process.env.AUTH_SECRET = 'test-secret-at-least-32-characters-long!!';

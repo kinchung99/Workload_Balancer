@@ -12,9 +12,9 @@
  */
 import { Hono } from 'hono';
 import { and, eq, gte, inArray, or } from 'drizzle-orm';
-import { inviteReplySchema, inviteSchema, type InviteDTO } from '../../../shared/contract';
-import { friendships, inviteGuests, invites as invitesTable, user } from '../db/schema';
-import type { Env } from '../types';
+import { inviteReplySchema, inviteSchema, type InviteDTO } from '../../../shared/contract.js';
+import { friendships, inviteGuests, invites as invitesTable, user } from '../db/schema.js';
+import type { Env } from '../types.js';
 
 export const invites = new Hono<Env>();
 

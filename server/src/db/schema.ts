@@ -23,9 +23,9 @@ import {
   boolean, index, integer, jsonb, pgTable, primaryKey, real,
   text, timestamp, uniqueIndex, varchar,
 } from 'drizzle-orm/pg-core';
-import { user } from './auth-schema';
+import { user } from './auth-schema.js';
 
-export { user, session, account, verification } from './auth-schema';
+export { user, session, account, verification } from './auth-schema.js';
 
 /* ------------------------------------------------------------------ profile */
 

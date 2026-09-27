@@ -2,6 +2,7 @@
   "name": "ballast",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Ballast \u2014 a stress and workload manager for students. Expo app, Hono API, shared contract.",
   "scripts": {
     "setup": "npm install && npm install --prefix ballast",
