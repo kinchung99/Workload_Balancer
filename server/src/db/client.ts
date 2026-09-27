@@ -32,6 +32,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 let cached: Database | null = null;
 
+/** Somewhere with no writable disk: Vercel, Lambda, Cloudflare and friends. */
+const isServerless = (): boolean =>
+  Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+
+/**
+ * A misconfiguration rather than a bug.
+ *
+ * Carried as its own type so the handler can answer with something a person can
+ * act on instead of a stack trace - the difference between "check your
+ * environment variables" and forty minutes of guessing.
+ */
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
 /**
  * Read `.env` if there is one, using Node's own loader.
  *
@@ -90,6 +108,21 @@ export async function getDb(): Promise<Database> {
   const placeholder = !url || url.includes('ep-xxx') || url.includes('user:pass@');
 
   if (placeholder) {
+    /*
+     * A serverless function has no writable disk and no business inventing a
+     * database. Without this the local-file fallback tries to `mkdir` on a
+     * read-only filesystem and the platform reports `FUNCTION_INVOCATION_FAILED`
+     * - which says nothing at all about the actual problem, and is the single
+     * most confusing way a first deploy can fail.
+     */
+    if (isServerless()) {
+      throw new ConfigError(
+        url
+          ? 'DATABASE_URL is still the example value from .env.example.'
+          : 'DATABASE_URL is not set on this deployment.',
+      );
+    }
+
     const dir = join(root, '.data');
     mkdirSync(dir, { recursive: true });
     const { PGlite } = await import('@electric-sql/pglite');

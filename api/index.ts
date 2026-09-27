@@ -12,7 +12,7 @@
  */
 import type { Hono } from 'hono';
 import { createApp } from '../server/src/app.ts';
-import { getDb } from '../server/src/db/client.ts';
+import { ConfigError, getDb } from '../server/src/db/client.ts';
 
 export const config = { runtime: 'nodejs' };
 
@@ -28,11 +28,48 @@ export const config = { runtime: 'nodejs' };
 let building: Promise<Hono> | null = null;
 
 const getApp = (): Promise<Hono> => {
-  building ??= getDb().then((db) => createApp(db) as unknown as Hono);
+  building ??= (async () => {
+    /*
+     * Refuse to run in production on the development signing key.
+     *
+     * Sessions are signed with it, so a known secret means anybody can forge
+     * one. This is the one misconfiguration worth refusing to start over rather
+     * than warning about, and it is cheap to check.
+     */
+    const secret = process.env.AUTH_SECRET?.trim();
+    if (!secret || secret.length < 16) {
+      throw new ConfigError('AUTH_SECRET is missing or too short (needs 16+ characters).');
+    }
+    const db = await getDb();
+    return createApp(db) as unknown as Hono;
+  })();
   return building;
 };
 
 export default async function handler(request: Request): Promise<Response> {
-  const app = await getApp();
-  return app.fetch(request);
+  try {
+    const app = await getApp();
+    return app.fetch(request);
+  } catch (err) {
+    /*
+     * Answer, rather than crash.
+     *
+     * A thrown error here becomes `FUNCTION_INVOCATION_FAILED` and an opaque id,
+     * which tells the person who just deployed this precisely nothing. A
+     * configuration problem is the overwhelmingly likely cause of a first
+     * failure, so it is worth spending a response body on saying which one.
+     */
+    building = null;   // so a fixed variable takes effect without a redeploy
+    const config = err instanceof ConfigError;
+    if (!config) console.error('[api] startup failed', err);
+
+    return Response.json({
+      error: config ? 'not_configured' : 'server_error',
+      detail: config ? (err as Error).message : 'The API failed to start.',
+      fix: config
+        ? 'Set DATABASE_URL, AUTH_SECRET and BASE_URL in your Vercel project settings, then redeploy.'
+        : 'Check the function logs in the Vercel dashboard.',
+      docs: 'https://github.com/kinchung99/Workload_Balancer#deploying',
+    }, { status: config ? 503 : 500 });
+  }
 }
