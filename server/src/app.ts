@@ -25,8 +25,14 @@ import { circle } from './routes/circle.js';
 import { invites } from './routes/invites.js';
 import { sharing } from './routes/sharing.js';
 import { sync } from './routes/sync.js';
+import { composeRoutes, defaultWriter, type Writer } from './routes/compose.js';
 
-export function createApp(db: Database, auth: Auth = makeAuth(db)) {
+export function createApp(
+  db: Database,
+  auth: Auth = makeAuth(db),
+  /** Who writes messages. Null when no key is configured; the app then drafts on the phone. */
+  writer: Writer | null = defaultWriter(),
+) {
   const app = new Hono<Env>();
 
   if (process.env.NODE_ENV !== 'test') app.use('*', logger());
@@ -87,6 +93,7 @@ export function createApp(db: Database, auth: Auth = makeAuth(db)) {
   app.use('/api/circle/*', requireUser);
   app.use('/api/sharing/*', requireUser);
   app.use('/api/invites/*', requireUser);
+  app.use('/api/compose/*', requireUser);
 
   /**
    * Who am I, and what am I sharing.
@@ -164,6 +171,7 @@ export function createApp(db: Database, auth: Auth = makeAuth(db)) {
   app.route('/api/circle', circle);
   app.route('/api/sharing', sharing);
   app.route('/api/invites', invites);
+  app.route('/api/compose', composeRoutes(writer));
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

@@ -64,10 +64,12 @@ sharing.post('/publish', async (c) => {
 
   const parsed = publishSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: 'bad_request', detail: parsed.error.issues[0]?.message }, 400);
-  const { visibility, windows } = parsed.data;
+  const { visibility, windows, hiddenFrom } = parsed.data;
 
-  await db.insert(profiles).values({ userId: me, visibility, code: makeCode() })
-    .onConflictDoUpdate({ target: profiles.userId, set: { visibility } });
+  // Older clients send no list, and must not wipe one a newer client set.
+  const hidden = hiddenFrom ? { hiddenFrom: [...new Set(hiddenFrom)] } : {};
+  await db.insert(profiles).values({ userId: me, visibility, code: makeCode(), ...hidden })
+    .onConflictDoUpdate({ target: profiles.userId, set: { visibility, ...hidden } });
 
   await db.delete(freeWindows).where(eq(freeWindows.userId, me));
 

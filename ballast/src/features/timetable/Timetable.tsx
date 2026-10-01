@@ -2,24 +2,25 @@ import { useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Button, Card, Chip, DreadPicker, Reveal, Screen, Sticker, Stack, Text,
+  Button, Card, Chip, Screen, Sticker, Stack, Text,
   PageHeader, StepDots,
 } from '@/components';
 import { SCREEN } from '@design/screens';
 import { color } from '@design/tokens';
 import {
-  FLAG_LABEL, FLAG_SHORT, attendanceRate, attendanceStatus, classesOn, moduleWeek,
-  parseTimetable, toItems,
+  BUILT_IN_FLAGS, FLAG_EMOJI, FLAG_LABEL, FLAG_SHORT, attendanceRate, attendanceStatus, classesOn,
+  flagInfo, parseTimetable, toItems,
 } from '@/lib/timetable';
+import { ModuleCard } from './ModuleCard';
+import { FlagMaker } from './FlagMaker';
 import { formatHour, weekDays } from '@/lib/schedule';
 import { DAY_LETTER, dayIndex, formatShort } from '@/lib/dates';
 import { loadOf } from '@/lib/load';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
-import type { ClassFlag, Dread, Item, Module } from '@/lib/types';
+import type { CustomFlag, Dread, FlagId, Item, Module } from '@/lib/types';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
 
-const FLAGS: ClassFlag[] = ['tips', 'coursework', 'attendance'];
 const KIND_TONE = { lecture: 'busy', lab: 'steady', tutorial: 'recovery', seminar: 'heavy' } as const;
 
 const SAMPLE = `Mon 09:00-11:00 CS2040 Operating Systems Lecture Kilburn LT1
@@ -49,9 +50,7 @@ const SUB = [
 
 export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
   const router = useRouter();
-  const {
-    today, modules, setModuleDread, setModuleImportance, toggleClassFlag, markAttendance, importTimetable,
-  } = useStore();
+  const { today, modules, toggleClassFlag, importTimetable, customFlags, removeCustomFlag } = useStore();
   const items = useItemsWithLogs();
 
   const days = weekDays(today);
@@ -59,6 +58,8 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
   const [openModule, setOpenModule] = useState<string | null>(null);
   const [step, setStep] = useState(initialStep);
   const [paste, setPaste] = useState('');
+  /** Where a new flag is being made: on a class (its id), in the flag shelf, or nowhere. */
+  const [making, setMaking] = useState<string | null>(null);
 
   const preview = useMemo(() => (paste.trim() ? parseTimetable(paste) : null), [paste]);
   const classesToday = classesOn(items, selected);
@@ -203,12 +204,47 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
             onPress={() => router.push(`/plan?day=${selected}`)}
           />
 
+          {/* The flag shelf: the three built in, and any of your own. */}
+          <Card gap={3}>
+            <Stack direction="row" align="center" justify="between">
+              <Text variant="micro" tone="subtle">FLAGS · WHY A CLASS MATTERS</Text>
+              {making === 'shelf' ? null : (
+                <Chip label="＋ New flag" tone="selected" onPress={() => { tapFeedback(); setMaking('shelf'); }} />
+              )}
+            </Stack>
+            <Stack direction="row" gap={2} wrap>
+              {BUILT_IN_FLAGS.map((flag) => (
+                <Chip key={flag} label={`${FLAG_EMOJI[flag]} ${FLAG_LABEL[flag]}`} readOnly />
+              ))}
+              {customFlags.map((flag) => (
+                <Chip
+                  key={flag.id}
+                  label={`${flag.emoji} ${flag.label}${flag.protect ? ' 🔒' : ''}  ✕`}
+                  tone={flag.protect ? 'heavy' : 'plain'}
+                  accessibilityHint="Deletes this flag from every class"
+                  onPress={() => { tapFeedback(); removeCustomFlag(flag.id); }}
+                />
+              ))}
+            </Stack>
+            {making === 'shelf' ? (
+              <FlagMaker onMade={() => setMaking(null)} onCancel={() => setMaking(null)} />
+            ) : customFlags.length ? (
+              <Text variant="micro" tone="subtle">Tap one of yours to delete it. 🔒 protects the class.</Text>
+            ) : (
+              <Text variant="micro" tone="subtle">Make your own: “Lab sign-off”, “Groups picked”, “Bring laptop”.</Text>
+            )}
+          </Card>
+
           <Card gap={4}>
             {classesToday.length ? (
               classesToday.map((session) => (
                 <ClassRow
                   key={session.id}
                   session={session}
+                  customFlags={customFlags}
+                  making={making === session.id}
+                  onMake={() => { tapFeedback(); setMaking(making === session.id ? null : session.id); }}
+                  onMade={(id) => { toggleClassFlag(session.id, id); setMaking(null); }}
                   onToggleFlag={(flag) => { tapFeedback(); toggleClassFlag(session.id, flag); }}
                   onCapture={() => router.push(`/add?date=${session.date}`)}
                 />
@@ -226,83 +262,20 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
 
         {/* Modules: dread once, priced everywhere. */}
         {step === 1 ? (
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">YOUR MODULES</Text>
-          {modules.map((module) => {
-            const week = moduleWeek(items, module.id, days);
-            const status = attendanceStatus(module);
-            const open = openModule === module.id;
-            return (
-              <Card key={module.id} gap={4} tone={status === 'below' ? 'heavy' : 'plain'}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: open }}
-                  accessibilityLabel={`${module.name}, ${week.hours} hours this week, dread ${module.dread}`}
-                  onPress={() => { tapFeedback(); setOpenModule(open ? null : module.id); }}
-                  className="active:opacity-70"
-                >
-                  <Stack direction="row" gap={4} align="center">
-                    <Stack gap={1} grow>
-                      <Text variant="body" weight="semibold">{module.name}</Text>
-                      <Text variant="micro" tone="subtle">
-                        {module.code} · {week.hours}h · {week.load} load
-                        {module.requiredAttendance !== null ? ` · ${attendanceRate(module)}% attended` : ''}
-                      </Text>
-                    </Stack>
-                    <Chip
-                      label={`Dread ${module.dread}`}
-                      tone={module.dread >= 4 ? 'heavy' : module.dread >= 3 ? 'busy' : 'steady'}
-                      readOnly
-                    />
-                  </Stack>
-                </Pressable>
-
-                {status === 'close' ? (
-                  <Text variant="micro" tone="busy">
-                    One more absence takes you under {module.requiredAttendance}%.
-                  </Text>
-                ) : status === 'below' ? (
-                  <Text variant="micro" tone="heavy">
-                    Below the {module.requiredAttendance}% the department expects.
-                  </Text>
-                ) : null}
-
-                {open ? (
-                  <Stack gap={4}>
-                    <Stack gap={2}>
-                      <Text variant="micro" tone="subtle">HOW MUCH YOU DREAD IT · re-prices every class</Text>
-                      <DreadPicker value={module.dread} onChange={(next) => setModuleDread(module.id, next)} />
-                    </Stack>
-                    <Stack gap={2}>
-                      <Text variant="micro" tone="subtle">HOW MUCH IT MATTERS</Text>
-                      <Stack direction="row" gap={2} wrap>
-                        {([1, 2, 3] as const).map((level) => (
-                          <Chip
-                            key={level}
-                            label={level === 1 ? 'Background' : level === 2 ? 'Normal' : 'Really matters'}
-                            tone={module.importance === level ? 'selected' : 'plain'}
-                            onPress={() => setModuleImportance(module.id, level)}
-                          />
-                        ))}
-                      </Stack>
-                    </Stack>
-                    {module.requiredAttendance !== null ? (
-                      <Stack gap={2}>
-                        <Text variant="micro" tone="subtle">
-                          ATTENDANCE · {module.attended} of {module.held}
-                        </Text>
-                        <Stack direction="row" gap={2} wrap>
-                          <Chip label="Went" tone="steady" onPress={() => { markAttendance(module.id, true); successFeedback(); }} />
-                          <Chip label="Missed it" tone="heavy" onPress={() => { markAttendance(module.id, false); successFeedback(); }} />
-                        </Stack>
-                      </Stack>
-                    ) : null}
-                  </Stack>
-                ) : null}
-              </Card>
-            );
-          })}
-        </Stack>
+          <Stack gap={4}>
+            <Text variant="micro" tone="subtle">YOUR MODULES · {modules.length}</Text>
+            {modules.map((module) => (
+              <ModuleCard
+                key={module.id}
+                module={module}
+                items={items}
+                days={days}
+                open={openModule === module.id}
+                onToggle={() => { tapFeedback(); setOpenModule(openModule === module.id ? null : module.id); }}
+                onJump={(date) => { setSelected(date); setStep(0); }}
+              />
+            ))}
+          </Stack>
         ) : null}
 
 
@@ -312,17 +285,26 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
   );
 }
 
-/** One class, with the three reasons it might matter more than its length. */
+/** One class, with every reason it might matter more than its length. */
 function ClassRow({
   session,
+  customFlags,
+  making,
+  onMake,
+  onMade,
   onToggleFlag,
   onCapture,
 }: {
   session: Item;
-  onToggleFlag: (flag: ClassFlag) => void;
+  customFlags: CustomFlag[];
+  making: boolean;
+  onMake: () => void;
+  onMade: (id: string) => void;
+  onToggleFlag: (flag: FlagId) => void;
   onCapture: () => void;
 }) {
   const flags = session.flags ?? [];
+  const all: FlagId[] = [...BUILT_IN_FLAGS, ...customFlags.map((flag) => flag.id)];
   return (
     <Stack gap={3} className="rounded-md border border-line-hairline px-4 py-4">
       <Stack direction="row" gap={4} align="start" justify="between">
@@ -341,16 +323,25 @@ function ClassRow({
       </Stack>
 
       <Stack direction="row" gap={2} wrap>
-        {FLAGS.map((flag) => (
-          <Chip
-            key={flag}
-            label={flags.includes(flag) ? FLAG_LABEL[flag] : FLAG_SHORT[flag]}
-            tone={flags.includes(flag) ? 'heavy' : 'plain'}
-            onPress={() => onToggleFlag(flag)}
-            accessibilityHint={flags.includes(flag) ? 'Marked. Tap to clear.' : FLAG_LABEL[flag]}
-          />
-        ))}
+        {all.map((flag) => {
+          const info = flagInfo(flag, customFlags);
+          if (!info) return null;
+          const on = flags.includes(flag);
+          const builtIn = (BUILT_IN_FLAGS as string[]).includes(flag);
+          return (
+            <Chip
+              key={flag}
+              label={`${info.emoji} ${builtIn && on ? FLAG_LABEL[flag as keyof typeof FLAG_LABEL] : info.short}`}
+              tone={on ? (info.protect ? 'heavy' : 'selected') : 'plain'}
+              onPress={() => onToggleFlag(flag)}
+              accessibilityHint={on ? 'Marked. Tap to clear.' : info.label}
+            />
+          );
+        })}
+        <Chip label={making ? 'Close' : '＋'} tone={making ? 'selected' : 'plain'} accessibilityHint="Make a flag of your own" onPress={onMake} />
       </Stack>
+
+      {making ? <FlagMaker onMade={onMade} onCancel={onMake} /> : null}
 
       {/* Work gets announced in class, which is the moment to capture it. */}
       {flags.includes('coursework') ? (

@@ -19,6 +19,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
+import type { Writer } from '../src/routes/compose.js';
 import { makeAuth } from '../src/lib/auth.js';
 import * as schema from '../src/db/schema.js';
 import type { Database } from '../src/db/client.js';
@@ -26,6 +27,8 @@ import type { Database } from '../src/db/client.js';
 process.env.NODE_ENV = 'test';
 process.env.AUTH_SECRET = 'test-secret-at-least-32-characters-long!!';
 process.env.BASE_URL = 'http://localhost';
+// The default app must not reach a real model from a test run, whatever the shell has set.
+delete process.env.ANTHROPIC_API_KEY;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -303,6 +306,63 @@ section('Publishing a calendar');
   await post('/api/sharing/publish', { visibility: 'evenings', windows }, ravi.cookie);
   check('turning it back on republishes',
     ((await (await call('/api/circle', {}, amira.cookie)).json()) as { circle: Array<{ free: unknown[] }> }).circle[0].free.length, 2);
+
+  // Hidden from one person: they see no times, and the windows still exist for everyone else.
+  const freeFor = async (cookie: string) =>
+    ((await (await call('/api/circle', {}, cookie)).json()) as { circle: Array<{ free: unknown[] }> }).circle[0].free.length;
+  await post('/api/sharing/publish', { visibility: 'busy', windows, hiddenFrom: [amira.id] }, ravi.cookie);
+  check('a friend you hide from sees no times', await freeFor(amira.cookie), 0);
+  check('while the windows themselves are still published', (await db.select().from(schema.freeWindows)).length, 3);
+  await post('/api/sharing/publish', { visibility: 'busy', windows }, ravi.cookie);
+  check('an older client sending no list does not unhide anyone', await freeFor(amira.cookie), 0);
+  await post('/api/sharing/publish', { visibility: 'busy', windows, hiddenFrom: [] }, ravi.cookie);
+  check('an empty list shows them again', await freeFor(amira.cookie), 3);
+  await post('/api/sharing/publish', { visibility: 'evenings', windows, hiddenFrom: [] }, ravi.cookie);
+}
+
+section('Writing a message');
+{
+  const context = { kind: 'decline', subject: "Aisyah's birthday dinner", to: 'Aisyah', when: 'Thu 20 Nov', commitment: 'soft', dread: 3 };
+  const unconfigured = await post('/api/compose/ideas', { context }, amira.cookie);
+  check('with no key configured it says so, not 500', unconfigured.status, 503);
+  check('in words the app can act on', ((await unconfigured.json()) as { error: string }).error, 'ai_not_configured');
+
+  const seen: unknown[] = [];
+  const fake: Writer = {
+    ideas: async (ctx) => { seen.push(ctx); return [{ id: 'ai-0', title: 'Say no, kindly', emoji: '💛', detail: 'Keeps the friendship' }]; },
+    draft: async (req) => `${req.intent.title} · ${req.tone} · ${req.length}`,
+  };
+  const withWriter = createApp(db, auth, fake);
+  const ask = (path: string, body: unknown, cookie?: string) =>
+    withWriter.request(`http://localhost${path}`, {
+      method: 'POST', body: JSON.stringify(body),
+      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    });
+
+  check('signed-out cannot spend anybody\'s model calls', (await ask('/api/compose/ideas', { context })).status, 401);
+
+  const ideas = await ask('/api/compose/ideas', { context }, amira.cookie);
+  check('ideas come back for a signed-in student', ideas.status, 200);
+  check('as cards with a title and an emoji',
+    ((await ideas.json()) as { ideas: Array<{ title: string; emoji: string }> }).ideas[0], { id: 'ai-0', title: 'Say no, kindly', emoji: '💛', detail: 'Keeps the friendship' });
+  check('the writer sees only the fields the contract allows',
+    Object.keys(seen[0] as object).sort(), ['commitment', 'dread', 'kind', 'subject', 'to', 'when']);
+
+  const extra = await ask('/api/compose/ideas', { context: { ...context, tasks: ['OS coursework'] } }, amira.cookie);
+  check('anything else sent along is dropped before the model', Object.keys(seen[1] as object).includes('tasks'), false);
+  check('and the request still works', extra.status, 200);
+
+  const draft = await ask('/api/compose/draft', { context, intent: { title: 'Say no, kindly' }, tone: 'warm' }, amira.cookie);
+  check('a draft comes back in the tone asked for', ((await draft.json()) as { message: string }).message, 'Say no, kindly · warm · medium');
+
+  check('an unknown tone is refused', (await ask('/api/compose/draft', { context, intent: { title: 'x' }, tone: 'sarcastic' }, amira.cookie)).status, 400);
+  check('so is a context with no subject', (await ask('/api/compose/ideas', { context: { ...context, subject: '' } }, amira.cookie)).status, 400);
+
+  // Thirty per ten minutes, per person. Jo has made none yet.
+  let last = 0;
+  for (let i = 0; i < 31; i += 1) last = (await ask('/api/compose/ideas', { context }, jo.cookie)).status;
+  check('the thirty-first call in ten minutes is slowed down', last, 429);
+  check('without affecting anyone else', (await ask('/api/compose/ideas', { context }, ravi.cookie)).status, 200);
 }
 
 section('Gatherings');
@@ -372,7 +432,7 @@ section('The deployment routes every path to the function');
     '/', '/health',
     '/api/auth/sign-up/email', '/api/auth/sign-in/anonymous', '/api/auth/sign-out',
     '/api/me', '/api/sync', '/api/circle', '/api/circle/request',
-    '/api/sharing/presence', '/api/invites',
+    '/api/sharing/presence', '/api/invites', '/api/compose/ideas', '/api/compose/draft',
   ]) {
     check(`${path} reaches the function`, reaches(path), true);
   }

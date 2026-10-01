@@ -1,21 +1,20 @@
-import { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  AreaIcon, Button, Card, Chip, DreadPicker, PageHeader, Screen, Stack, Sticker, Text,
+  AreaIcon, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { BUCKET_LABEL, COMMITMENT_LABEL, describeMix, loadOf } from '@/lib/load';
-import { daysLeft, isAtRisk, needsPrep, percentUndone, remaining, scheduledHours, sittingsOf, unplanned } from '@/lib/prep';
+import { needsPrep, remaining, sittingsOf } from '@/lib/prep';
 import { formatHour, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
-import { successFeedback, tapFeedback } from '@/lib/haptics';
+import { successFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
-import { planSessions, unplaced } from '@/lib/prep';
-import { isProtectedClass, FLAG_LABEL } from '@/lib/timetable';
-
-const UNBOOKED = [0.5, 1, 2];
+import { flagInfo, isProtectedClass } from '@/lib/timetable';
+import { LogTime, OwingSummary } from '@/features/item/Owing';
+import { Sittings } from '@/features/item/Sittings';
+import { DreadCard } from '@/features/item/Dread';
 
 /**
  * Two real items, so `/item/...` renders in the static export rather than the
@@ -40,12 +39,8 @@ export async function generateStaticParams() {
 export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const {
-    today, setDread, scheduleItem, scheduleSessions, completeSitting, logUnbookedHours,
-    unscheduleSession, setSessionNote, pushSittings, moveItem,
-  } = useStore();
+  const { today, scheduleItem, moveItem, customFlags } = useStore();
   const items = useItemsWithLogs();
-  const [note, setNote] = useState('');
 
   const item = items.find((candidate) => candidate.id === id);
   if (!item) {
@@ -59,10 +54,10 @@ export default function ItemDetail() {
   }
 
   const owing = needsPrep(item);
-  const sittings = sittingsOf(item, items);
+  /** Work that had preparation and has none left. Worth saying so, once. */
+  const finished = !!item.prepHours && remaining(item) === 0;
+  const ticked = sittingsOf(item, items).filter((s) => s.sessionDone).length;
   const slots = startOptions(items, item.date, item.hours);
-  const plan = planSessions(item, items, today);
-  const risk = owing && isAtRisk(item, items, today);
   const locked = isProtectedClass(item) || item.commitment === 'hard';
 
   return (
@@ -73,9 +68,9 @@ export default function ItemDetail() {
     >
       <Stack gap={5} className="pt-2">
         <PageHeader
-          sticker={owing ? 'assignment' : item.isRecovery ? 'leaf' : item.moduleId ? 'class' : 'basket'}
+          sticker={owing || finished ? 'assignment' : item.isRecovery ? 'leaf' : item.moduleId ? 'class' : 'basket'}
           wash={color.area[item.bucket].wash}
-          eyebrow={owing ? `Due ${formatShort(item.deadline ?? item.date)}` : formatShort(item.date)}
+          eyebrow={owing || finished ? `Due ${formatShort(item.deadline ?? item.date)}` : formatShort(item.date)}
           title={item.title}
           sub={describeMix(item.mix, item.bucket)}
           wiggle={false}
@@ -93,13 +88,16 @@ export default function ItemDetail() {
             {item.room ? <Chip label={item.room} readOnly /> : null}
             {item.startHour !== undefined ? (
               <Chip label={`${formatHour(item.startHour)}–${formatHour(item.startHour + item.hours)}`} readOnly />
-            ) : (
+            ) : finished ? null : (
               <Chip label="No time yet" tone="busy" readOnly />
             )}
           </Stack>
           {item.flags?.length ? (
             <Stack direction="row" gap={2} wrap>
-              {item.flags.map((flag) => <Chip key={flag} label={FLAG_LABEL[flag]} tone="heavy" readOnly />)}
+              {item.flags.map((flag) => {
+                const info = flagInfo(flag, customFlags);
+                return info ? <Chip key={flag} label={`${info.emoji} ${info.label}`} tone={info.protect ? 'heavy' : 'plain'} readOnly /> : null;
+              })}
             </Stack>
           ) : null}
           {locked ? (
@@ -112,82 +110,31 @@ export default function ItemDetail() {
           ) : null}
         </Card>
 
-        {/* Owing work: the bar, the sittings, and the planner. */}
+        {/* Owing work: where it stands, when it happens, and what you did off-plan. */}
         {owing ? (
-          <Card tone={risk ? 'heavy' : 'plain'} gap={4}>
-            <Stack direction="row" justify="between" align="center">
-              <Text variant="heading">{remaining(item)}h still to do</Text>
-              <Text variant="heading" tone={risk ? 'heavy' : 'busy'}>{100 - percentUndone(item)}%</Text>
-            </Stack>
-            <View className="h-4 w-full flex-row overflow-hidden rounded-pill bg-track">
-              <View style={{ flexGrow: (item.prepDone ?? 0) || 0.0001, backgroundColor: color.band.steady.fill }} />
-              <View style={{ flexGrow: scheduledHours(item, items) || 0.0001, backgroundColor: color.band.recovery.fill }} />
-              <View style={{ flexGrow: unplanned(item, items) || 0.0001, backgroundColor: color.surface.track }} />
-            </View>
-            <Text variant="footnote" tone="muted">
-              {item.prepDone ?? 0}h done · {scheduledHours(item, items)}h booked · {unplanned(item, items)}h loose
-              {' · '}{daysLeft(item, today)} day{daysLeft(item, today) === 1 ? '' : 's'} left
-            </Text>
-            {risk ? (
-              <Text variant="footnote" tone="heavy">Not enough free time left. Something has to move.</Text>
-            ) : null}
+          <>
+            <OwingSummary item={item} items={items} today={today} />
+            <Sittings item={item} items={items} />
+            <LogTime item={item} />
+          </>
+        ) : null}
 
-            {plan.length ? (
-              <Button
-                label={`Book ${plan.length} sitting${plan.length === 1 ? '' : 's'} for me`}
-                onPress={() => { scheduleSessions(item.id, plan, { replace: true }); successFeedback(); }}
-              />
-            ) : null}
-            {plan.length && unplaced(item, plan) > 0 ? (
-              <Text variant="micro" tone="heavy">{unplaced(item, plan)}h will not fit before the deadline.</Text>
-            ) : null}
-
-            {sittings.length ? (
-              <Stack gap={3}>
-                <Text variant="micro" tone="subtle">
-                  YOUR SITTINGS · {sittings.filter((s) => s.sessionDone).length}/{sittings.length} DONE
+        {finished ? (
+          <Card tone="steady" gap={3}>
+            <Stack direction="row" gap={4} align="center">
+              <Sticker name="star" size={48} wiggle />
+              <Stack gap={1} grow>
+                <Text variant="heading" tone="steady">All {item.prepHours}h done</Text>
+                <Text variant="footnote" tone="muted">
+                  {ticked ? `${ticked} sitting${ticked === 1 ? '' : 's'} ticked off · ` : ''}Off every list.
                 </Text>
-                {sittings.map((session) => (
-                  <Stack key={session.id} gap={3} className={`rounded-md px-3 py-3 ${session.sessionDone ? 'bg-steady-wash' : 'bg-sunken'}`}>
-                    <Stack direction="row" gap={3} justify="between" align="center">
-                      <Text variant="footnote" weight="semibold" tone={session.sessionDone ? 'steady' : 'recovery'}>
-                        {formatShort(session.date)} · {formatHour(session.startHour ?? 0)}–{formatHour((session.startHour ?? 0) + session.hours)}
-                      </Text>
-                      <Text variant="micro" tone="subtle">{session.hours}h</Text>
-                    </Stack>
-                    {session.sessionDone ? (
-                      <Text variant="micro" tone="steady">Done — {session.hours}h went onto the bar.</Text>
-                    ) : (
-                      <Stack direction="row" gap={2} wrap>
-                        <Chip label={`Done · +${session.hours}h`} tone="steady" onPress={() => { completeSitting(session.id); successFeedback(); }} />
-                        <Chip label="Give it back" onPress={() => unscheduleSession(session.id)} />
-                      </Stack>
-                    )}
-                  </Stack>
-                ))}
-              </Stack>
-            ) : null}
-
-            <Stack gap={2}>
-              <Text variant="micro" tone="subtle">DID SOME WITHOUT BOOKING IT?</Text>
-              <Stack direction="row" gap={2} wrap>
-                {UNBOOKED.filter((hours) => hours <= remaining(item)).map((hours) => (
-                  <Chip
-                    key={hours}
-                    label={`+${hours < 1 ? `${hours * 60}m` : `${hours}h`}`}
-                    onPress={() => { logUnbookedHours(item.id, hours); successFeedback(); }}
-                  />
-                ))}
-                {sittings.some((s) => s.date === today && !s.sessionDone) ? (
-                  <Chip label="Push today to tomorrow" onPress={() => { pushSittings(item.id, today, addDays(today, 1)); successFeedback(); }} />
-                ) : null}
               </Stack>
             </Stack>
           </Card>
         ) : null}
 
         {/* Anything with a slot, or wanting one. */}
-        {!owing && !locked && !item.repeats ? (
+        {!owing && !finished && !locked && !item.repeats ? (
           <Card gap={4}>
             <Text variant="heading">{item.startHour === undefined ? 'Give it a time' : 'Move it'}</Text>
             {slots.length ? (
@@ -218,15 +165,7 @@ export default function ItemDetail() {
         ) : null}
 
         {/* How much you mind it — the one number only you can set. */}
-        {!item.isRecovery && !item.isLog ? (
-          <Card gap={4}>
-            <Stack gap={2}>
-              <Text variant="heading">How much are you dreading it?</Text>
-              <Text variant="footnote" tone="muted">Changing this re-prices the whole week.</Text>
-            </Stack>
-            <DreadPicker value={item.dread} onChange={(next) => { setDread(item.id, next); tapFeedback(); }} />
-          </Card>
-        ) : null}
+        {!item.isRecovery && !item.isLog ? <DreadCard item={item} items={items} /> : null}
 
         {!locked && item.commitment !== 'hard' && !item.repeats && !item.moduleId ? (
           <Button label="Write a message to get out of it" kind="secondary" onPress={() => router.push(`/decline/${item.id}`)} />

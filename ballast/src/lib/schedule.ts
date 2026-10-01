@@ -85,12 +85,12 @@ export function freeSlots(items: Item[], date: string, minHours = 0.5): Slot[] {
  * does not exist is worse than offering none, so nothing is listed unless the
  * gap is genuinely long enough.
  */
-export function startOptions(items: Item[], date: string, hours: number, max = 8): number[] {
+export function startOptions(items: Item[], date: string, hours: number, max = 8, step = 1): number[] {
   const need = Math.max(hours, 0.5);
   return freeSlots(items, date, need)
     .flatMap((slot) => {
       const out: number[] = [];
-      for (let h = Math.ceil(slot.start); h + need <= slot.end; h += 1) out.push(h);
+      for (let h = Math.ceil(slot.start / step) * step; h + need <= slot.end; h += step) out.push(h);
       return out;
     })
     .slice(0, max);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   Avatar, Button, Card, Chip, Screen, Stack, Sticker, Text,
 } from '@/components';
@@ -76,14 +76,19 @@ export default function FriendDay() {
       back="/friends"
       backLabel="Friends"
       footer={
-        best ? (
+        <>
+          {best ? (
+            <Button
+              label={`Ask about ${dayName(best.date)}`}
+              onPress={() => open(PLAN_MESSAGE(`${dayName(best.date)} from ${formatHour(best.start)}`, [person.name]))}
+            />
+          ) : null}
           <Button
-            label={`Ask about ${dayName(best.date)}`}
-            onPress={() => open(PLAN_MESSAGE(`${dayName(best.date)} from ${formatHour(best.start)}`, [person.name]))}
+            label="✨ Write them a message"
+            kind={best ? 'secondary' : 'primary'}
+            onPress={() => { tapFeedback(); router.push(`/message?kind=checkin&to=${person.id}` as Href); }}
           />
-        ) : (
-          <Button label="Send a message" onPress={() => open(CHECK_IN_MESSAGE(person.name))} />
-        )
+        </>
       }
     >
       <Stack gap={5} className="pt-2">

@@ -31,6 +31,9 @@ for (const [from, to] of [
   ['src/lib/rebalance.ts', 'rebalance.ts'],
   ['src/lib/forecast.ts', 'forecast.ts'],
   ['src/lib/prep.ts', 'prep.ts'],
+  ['src/lib/sittings.ts', 'sittings.ts'],
+  ['src/lib/compose.ts', 'compose.ts'],
+  ['src/lib/together.ts', 'together.ts'],
   ['src/lib/moments.ts', 'moments.ts'],
   ['src/lib/timetable.ts', 'timetable.ts'],
   ['src/lib/priority.ts', 'priority.ts'],
@@ -110,6 +113,11 @@ const { categorise, errandLoad, outstandingLoad, openErrands } = await import(jo
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
 const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, sittingsOf, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
+const { dayFacts, whyThisDay, describeChange, durationLabel, nearestStart, nowHourFor } = await import(join(tmp, 'sittings.ts'));
+const { offlineIdeas, offlineDraft, offlineTweak, recipientOf, whatIsSent, TONES } = await import(join(tmp, 'compose.ts'));
+const { heatmap, everyoneFree, fitsWindow } = await import(join(tmp, 'together.ts'));
+const { flagInfo } = await import(join(tmp, 'timetable.ts'));
+const { wireVisibility, DEFAULT_SHARE_RULES } = await import(join(tmp, 'sharing.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
 const { prioritise, rank, urgencyFactor } = await import(join(tmp, 'priority.ts'));
@@ -745,6 +753,188 @@ console.log('\nPlanning the sittings');
   check('and the deadline has not moved', s().items.find((i) => i.id === 'algo-set').deadline, due);
 }
 
+console.log('\nSittings land in hours you would actually work');
+{
+  s().reset();
+  const algo = s().items.find((i) => i.id === 'algo-set');
+  const plan = planSessions(algo, s().items, s().today);
+  // The first-gap planner put both of these at 7am, and gave Tuesday one hour
+  // because 7 to 8 came before a free evening.
+  check('nothing starts before 9am', plan.every((p) => p.startHour >= 9), true);
+  check('nothing runs past 9pm', plan.every((p) => p.startHour + p.hours <= 21), true);
+  check('the lightest day gets a full two hours', plan.find((p) => p.date === addDaysISO(s().today, 1)).hours, 2);
+  check('and it all fits', plan.reduce((t, p) => t + p.hours, 0), 3);
+  check('listed in date order', plan.map((p) => p.date), [...plan.map((p) => p.date)].sort());
+
+  // Due tomorrow, three hours left: one pass placed two and gave up on the third.
+  const tight = { ...algo, date: addDaysISO(s().today, 1), deadline: addDaysISO(s().today, 1) };
+  const squeezed = planSessions(tight, s().items, s().today);
+  check('a second pass fits what the first could not', squeezed.reduce((t, p) => t + p.hours, 0), 3);
+  check('without two sittings overlapping', squeezed.every((a, i) => squeezed.every((b, j) => i === j || a.date !== b.date || a.startHour + a.hours <= b.startHour || b.startHour + b.hours <= a.startHour)), true);
+
+  // Late in the day, the morning is gone.
+  const late = planSessions(tight, s().items, s().today, 20);
+  check('nothing is planned in hours already past', late.filter((p) => p.date === s().today).every((p) => p.startHour >= 20), true);
+  check('a day that is not today has no "now"', nowHourFor('2025-11-10', new Date('2026-01-01T12:00:00Z')), undefined);
+}
+
+console.log('\nEvery suggestion says why, every change says what it cost');
+{
+  s().reset();
+  const algo = s().items.find((i) => i.id === 'algo-set');
+  const plan = planSessions(algo, s().items, s().today);
+  const facts = dayFacts(algo, s().items, s().today, plan);
+  const tue = facts.find((f) => f.date === addDaysISO(s().today, 1));
+  check('Tuesday is the lightest day', whyThisDay(tue)[0], 'Lightest day');
+  check('and the reason carries its numbers', whyThisDay(tue).slice(1), ['19 load', '9.8h booked']);
+  check('the due day is never "lightest"', whyThisDay(facts.find((f) => f.isDue))[0], 'Due day');
+  check('a plan adds load to the days it uses', tue.adding > 0, true);
+  check('and nothing to the days it does not', facts.filter((f) => !plan.some((p) => p.date === f.date)).every((f) => f.adding === 0), true);
+
+  const moved = describeChange(algo, s().items, plan[0], { ...plan[0], date: addDaysISO(s().today, 2), hours: 1.5 });
+  check('moving to a heavier day says by how much', moved.find((c) => c.key === 'day').note, '+14 load heavier');
+  check('and reads as a cost', moved.find((c) => c.key === 'day').tone, 'heavy');
+  check('trimming says what goes back to loose', moved.find((c) => c.key === 'length').note, '30m back to loose');
+  check('the due day is called out', describeChange(algo, s().items, plan[0], { ...plan[0], date: algo.deadline }).find((c) => c.key === 'day').note, 'Due day · no buffer');
+  check('no change, nothing listed', describeChange(algo, s().items, plan[0], { ...plan[0] }).length, 0);
+
+  check('durations read exactly', [0, 0.5, 1, 1.5, 2].map(durationLabel), ['0h', '30m', '1h', '1h 30m', '2h']);
+  check('a drag snaps to the nearest start that fits', nearestStart([9, 9.5, 14, 19], 15.8), 14);
+  check('and a day with none offers none', nearestStart([], 12), undefined);
+}
+
+console.log('\nBooked sittings can move, and re-planning keeps what is done');
+{
+  s().reset();
+  const sitting = () => s().items.find((i) => i.parentId === 'algo-set' && !i.sessionDone);
+  s().scheduleSessions('algo-set', [{ date: s().today, startHour: 8, hours: 1 }, { date: addDaysISO(s().today, 1), startHour: 19, hours: 2 }]);
+  const first = sittingsOf(s().items.find((i) => i.id === 'algo-set'), s().items)[0];
+  s().completeSitting(first.id);
+  s().scheduleSessions('algo-set', [{ date: addDaysISO(s().today, 2), startHour: 14, hours: 1 }], { replace: true });
+  check('re-planning keeps the sitting already done', s().items.some((i) => i.id === first.id && i.sessionDone), true);
+  check('and replaces the ones still ahead', s().items.filter((i) => i.parentId === 'algo-set' && !i.sessionDone).length, 1);
+
+  const id = sitting().id;
+  s().updateSession(id, { date: addDaysISO(s().today, 1), startHour: 19, hours: 1.5 });
+  check('a sitting moves to another day', sitting().date, addDaysISO(s().today, 1));
+  check('at the new time', sitting().startHour, 19);
+  check('for the new length', sitting().hours, 1.5);
+  check('and stays the same sitting', sitting().id, id);
+  s().updateSession(first.id, { date: addDaysISO(s().today, 3) });
+  check('a done sitting stays where it happened', s().items.find((i) => i.id === first.id).date, s().today);
+
+  s().setDread('algo-set', 5);
+  check('dread re-prices the sittings still ahead', sitting().dread, 5);
+  check('but not the one already done', s().items.find((i) => i.id === first.id).dread, 3);
+}
+
+console.log('\nWriting a message, without a server');
+{
+  const coursework = { kind: 'decline', subject: 'Algorithms problem set', to: 'my lecturer', commitment: 'soft', dread: 3 };
+  const dinner = { kind: 'decline', subject: "Aisyah's birthday dinner", to: 'Aisyah', commitment: 'soft', dread: 3, when: 'Thu 20 Nov, 7pm' };
+  check('coursework offers an extension first', offlineIdeas(coursework)[0].id, 'extension');
+  check('a dinner never offers an extension', offlineIdeas(dinner).some((i) => i.id === 'extension'), false);
+  check('a dinner offers coming for part of it', offlineIdeas(dinner).some((i) => i.id === 'part'), true);
+  check('never more than five ideas', [coursework, dinner].every((c) => offlineIdeas(c).length <= 5), true);
+  check('check-ins and invites have their own ideas', [offlineIdeas({ ...dinner, kind: 'checkin' })[0].id, offlineIdeas({ ...dinner, kind: 'invite' })[0].id], ['thinking', 'propose']);
+  check('the recipient comes from the title', recipientOf("Aisyah's birthday dinner"), 'Aisyah');
+  check('and is not guessed when there is none', recipientOf('Algorithms problem set'), null);
+
+  // Every intent, every tone, every length: no invented excuses, ever.
+  const all = [];
+  for (const context of [coursework, dinner, { ...dinner, kind: 'checkin' }, { ...dinner, kind: 'invite' }]) {
+    for (const idea of offlineIdeas(context)) {
+      for (const tone of TONES) {
+        for (const length of ['short', 'medium', 'long']) all.push(offlineDraft(context, idea, tone.id, length));
+      }
+    }
+  }
+  check('no draft invents an illness or an emergency', all.filter((text) => /\b(sick|ill|unwell|emergency|hospital|funeral|flu)\b/i.test(text)).length, 0);
+  check('every draft is addressed to someone', all.every((text) => /^(Hey|Hi|Heyyy)/.test(text)), true);
+  const idea = offlineIdeas(dinner)[0];
+  check('short is shorter than detailed', offlineDraft(dinner, idea, 'warm', 'short').length < offlineDraft(dinner, idea, 'warm', 'long').length, true);
+  const long = offlineDraft(dinner, idea, 'warm', 'long');
+  check('"shorter" makes it shorter', offlineTweak(long, 'shorter', dinner, idea, 'warm', 'long', 0).length < long.length, true);
+  check('"offer a new date" offers one', /next week/i.test(offlineTweak(offlineDraft(dinner, { id: 'overloaded', title: 'x' }, 'brief', 'short'), 'date', dinner, idea, 'brief', 'short', 0)), true);
+  check('"another version" is a different message', offlineTweak(long, 'again', dinner, idea, 'warm', 'long', 0) !== long, true);
+  check('words of your own still make a message', offlineDraft(dinner, { title: 'Ask to join on a video call' }, 'warm', 'medium').includes('video call'), true);
+  check('the "what Claude sees" list shows only what is sent', whatIsSent({ kind: 'checkin', subject: 'Checking in on Jo', to: 'Jo' }).map(([k]) => k), ['About', 'To']);
+}
+
+console.log('\nSharing your own hours, and hiding from someone');
+{
+  s().reset();
+  const rules = { ...DEFAULT_SHARE_RULES, week: [null, null, null, null, null, { start: 12, end: 18 }, null] };
+  const sat = addDaysISO(s().today, 5);
+  const shown = published(s().items, sat, 'custom', 1, rules);
+  check('custom shares inside the hours chosen', shown.every((w) => w.start >= 12 && w.end <= 18), true);
+  check('and something on the day it allows', shown.length > 0, true);
+  check('a day switched off shares nothing', published(s().items, s().today, 'custom', 1, rules), []);
+  check('custom reaches the server as free/busy', wireVisibility('custom'), 'busy');
+  check('the presets go as they are', ['off', 'evenings', 'busy'].map(wireVisibility), ['off', 'evenings', 'busy']);
+  const tight = published(s().items, sat, 'custom', 1, { ...rules, minHours: 3 });
+  check('a longer minimum drops the short windows', tight.every((w) => w.end - w.start >= 3), true);
+
+  s().setSharing('custom');
+  s().setShareDay(6, null);
+  check('a day can be switched off', s().shareRules.week[6], null);
+  s().toggleHiddenFrom('jo');
+  check('hiding someone lists them', s().shareRules.hiddenFrom, ['jo']);
+  s().toggleHiddenFrom('jo');
+  check('and tapping again shows them again', s().shareRules.hiddenFrom, []);
+}
+
+console.log('\nFlags of your own');
+{
+  s().reset();
+  const lecture = s().items.find((i) => i.moduleId && !(i.flags ?? []).length);
+  const lock = s().addCustomFlag({ label: 'Lab sign-off', emoji: '🧪', protect: true });
+  const note = s().addCustomFlag({ label: 'Bring laptop', emoji: '💻', protect: false });
+  check('a protecting flag says so in its id', lock.startsWith('lock-'), true);
+  check('a note does not', note.startsWith('note-'), true);
+  s().toggleClassFlag(lecture.id, note);
+  check('a note never protects a class', isProtectedClass(s().items.find((i) => i.id === lecture.id)), false);
+  s().toggleClassFlag(lecture.id, lock);
+  check('a protecting flag does', isProtectedClass(s().items.find((i) => i.id === lecture.id)), true);
+  check('a flag of your own has a name and a picture', flagInfo(lock, s().customFlags), { label: 'Lab sign-off', short: 'Lab sign-off', emoji: '🧪', protect: true });
+  check('built-in flags still read as before', flagInfo('tips').label, 'Gives exam tips');
+  s().removeCustomFlag(lock);
+  check('deleting a flag takes it off every class', s().items.some((i) => (i.flags ?? []).includes(lock)), false);
+  check('and the class is movable again', isProtectedClass(s().items.find((i) => i.id === lecture.id)), false);
+  check('a deleted flag reads as nothing', flagInfo(lock, s().customFlags), null);
+}
+
+console.log('\nGroups, and finding a time');
+{
+  s().reset();
+  const id = s().createGroup({ name: '  Badminton  ', emoji: '🏸', members: ['amin', 'amin', 'jo'] });
+  const group = () => s().groups.find((g) => g.id === id);
+  check('a group is made with a tidy name', group().name, 'Badminton');
+  check('and nobody in it twice', group().members, ['amin', 'jo']);
+  s().toggleGroupMember(id, 'ravi');
+  check('a friend can be added', group().members.includes('ravi'), true);
+  s().toggleGroupMember(id, 'jo');
+  check('and taken off', group().members.includes('jo'), false);
+
+  const people = s().circle.filter((p) => ['amin', 'ravi'].includes(p.id));
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(s().today, i));
+  const windows = everyoneFree(s().items, people, days, 2);
+  check('the first evening that works for all three', windows[0], { date: addDaysISO(s().today, 2), start: 18, end: 22 });
+  check('no window is shorter than the plan', windows.every((w) => w.end - w.start >= 2), true);
+  check('a plan inside a window fits', fitsWindow(windows, windows[0].date, 19, 2), true);
+  check('one running past it does not', fitsWindow(windows, windows[0].date, 21, 2), false);
+  const grid = heatmap(s().items, people, days);
+  const wed7pm = grid[2].find((c) => c.hour === 19);
+  check('the heatmap counts you as one of them', wed7pm.of, 3);
+  check('and knows who is free', wed7pm.who, ['You', 'Amin', 'Ravi']);
+  check('silence is not availability', everyoneFree(s().items, [...people, { id: 'x', name: 'X', free: [] }], days, 2), []);
+
+  s().sendInvite({ title: 'Dinner · Badminton', date: windows[0].date, startHour: 18, hours: 2, people: ['amin', 'ravi'], groupId: id });
+  check('an invite remembers its group', s().invites[0].groupId, id);
+  s().deleteGroup(id);
+  check('a group can be deleted', s().groups.some((g) => g.id === id), false);
+}
+
 console.log('\nTonight, as three kinds of night');
 {
   s().reset();
@@ -1232,7 +1422,7 @@ console.log('\nWhat leaves your phone');
   const today = s().today;
   const mine = s().items;
 
-  check('three levels, no more', VISIBILITY.map((v) => v.value), ['off', 'evenings', 'busy']);
+  check('three presets, and your own hours', VISIBILITY.map((v) => v.value), ['off', 'evenings', 'busy', 'custom']);
   check('evenings by default', s().sharing, 'evenings');
 
   // Off is genuinely off. Not "off but still discoverable".

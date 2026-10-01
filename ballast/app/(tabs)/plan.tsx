@@ -29,7 +29,7 @@ import { WEEK_NUMBER } from '@/data/seed';
  */
 export default function Plan() {
   const router = useRouter();
-  const { ceilings, today } = useStore();
+  const { ceilings, today, customFlags } = useStore();
   const items = useItemsWithLogs();
 
   // Arriving from Home's week strip opens straight onto that day.
@@ -111,6 +111,7 @@ export default function Plan() {
             <DayTimeline
               items={items}
               date={selected}
+              customFlags={customFlags}
               onSelect={(item) => router.push(`/item/${item.id}`)}
               onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
               todoMeta={owingMeta}

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import {
   Avatar, Battery, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
+import { groupWash } from '@/features/social/groupArt';
 import { BAND_WORD, circleOrder, isStale, lastSeen, updatedToday, worthANudge } from '@/lib/circle';
 import { chargeOf } from '@/lib/battery';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
@@ -40,7 +41,7 @@ const RING: Record<BandName, string> = {
  */
 export default function Friends() {
   const router = useRouter();
-  const { circle, phoneContacts, sharing, markContacted, logMoment } = useStore();
+  const { circle, phoneContacts, sharing, markContacted, logMoment, groups } = useStore();
   const reading = useReading();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -127,14 +128,73 @@ export default function Friends() {
                 Opened in WhatsApp.
               </Text>
             ) : (
-              <Button
-                label={`Send "thinking of you"`}
-                kind="secondary"
-                onPress={() => send(nudge.person)}
-              />
+              <Stack direction="row" gap={2}>
+                <Button
+                  label={`Send "thinking of you"`}
+                  kind="secondary"
+                  className="flex-1"
+                  onPress={() => send(nudge.person)}
+                />
+                <Button
+                  label="✨"
+                  kind="secondary"
+                  accessibilityLabel={`Write ${nudge.person.name} a message`}
+                  onPress={() => { tapFeedback(); router.push(`/message?kind=checkin&to=${nudge.person.id}` as Href); }}
+                />
+              </Stack>
             )}
           </Card>
         ) : null}
+
+        {/* Groups, as a row of bubbles: the people you plan with most, one tap away. */}
+        <Stack gap={3}>
+          <Stack direction="row" align="center" justify="between">
+            <Text variant="micro" tone="subtle">GROUPS · {groups.length}</Text>
+            <Text variant="micro" tone="subtle">Tap one to find a time</Text>
+          </Stack>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: 8 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="New group"
+              onPress={() => { tapFeedback(); router.push('/group/new' as Href); }}
+              className="items-center gap-2 active:opacity-60"
+              style={{ width: 76 }}
+            >
+              <View className="items-center justify-center rounded-pill border-2 border-dashed border-line-strong" style={{ width: 68, height: 68 }}>
+                <Text variant="title" tone="subtle">＋</Text>
+              </View>
+              <Text variant="micro" tone="subtle">New group</Text>
+            </Pressable>
+            {groups.map((group) => {
+              const members = circle.filter((person) => group.members.includes(person.id));
+              return (
+                <Pressable
+                  key={group.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${group.name}, ${members.length + 1} people`}
+                  onPress={() => { tapFeedback(); router.push(`/group/${group.id}` as Href); }}
+                  className="items-center gap-2 active:opacity-60"
+                  style={{ width: 76 }}
+                >
+                  {/* A ring like a story bubble, so a group reads as a place you can open. */}
+                  <View className="items-center justify-center rounded-pill" style={{ width: 68, height: 68, borderWidth: 3, borderColor: color.decor.blush, padding: 3 }}>
+                    <View className="h-full w-full items-center justify-center rounded-pill" style={{ backgroundColor: groupWash(group.id) }}>
+                      <Text variant="title">{group.emoji}</Text>
+                    </View>
+                  </View>
+                  <Text variant="micro" weight="semibold" numberOfLines={1}>{group.name}</Text>
+                  <Stack direction="row" style={{ marginTop: -2 }}>
+                    {members.slice(0, 3).map((person, i) => (
+                      <View key={person.id} className="items-center justify-center rounded-pill bg-sunken" style={{ width: 20, height: 20, marginLeft: i ? -6 : 0, borderWidth: 1.5, borderColor: color.surface.page }}>
+                        <Text variant="micro">{person.initials[0]}</Text>
+                      </View>
+                    ))}
+                  </Stack>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Stack>
 
         {/* The circle. View only — tap a row for what you can do about it. */}
         <Stack gap={3}>
@@ -153,6 +213,7 @@ export default function Friends() {
               sent={sentTo === person.id}
               onToggle={() => { tapFeedback(); setOpen(open === person.id ? null : person.id); }}
               onSend={() => send(person)}
+              onWrite={() => { tapFeedback(); router.push(`/message?kind=checkin&to=${person.id}` as Href); }}
               onCalendar={() => { tapFeedback(); router.push(`/friend/${person.id}`); }}
             />
           ))}
@@ -190,13 +251,14 @@ export default function Friends() {
  * quietly inventing news.
  */
 function FriendRow({
-  person, open, sent, onToggle, onSend, onCalendar,
+  person, open, sent, onToggle, onSend, onWrite, onCalendar,
 }: {
   person: CircleMember;
   open: boolean;
   sent: boolean;
   onToggle: () => void;
   onSend: () => void;
+  onWrite: () => void;
   onCalendar: () => void;
 }) {
   const stale = isStale(person);
@@ -239,8 +301,9 @@ function FriendRow({
           {sent ? (
             <Chip label="Opened in WhatsApp" tone="steady" readOnly />
           ) : (
-            <Chip label="Send a message" onPress={onSend} />
+            <Chip label="Say hi" onPress={onSend} />
           )}
+          <Chip label="✨ Write a message" onPress={onWrite} />
         </Stack>
       ) : null}
     </Stack>

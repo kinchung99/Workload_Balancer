@@ -13,8 +13,8 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { DAY_END, endHour, formatHour, freeSlots, slotHours, daySchedule } from '@/lib/schedule';
 import { BUCKET_LABEL, bandFor, describeMix, loadOf, shortMix } from '@/lib/load';
-import type { Item } from '@/lib/types';
-import { FLAG_SHORT, isProtectedClass } from '@/lib/timetable';
+import type { CustomFlag, Item } from '@/lib/types';
+import { flagInfo, isProtectedClass } from '@/lib/timetable';
 import { color } from '@design/tokens';
 import { AreaIcon } from '../primitives/AreaIcon';
 import { Chip } from '../primitives/Chip';
@@ -111,7 +111,10 @@ export function DayTimeline({
   todo,
   todoMeta,
   showGaps = true,
+  customFlags = [],
 }: {
+  /** The student's own flags, so a class wearing one can name it. */
+  customFlags?: CustomFlag[];
   items: Item[];
   date: string;
   /** Opens the one screen where a thing can be changed. Rows are read-only. */
@@ -213,9 +216,10 @@ export function DayTimeline({
                 {/* The hour where the hints get given is worth saying out loud. */}
                 {row.item.flags?.length ? (
                   <Stack direction="row" gap={2} wrap>
-                    {row.item.flags.map((flag) => (
-                      <Chip key={flag} label={FLAG_SHORT[flag]} tone={flag === 'tips' ? 'heavy' : 'plain'} readOnly />
-                    ))}
+                    {row.item.flags.map((flag) => {
+                      const info = flagInfo(flag, customFlags);
+                      return info ? <Chip key={flag} label={`${info.emoji} ${info.short}`} tone={flag === 'tips' ? 'heavy' : 'plain'} readOnly /> : null;
+                    })}
                   </Stack>
                 ) : null}
               </Stack>

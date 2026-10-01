@@ -15,8 +15,8 @@ import type { SyncDoc } from '@shared/contract';
 import { api, hasServer } from '@/lib/api';
 import { bandFor } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
-import { published } from '@/lib/sharing';
-import { weekDays } from '@/lib/schedule';
+import { published, wireVisibility } from '@/lib/sharing';
+import { addDays } from '@/lib/dates';
 import { applyPull, backoffFor, DEBOUNCE_MS } from '@/state/sync';
 import { diff, snapshotOf, type Snapshot } from '@/state/snapshot';
 import { useStore } from '@/state/store';
@@ -174,10 +174,15 @@ export function useSync(): void {
         heavyForDays: 0,
       });
 
-      const windows = weekDays(state.today).flatMap((date) =>
-        published(withLogs, date, state.sharing).map((slot) => ({ date, start: slot.start, end: slot.end })),
+      const days = Array.from({ length: state.shareRules.ahead }, (_, i) => addDays(state.today, i));
+      const windows = days.flatMap((date) =>
+        published(withLogs, date, state.sharing, 1, state.shareRules).map((slot) => ({ date, start: slot.start, end: slot.end })),
       );
-      await api.publishWindows({ visibility: state.sharing, windows });
+      await api.publishWindows({
+        visibility: wireVisibility(state.sharing),
+        windows,
+        hiddenFrom: state.shareRules.hiddenFrom,
+      });
     };
 
     void publish();

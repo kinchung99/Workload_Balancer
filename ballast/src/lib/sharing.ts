@@ -19,7 +19,8 @@
  * empty list rather than a suspiciously full one.
  */
 import { DAY_END, DAY_START, freeSlots, overlap, slotHours, type Slot } from './schedule';
-import type { CircleMember, Item } from './types';
+import { dayIndex } from './dates';
+import type { CircleMember, Item, ShareRules } from './types';
 
 /** Evening starts here. The window nearly every plan between students lands in. */
 export const EVENING_FROM = 17;
@@ -27,20 +28,62 @@ export const EVENING_FROM = 17;
 /**
  * How much of your week other people can see.
  *
- * Deliberately three, not a per-friend matrix. A privacy control nobody can
- * hold in their head gets set once at random and then distrusted, and the
- * honest summary of each of these fits in a sentence.
+ * Three presets whose honest summary fits in a sentence, because a privacy
+ * control nobody can hold in their head gets set once at random and then
+ * distrusted. The finer control - your own hours, and who sees nothing - sits
+ * one level down, for the people who want it, rather than in front of everyone.
  */
 export type Visibility = 'off' | 'evenings' | 'busy';
 
-export const VISIBILITY: Array<{ value: Visibility; word: string; note: string }> = [
-  { value: 'off', word: 'Nothing', note: 'They see your battery. No times at all.' },
-  { value: 'evenings', word: 'Evenings only', note: 'Free evenings, after 5pm. Nothing daytime.' },
-  { value: 'busy', word: 'Free / busy', note: 'When you are free, all day. Never what you are doing.' },
+/**
+ * The three presets, plus your own rules.
+ *
+ * `custom` never reaches the server as a fourth level: it is published as
+ * free/busy with the windows already cut to the hours you chose, so the
+ * server's rule stays the simple one and the windows say exactly what they
+ * should.
+ */
+export type ShareMode = Visibility | 'custom';
+
+export const VISIBILITY: Array<{ value: ShareMode; word: string; note: string; emoji: string }> = [
+  { value: 'off', word: 'Nothing', note: 'They see your battery. No times at all.', emoji: '🔒' },
+  { value: 'evenings', word: 'Evenings only', note: 'Free evenings, after 5pm. Nothing daytime.', emoji: '🌙' },
+  { value: 'busy', word: 'Free / busy', note: 'When you are free, all day. Never what you are doing.', emoji: '📅' },
+  { value: 'custom', word: 'Custom hours', note: 'Only the days and hours you pick.', emoji: '🎛️' },
 ];
 
-export const VISIBILITY_WORD = (v: Visibility): string =>
+export const VISIBILITY_WORD = (v: ShareMode): string =>
   VISIBILITY.find((option) => option.value === v)!.word;
+
+/** What the server is told. Custom rides as free/busy; the windows carry the rules. */
+export const wireVisibility = (mode: ShareMode): Visibility => (mode === 'custom' ? 'busy' : mode);
+
+/**
+ * Where custom starts: weekday evenings and weekend daytimes.
+ *
+ * Close to "evenings only" on purpose, so switching to custom changes nothing
+ * until the student changes something.
+ */
+export const DEFAULT_SHARE_RULES: ShareRules = {
+  week: [
+    { start: 17, end: 23 }, { start: 17, end: 23 }, { start: 17, end: 23 }, { start: 17, end: 23 },
+    { start: 17, end: 23 }, { start: 10, end: 22 }, { start: 10, end: 22 },
+  ],
+  minHours: 1,
+  ahead: 14,
+  hiddenFrom: [],
+};
+
+/** Ready-made week shapes for the custom editor. One tap, then adjust. */
+export const SHARE_TEMPLATES: Array<{ id: string; label: string; emoji: string; week: ShareRules['week'] }> = [
+  {
+    id: 'evenings', label: 'Weeknights', emoji: '🌙',
+    week: [{ start: 18, end: 23 }, { start: 18, end: 23 }, { start: 18, end: 23 }, { start: 18, end: 23 }, { start: 18, end: 23 }, null, null],
+  },
+  { id: 'weekends', label: 'Weekends', emoji: '☀️', week: [null, null, null, null, null, { start: 10, end: 22 }, { start: 10, end: 22 }] },
+  { id: 'friday', label: 'Fri & Sat nights', emoji: '🎉', week: [null, null, null, null, { start: 18, end: 23 }, { start: 18, end: 23 }, null] },
+  { id: 'all', label: 'Any free time', emoji: '🌈', week: Array.from({ length: 7 }, () => ({ start: 7, end: 23 })) },
+];
 
 /**
  * One word, for a stat tile.
@@ -49,10 +92,11 @@ export const VISIBILITY_WORD = (v: Visibility): string =>
  * its label out of line with the tiles beside it. A stat row only works when
  * every value is one line.
  */
-export const VISIBILITY_SHORT: Record<Visibility, string> = {
+export const VISIBILITY_SHORT: Record<ShareMode, string> = {
   off: 'Private',
   evenings: 'Evenings',
   busy: 'Free/busy',
+  custom: 'Custom',
 };
 
 /**
@@ -61,8 +105,23 @@ export const VISIBILITY_SHORT: Record<Visibility, string> = {
  * Derived from the same `freeSlots` the booking pickers use, so what friends see
  * can never drift from what your own day actually looks like.
  */
-export function published(items: Item[], date: string, visibility: Visibility, minHours = 1): Slot[] {
+export function published(
+  items: Item[],
+  date: string,
+  visibility: ShareMode,
+  minHours = 1,
+  rules: ShareRules = DEFAULT_SHARE_RULES,
+): Slot[] {
   if (visibility === 'off') return [];
+  if (visibility === 'custom') {
+    const window = rules.week[dayIndex(date)];
+    if (!window) return [];
+    // Custom is the student's own rule, so its shortest window is theirs too.
+    const need = rules.minHours;
+    return freeSlots(items, date, need)
+      .map((slot) => ({ start: Math.max(slot.start, window.start), end: Math.min(slot.end, window.end) }))
+      .filter((slot) => slotHours(slot) >= need);
+  }
   const free = freeSlots(items, date, minHours);
   if (visibility === 'busy') return free;
   return free
@@ -114,13 +173,15 @@ export function sharedDays(
   mine: Item[],
   people: CircleMember[],
   days: string[],
-  visibility: Visibility,
+  visibility: ShareMode,
   minHours = 2,
 ): SharedDay[] {
   if (!people.length) return [];
   return days
     .map((date) => {
-      const ours = published(mine, date, visibility === 'off' ? 'busy' : visibility, minHours);
+      // Your own free time for your own plan: what you publish to others is a
+      // separate question, so only "evenings" narrows it.
+      const ours = published(mine, date, visibility === 'evenings' ? 'evenings' : 'busy', minHours);
       const theirs = people.map((person) => freeOn(person, date));
       // Anyone who published nothing for that day cannot be counted as free on it.
       if (!ours.length || theirs.some((list) => list.length === 0)) return null;

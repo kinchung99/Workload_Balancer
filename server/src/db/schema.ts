@@ -58,6 +58,13 @@ export const profiles = pgTable('profiles', {
    * shown on a screen — which is how friending actually happens in the room.
    */
   code: varchar('code', { length: 8 }).notNull(),
+  /**
+   * Friends who see none of your times, whatever `visibility` says.
+   *
+   * A list on the owner's row rather than a per-viewer copy of the windows: one
+   * set of windows, one short list of who may not look, applied on every read.
+   */
+  hiddenFrom: jsonb('hidden_from').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('profiles_code_idx').on(t.code)]);
 

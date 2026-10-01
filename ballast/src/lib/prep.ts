@@ -8,7 +8,7 @@
  * So anything with preparation stays on *every* day's list from now until it is
  * due, carrying how much of it is left, and disappears the moment it is done.
  */
-import { DAY_END, dayHours, freeSlots, slotHours, startOptions } from './schedule';
+import { dayHours, freeSlots, slotHours, startOptions } from './schedule';
 import { sumLoad } from './load';
 import { daysBetween } from './dates';
 import type { Item } from './types';
@@ -113,31 +113,94 @@ export interface Session {
 }
 
 /** No one does nine hours in one go, and nobody plans a fifteen-minute session. */
-const MAX_SESSION = 2;
-const MIN_SESSION = 0.5;
+export const MAX_SESSION = 2;
+export const MIN_SESSION = 0.5;
 
 /**
- * Spread the remaining work across the days before it is due.
+ * The hours a sitting belongs in.
  *
- * Deliberately a scheduler rather than a model call: it runs offline, it is
- * explainable, and a student can see why every session is where it is. It works
- * backwards from the deadline in the sense that it always leaves the last day
- * clear if it can, because handing in is not the same as finishing.
+ * The planner used to take the first gap of the day, which is 7am on every day
+ * that has one: both sittings of the problem set landed at dawn, and Tuesday got
+ * one hour because 7 to 8 came before the four free hours that evening. Work
+ * goes inside this window when the day allows, and only outside it when not.
  */
+export const STUDY_WINDOW = [9, 21] as const;
+
 /** What a day already carries, for showing and for choosing where work goes. */
 export const loadOnDay = (items: Item[], date: string): number =>
   Math.max(0, sumLoad(items.filter((i) => i.date === date)));
 
 export const committedOnDay = (items: Item[], date: string): number => dayHours(items, date).committed;
 
-export function planSessions(item: Item, items: Item[], today: string): Session[] {
+/**
+ * Proposed sittings as items, so the gaps and the load can see them.
+ *
+ * A plan that is not yet booked still has to occupy its hours, or the next
+ * sitting gets put on top of it - and still has to weigh something, or the
+ * "this day gets heavier" readout would say nothing.
+ */
+export const sessionItems = (item: Item, sessions: Session[]): Item[] =>
+  sessions.map((session, index) => ({
+    id: `plan-session-${session.date}-${index}`,
+    title: item.title,
+    bucket: item.bucket,
+    hours: session.hours,
+    dread: item.dread,
+    commitment: item.commitment,
+    date: session.date,
+    startHour: session.startHour,
+    mix: item.mix,
+  }));
+
+/**
+ * Every half-hour a sitting of this length could start on a day.
+ *
+ * `notBefore` drops the part of today that has already happened: proposing
+ * 9am at 4pm is offering a time that does not exist.
+ */
+export const sittingStarts = (busy: Item[], date: string, hours: number, notBefore?: number): number[] =>
+  startOptions(busy, date, hours, 64, 0.5).filter((h) => notBefore === undefined || h >= notBefore);
+
+/** How far outside the study window a start sits, in hours. Zero is inside. */
+const outsideWindow = (start: number, hours: number): number => {
+  const [from, to] = STUDY_WINDOW;
+  if (start < from) return from - start;
+  if (start + hours > to) return start + hours - to;
+  return 0;
+};
+
+/** The best start on a day: the earliest inside the window, else the nearest to it. */
+export function bestStart(busy: Item[], date: string, hours: number, notBefore?: number): number | undefined {
+  const options = sittingStarts(busy, date, hours, notBefore);
+  if (!options.length) return undefined;
+  return [...options].sort((a, b) => outsideWindow(a, hours) - outsideWindow(b, hours) || a - b)[0];
+}
+
+/** The days a piece of work can still be done on, today through the deadline. */
+export const workDays = (item: Item, today: string): string[] =>
+  Array.from({ length: daysLeft(item, today) + 1 }, (_, offset) => addDaysLocal(today, offset));
+
+/**
+ * Spread the remaining work across the days before it is due.
+ *
+ * Deliberately a scheduler rather than a model call: it runs offline, it is
+ * explainable, and a student can see why every session is where it is. It
+ * leaves the due day clear if it can, because handing in is not the same as
+ * finishing.
+ */
+export function planSessions(
+  item: Item,
+  items: Item[],
+  today: string,
+  /** The hour it is now, when `today` really is today. Nothing is planned before it. */
+  nowHour?: number,
+): Session[] {
   // Plan what has neither been done nor booked; anything already scheduled stays
   // where the student put it.
   let left = unplanned(item, items);
   if (left <= 0) return [];
 
-  const days = daysLeft(item, today);
-  const targets = Array.from({ length: days + 1 }, (_, offset) => addDaysLocal(today, offset));
+  const targets = workDays(item, today);
   // Aim to be finished the day before it is due, and only use the due day itself
   // if there is genuinely no other room.
   const preferred = targets.length > 1 ? targets.slice(0, -1) : targets;
@@ -154,44 +217,40 @@ export function planSessions(item: Item, items: Item[], today: string): Session[
     const diff = loadOnDay(items, a) - loadOnDay(items, b);
     return diff !== 0 ? diff : a.localeCompare(b);
   });
-  const order = [...byRoom, ...lastResort];
 
   const sessions: Session[] = [];
-  const placedByDay = new Map<string, Session[]>();
 
-  for (const date of order) {
-    if (left <= 0) break;
-    const taken = placedByDay.get(date) ?? [];
-    const busy: Item[] = [
-      ...items,
-      ...taken.map((session, index) => ({
-        id: `plan-session-${date}-${index}`,
-        title: item.title,
-        bucket: item.bucket,
-        hours: session.hours,
-        dread: item.dread,
-        commitment: item.commitment,
-        date,
-        startHour: session.startHour,
-      })),
-    ];
-
-    for (const slot of freeSlots(busy, date, MIN_SESSION)) {
-      if (left <= 0) break;
-      const room = Math.min(slotHours(slot), MAX_SESSION, left, DAY_END - slot.start);
-      if (room < MIN_SESSION) continue;
-      const hours = Math.round(room * 2) / 2;
-      const start = startOptions(busy, date, hours, 24).find((h) => h >= slot.start && h + hours <= slot.end);
-      if (start === undefined) continue;
-      const session = { date, startHour: start, hours };
-      sessions.push(session);
-      placedByDay.set(date, [...taken, session]);
-      left = Math.round((left - hours) * 10) / 10;
-      break; // one sitting per day per pass, so work is spread rather than crammed
+  /**
+   * One sitting per day per pass, so work is spread rather than crammed - and
+   * then another pass if hours are still left over.
+   *
+   * There used to be one pass and nothing after it, so three hours due tomorrow
+   * placed two of them and called the third "will not fit" with the whole
+   * evening free.
+   */
+  for (const pool of [byRoom, lastResort]) {
+    for (let pass = 0; pass < 3 && left > 0; pass += 1) {
+      let placed = false;
+      for (const date of pool) {
+        if (left <= 0) break;
+        const busy = [...items, ...sessionItems(item, sessions)];
+        const notBefore = date === today ? nowHour : undefined;
+        // The biggest sitting that fits, down to half an hour.
+        const want = Math.min(MAX_SESSION, Math.max(MIN_SESSION, Math.ceil(left * 2) / 2));
+        for (let hours = want; hours >= MIN_SESSION; hours -= 0.5) {
+          const startHour = bestStart(busy, date, hours, notBefore);
+          if (startHour === undefined) continue;
+          sessions.push({ date, startHour, hours });
+          left = Math.max(0, Math.round((left - hours) * 10) / 10);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) break;
     }
   }
 
-  return sessions;
+  return sessions.sort((a, b) => a.date.localeCompare(b.date) || a.startHour - b.startHour);
 }
 
 /** What the plan does not manage to fit, so the screen can say so plainly. */

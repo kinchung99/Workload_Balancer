@@ -12,8 +12,8 @@
  */
 import Constants from 'expo-constants';
 import type {
-  CircleMemberDTO, InviteDTO, InviteRequest, MeDTO, PendingRequestDTO,
-  Presence, PublishRequest, SyncDoc, SyncResponse, Visibility,
+  CircleMemberDTO, ComposeContext, ComposeDraftRequest, ComposeDraftResponse, ComposeIdeasResponse,
+  InviteDTO, InviteRequest, MeDTO, PendingRequestDTO, Presence, PublishRequest, SyncDoc, SyncResponse, Visibility,
 } from '@shared/contract';
 
 /**
@@ -101,8 +101,11 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 12_0
   }
 }
 
-const post = <T>(path: string, body: unknown) =>
-  request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+const post = <T>(path: string, body: unknown, timeoutMs?: number) =>
+  request<T>(path, { method: 'POST', body: JSON.stringify(body) }, timeoutMs);
+
+/** A model call takes seconds, not milliseconds. Still bounded, so the screen never hangs. */
+const WRITING_TIMEOUT = 25_000;
 
 /* -------------------------------------------------------------------- auth */
 
@@ -162,6 +165,14 @@ export const api = {
   replyToInvite: (inviteId: string, response: 'yes' | 'no') =>
     post<{ ok: true }>('/api/invites/respond', { inviteId, response }),
   cancelInvite: (id: string) => request<{ ok: true }>(`/api/invites/${id}`, { method: 'DELETE' }),
+
+  /* --------------------------------------------------------------- compose */
+
+  /** What the message could be for. Falls back to the phone's own ideas on any failure. */
+  composeIdeas: (context: ComposeContext) =>
+    post<ComposeIdeasResponse>('/api/compose/ideas', { context }, WRITING_TIMEOUT),
+  composeDraft: (body: ComposeDraftRequest) =>
+    post<ComposeDraftResponse>('/api/compose/draft', body, WRITING_TIMEOUT),
 };
 
 export type { CircleMemberDTO, InviteDTO, MeDTO, PendingRequestDTO, Visibility };

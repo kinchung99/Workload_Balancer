@@ -12,7 +12,7 @@
  */
 import { addDays, dayIndex } from './dates';
 import { loadOf } from './load';
-import type { ClassFlag, Item, Module, SessionKind } from './types';
+import type { ClassFlag, CustomFlag, FlagId, Item, Module, SessionKind } from './types';
 
 export const SESSION_KINDS: SessionKind[] = ['lecture', 'lab', 'tutorial', 'seminar'];
 
@@ -28,9 +28,57 @@ export const FLAG_SHORT: Record<ClassFlag, string> = {
   attendance: 'Register',
 };
 
+export const BUILT_IN_FLAGS: ClassFlag[] = ['tips', 'coursework', 'attendance'];
+
+export const FLAG_EMOJI: Record<ClassFlag, string> = {
+  tips: '💡',
+  coursework: '📝',
+  attendance: '✋',
+};
+
+/**
+ * A custom flag's id says whether it protects the class.
+ *
+ * `lock-…` protects, `note-…` does not. Carrying it in the id rather than only
+ * on the flag record means every pure function that asks "can this move?" -
+ * the rebalancer, the ranking, the swap - gets the right answer from the item
+ * alone, without each of them being handed the student's list of flags.
+ * Protection is therefore fixed when the flag is made, which is also the
+ * honest behaviour: a flag that quietly stopped protecting would be a trap.
+ */
+export const customFlagId = (protect: boolean, now = Date.now()): string => `${protect ? 'lock' : 'note'}-${now}`;
+
+const protects = (flag: FlagId): boolean => flag === 'tips' || flag === 'attendance' || flag.startsWith('lock-');
+
 /** A class carrying any of these is never proposed for moving or skipping. */
 export const isProtectedClass = (item: Item): boolean =>
-  !!item.moduleId && (item.flags ?? []).some((flag) => flag === 'tips' || flag === 'attendance');
+  !!item.moduleId && (item.flags ?? []).some(protects);
+
+/** Any flag, built-in or the student's own, as words and a picture. Null if it was deleted. */
+export function flagInfo(flag: FlagId, custom: CustomFlag[] = []): { label: string; short: string; emoji: string; protect: boolean } | null {
+  if ((BUILT_IN_FLAGS as string[]).includes(flag)) {
+    const known = flag as ClassFlag;
+    return { label: FLAG_LABEL[known], short: FLAG_SHORT[known], emoji: FLAG_EMOJI[known], protect: protects(flag) };
+  }
+  const mine = custom.find((c) => c.id === flag);
+  return mine ? { label: mine.label, short: mine.label, emoji: mine.emoji, protect: protects(flag) } : null;
+}
+
+/** A picture for a module the student has not picked one for, guessed from its name. */
+const GUESS: Array<[RegExp, string]> = [
+  [/operat|system program|kernel/i, '💻'], [/algorithm|math|calcul|statistic/i, '🧮'],
+  [/network|web|internet/i, '🌐'], [/distribut|cloud|parallel/i, '🛰️'], [/data|database/i, '🗄️'],
+  [/\bai\b|machine|learning|intelligen/i, '🤖'], [/design|art|media/i, '🎨'], [/bio|chem|physic|lab/i, '🧪'],
+  [/econ|business|financ|account/i, '📈'], [/law|legal/i, '⚖️'], [/history|literat|english|writing/i, '📜'],
+  [/psych|mind|neuro/i, '🧠'], [/security|crypt/i, '🔐'],
+];
+
+export const moduleEmoji = (module: Module): string =>
+  module.emoji ?? GUESS.find(([pattern]) => pattern.test(module.name))?.[1] ?? '📘';
+
+export const MODULE_EMOJIS = ['💻', '🧮', '🌐', '🛰️', '🗄️', '🤖', '🧪', '📈', '🎨', '📜', '⚖️', '🧠', '🔐', '📘', '🎧', '⚙️'];
+
+export const FLAG_EMOJIS = ['⭐', '🔥', '📣', '👥', '🎤', '📌', '⚠️', '🎯', '🧪', '💻', '🍕', '🎓'];
 
 export const classesOn = (items: Item[], date: string): Item[] =>
   items

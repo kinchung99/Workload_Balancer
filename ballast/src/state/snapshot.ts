@@ -40,6 +40,9 @@ export interface Syncable {
   sharing: string;
   customActions: unknown[];
   onboarded: boolean;
+  customFlags: unknown[];
+  groups: unknown[];
+  shareRules: unknown;
 }
 
 const byId = (rows: Array<{ id: string }>): Record<string, unknown> =>
@@ -73,6 +76,9 @@ export function snapshotOf(state: Syncable): Snapshot {
         sharing: state.sharing,
         customActions: state.customActions,
         onboarded: state.onboarded,
+        customFlags: state.customFlags,
+        groups: state.groups,
+        shareRules: state.shareRules,
       },
     },
   };

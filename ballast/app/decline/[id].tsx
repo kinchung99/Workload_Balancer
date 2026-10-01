@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { successFeedback } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card, Chip, PageHeader, Screen, Stack, Text } from '@/components';
 import { SCREEN } from '@design/screens';
-import { TONES, draft, reword, type Tone } from '@/lib/drafter';
-import { dayName } from '@/lib/dates';
+import { Composer } from '@/features/compose/Composer';
+import { recipientOf } from '@/lib/compose';
+import { daysBetween, formatShort } from '@/lib/dates';
+import { successFeedback } from '@/lib/haptics';
 import { isMovable, loadOf } from '@/lib/load';
-import { nextWeek, useStore, weekReading } from '@/state/store';
-import { Card as ResultCard } from '@/components';
+import { formatHour } from '@/lib/schedule';
+import { useStore, weekReading } from '@/state/store';
+import type { ComposeContext } from '@shared/contract';
+import type { Item } from '@/lib/types';
 
 /**
  * The frame the interface study documents. Also what makes `/decline/...` render
@@ -19,8 +22,20 @@ export async function generateStaticParams() {
   return [{ id: 'w11-birthday' }];
 }
 
-/** "Aisyah's birthday dinner" -> "Aisyah". The message has to sound like a person. */
-const recipientOf = (title: string): string => title.match(/^([\w'-]+)'s\b/)?.[1] ?? 'them';
+/**
+ * The heaviest other thing near this one - the honest reason, in words.
+ *
+ * "I'm swamped" is vague and reads as an excuse; "the group presentation on
+ * Wednesday" is a fact the other person can picture.
+ */
+function pressureNear(items: Item[], item: Item): string | undefined {
+  const near = items
+    .filter((other) =>
+      other.id !== item.id && !other.isRecovery && !other.isLog && !other.spread && !other.parentId && !other.repeats
+      && Math.abs(daysBetween(item.date, other.date)) <= 3)
+    .sort((a, b) => loadOf(b) - loadOf(a))[0];
+  return near ? `${near.title} on ${formatShort(near.date).slice(0, 3)}` : undefined;
+}
 
 /**
  * Screen 7 — The hard part was never knowing what to cut.
@@ -35,26 +50,29 @@ const recipientOf = (title: string): string => title.match(/^([\w'-]+)'s\b/)?.[1
 export default function Decline() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { items, ceilings, today, keepItem } = useStore();
+  const { items, ceilings, keepItem } = useStore();
 
   const item = items.find((i) => i.id === id);
-  const [tone, setTone] = useState<Tone>('warm');
-  const [edited, setEdited] = useState<string | null>(null);
+  const [body, setBody] = useState<string | null>(null);
   /** What actually happened, so the screen can report it instead of vanishing. */
   const [outcome, setOutcome] = useState<'copied' | 'opened' | 'going' | null>(null);
 
-  const context = useMemo(
-    () => ({
-      to: item ? recipientOf(item.title) : 'them',
-      occasion: item?.title.replace(/^[\w'-]+'s\s*/, '') ?? 'it',
-      clash: 'the OS deadline on Wednesday',
-      newDate: 'the week after',
-      hook: 'the internship',
-    }),
-    [item],
-  );
+  const context = useMemo<ComposeContext | null>(() => {
+    if (!item) return null;
+    const coursework = !!item.deadline || !!item.moduleId;
+    return {
+      kind: 'decline',
+      subject: item.title,
+      to: recipientOf(item.title) ?? (coursework ? 'my lecturer' : 'them'),
+      when: `${formatShort(item.deadline ?? item.date)}${item.startHour !== undefined ? `, ${formatHour(item.startHour)}` : ''}`,
+      commitment: item.commitment,
+      pressure: pressureNear(items, item),
+      weekPercent: weekReading(items, item.date, ceilings).overall,
+      dread: item.dread,
+    };
+  }, [item, items, ceilings]);
 
-  if (!item) {
+  if (!item || !context) {
     return (
       <Screen back="/plan" backLabel="Plan" footer={<Button label="Back" kind="secondary" onPress={() => router.replace('/plan')} />}>
         <Text variant="heading" className="pt-8">That item is no longer in your week.</Text>
@@ -62,14 +80,20 @@ export default function Decline() {
     );
   }
 
-  const nextWeekPercent = weekReading(items, nextWeek(today), ceilings).overall;
-  const body = edited ?? draft(tone, context);
+  const weekPercent = context.weekPercent ?? 0;
+  /** The demo's re-plan is specific to the birthday; anywhere else, going just keeps it. */
+  const replans = item.id === 'w11-birthday';
 
   if (outcome) {
     const copy = {
       copied: { head: 'Copied.', body: 'Paste it wherever you talk to them. Ballast never sends anything itself.' },
       opened: { head: 'Over to you.', body: 'The draft is in WhatsApp under your name. Read it before you send it.' },
-      going: { head: "You're going.", body: 'The chapter 9 reading moved to Sunday so the week still works. That was the only change.' },
+      going: {
+        head: "You're going.",
+        body: replans
+          ? 'The chapter 9 reading moved to Sunday so the week still works. That was the only change.'
+          : 'Nothing changed. It stays in your week.',
+      },
     }[outcome];
 
     return (
@@ -88,9 +112,9 @@ export default function Decline() {
             {outcome === 'going' ? 'RE-PLANNED' : 'DRAFTED'}
           </Text>
           <Text variant="title" accessibilityRole="header" accessibilityLiveRegion="polite">{copy.head}</Text>
-          <ResultCard tone={outcome === 'going' ? 'steady' : 'recovery'} gap={2}>
+          <Card tone={outcome === 'going' ? 'steady' : 'recovery'} gap={2}>
             <Text variant="callout">{copy.body}</Text>
-          </ResultCard>
+          </Card>
         </Stack>
       </Screen>
     );
@@ -104,7 +128,10 @@ export default function Decline() {
         <>
           <Button
             label="Open in WhatsApp"
+            kind={body ? 'primary' : 'secondary'}
+            disabled={!body}
             onPress={async () => {
+              if (!body) return;
               // wa.me works on the phone app and in a browser, unlike whatsapp://
               const url = `https://wa.me/?text=${encodeURIComponent(body)}`;
               const ok = await Linking.canOpenURL(url).catch(() => false);
@@ -114,31 +141,32 @@ export default function Decline() {
               setOutcome(ok ? 'opened' : 'copied');
             }}
           />
-          <Button
-            label="Copy it"
-            kind="secondary"
-            onPress={async () => {
-              await Clipboard.setStringAsync(body);
-              successFeedback();
-              setOutcome('copied');
-            }}
-          />
-          {/* c. Going is a first-class option. It sits as a real button, not a
-              dismissal, and choosing it triggers a re-plan rather than a guilt
-              trip. An app that only accepts one answer stops being trusted. */}
-          <Button
-            label="Actually, I'm going"
-            kind="secondary"
-            onPress={() => {
-              // Going is not the wrong answer, so the week re-plans around it.
-              keepItem(item.id, 'w11-ch9');
-              successFeedback();
-              setOutcome('going');
-            }}
-          />
-          <Text variant="footnote" tone="subtle" className="pt-2">
-            If you go, the chapter 9 reading moves to Sunday. Going is not the wrong answer.
-          </Text>
+          <Stack direction="row" gap={2}>
+            {body ? (
+              <Button
+                label="Copy it"
+                kind="secondary"
+                className="flex-1"
+                onPress={async () => {
+                  await Clipboard.setStringAsync(body);
+                  successFeedback();
+                  setOutcome('copied');
+                }}
+              />
+            ) : null}
+            {/* Going is a first-class option. It sits as a real button, not a
+                dismissal, and choosing it re-plans rather than guilt-trips. */}
+            <Button
+              label="Actually, I'm going"
+              kind="quiet"
+              className="flex-1"
+              onPress={() => {
+                if (replans) keepItem(item.id, 'w11-ch9');
+                successFeedback();
+                setOutcome('going');
+              }}
+            />
+          </Stack>
         </>
       }
     >
@@ -149,56 +177,46 @@ export default function Decline() {
           sub="The app writes it. It never sends it."
         />
 
-        {/* a. It names the trade in one line. No lecture about boundaries, no
-            wellbeing language, just the arithmetic that makes it obvious. */}
-        <Card gap={4}>
+        {/* It names the trade in one line. No lecture, just the arithmetic. */}
+        <Card gap={3}>
           <Stack direction="row" gap={4} align="center" justify="between">
-            <Stack gap={2} grow>
+            <Stack gap={1} grow>
               <Text variant="body" weight="semibold">
                 {item.title}{item.when ? `, ${item.when}` : ''}
               </Text>
               <Text variant="footnote" tone="muted">
-                {loadOf(item)} load, and next week you are at {nextWeekPercent}%
+                {loadOf(item)} load · that week you are at {weekPercent}%
               </Text>
             </Stack>
             <Chip label={isMovable(item) ? 'Movable' : 'Hard'} tone={isMovable(item) ? 'heavy' : 'plain'} readOnly />
           </Stack>
+          <WeekMeter percent={weekPercent} />
+          {replans ? (
+            <Text variant="micro" tone="subtle">
+              If you go, the chapter 9 reading moves to Sunday. Going is not the wrong answer.
+            </Text>
+          ) : null}
         </Card>
 
-        {/* b. Three tones, because context is everything. The message you send a
-            project group is not the one you send your mum or your closest friend. */}
-        <Stack gap={3}>
-          <Text variant="footnote" tone="subtle">Pick a tone</Text>
-          <Stack direction="row" gap={3} wrap>
-            {TONES.map((option) => (
-              <Chip
-                key={option.id}
-                label={option.label}
-                tone={tone === option.id ? 'selected' : 'plain'}
-                accessibilityHint={option.note}
-                onPress={() => {
-                  setTone(option.id);
-                  setEdited(null);
-                }}
-              />
-            ))}
-          </Stack>
-        </Stack>
-
-        <Card gap={4}>
-          <Text variant="footnote" tone="subtle">To {context.to}, on WhatsApp</Text>
-          <Text variant="body" accessibilityLabel={`Draft message. ${body}`}>{body}</Text>
-          <Stack direction="row" gap={3} wrap>
-            <Chip label="Reword" onPress={() => setEdited(reword(body, 'reword', context))} />
-            <Chip label="Shorter" onPress={() => setEdited(reword(body, 'shorter', context))} />
-            <Chip label="Offer a new date" onPress={() => setEdited(reword(body, 'newDate', context))} />
-          </Stack>
-        </Card>
-
-        <Text variant="footnote" tone="subtle">
-          Also drafts extension requests and shift swaps.
-        </Text>
+        <Composer context={context} onChange={setBody} />
       </Stack>
     </Screen>
+  );
+}
+
+/** How full that week is, as a bar with the 78% line drawn on it. */
+function WeekMeter({ percent }: { percent: number }) {
+  const band = percent >= 78 ? 'heavy' : percent >= 60 ? 'busy' : 'steady';
+  const fill = { steady: 'bg-steady-fill', busy: 'bg-busy-fill', heavy: 'bg-heavy-fill' }[band];
+  return (
+    <Stack gap={1}>
+      <Stack direction="row" className="h-3 w-full overflow-hidden rounded-pill bg-track">
+        <Stack className={`h-3 ${fill}`} style={{ width: `${Math.min(100, percent)}%` }} />
+      </Stack>
+      <Stack direction="row" justify="between">
+        <Text variant="micro" tone="subtle">WEEK LOAD</Text>
+        <Text variant="micro" tone={band}>{band === 'heavy' ? 'OVER YOUR LINE' : band === 'busy' ? 'NEAR YOUR LINE' : 'ROOM LEFT'}</Text>
+      </Stack>
+    </Stack>
   );
 }

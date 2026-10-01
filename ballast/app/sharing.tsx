@@ -1,42 +1,53 @@
-import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useState, type ReactNode } from 'react';
+import { Pressable, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import {
-  Battery, Card, PageHeader, Screen, Stack, Sticker, Text,
+  Avatar, Battery, Card, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
-import { Pressable } from 'react-native';
-import { color } from '@design/tokens';
+import { color, radius } from '@design/tokens';
 import { SCREEN } from '@design/screens';
+import { DAY_LETTER } from '@/lib/dates';
 import { VISIBILITY, published } from '@/lib/sharing';
-import { formatHour, weekDays } from '@/lib/schedule';
-import { dayName } from '@/lib/dates';
+import { weekDays } from '@/lib/schedule';
 import { tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
+import { WeekPreview } from '@/features/sharing/WeekPreview';
 
 /**
  * What your circle sees — shown, not described.
  *
- * Privacy settings normally fail in the same way: three options explained in
- * prose, no way to check what you just agreed to, so people pick one at random
- * and never trust it again. This screen answers the only question that matters —
- * *what does Ravi actually see when he taps my name?* — by showing him his own
- * view of your week, live, as you change the setting.
+ * Privacy settings normally fail in the same way: options explained in prose,
+ * no way to check what you just agreed to, so people pick one at random and
+ * never trust it again. This screen answers the only question that matters —
+ * *what does Amin actually see when he taps my name?* — by showing his view of
+ * your week, live, as you change the setting. Tap another face to see theirs.
+ *
+ * Three presets cover most people. "Custom hours" and "Who sees your times"
+ * are one level down, for the student whose Sunday mornings are nobody's
+ * business or who only wants the study group to see their evenings.
  *
  * Nothing on it is a dark pattern. `Nothing` is genuinely nothing, it is one tap
  * from here, and choosing it does not disable the rest of the app.
  */
 export default function Sharing() {
   const router = useRouter();
-  const { circle, sharing, setSharing, today } = useStore();
+  const { circle, sharing, setSharing, shareRules, today } = useStore();
   const items = useItemsWithLogs();
   const reading = useReading();
   const days = weekDays(today);
+  const friends = circle.filter((person) => !person.isYou);
+  const hidden = shareRules.hiddenFrom;
 
-  /** Exactly what a friend would be shown, computed by the same function they read. */
-  const preview = days.map((date) => ({ date, free: published(items, date, sharing) }));
+  /** Whose eyes the preview is through. Named, because "a friend" is abstract and "Amin" is not. */
+  const [viewer, setViewer] = useState<string | null>(friends[0]?.id ?? null);
+  const someone = friends.find((person) => person.id === viewer);
+  const blocked = !!someone && hidden.includes(someone.id);
+
+  /** Exactly what they would be shown, computed by the same function that publishes. */
+  const preview = days.map((date) => ({ date, free: blocked ? [] : published(items, date, sharing, 1, shareRules) }));
   const windows = preview.reduce((sum, day) => sum + day.free.length, 0);
-  /** Named, because "what your friends see" is abstract and "what Ravi sees" is not. */
-  const someone = circle.find((person) => !person.isYou);
+  const seeing = friends.filter((person) => !hidden.includes(person.id));
 
   return (
     <Screen back="/friends" backLabel="Friends">
@@ -75,17 +86,45 @@ export default function Sharing() {
               >
                 <View
                   className="items-center justify-center rounded-pill"
-                  style={{ width: 26, height: 26, borderWidth: 2.5, borderColor: picked ? color.ink.default : color.line.strong }}
+                  style={{ width: 40, height: 40, backgroundColor: picked ? color.decor.lilac : color.surface.sunken }}
                 >
-                  {picked ? <View className="rounded-pill" style={{ width: 12, height: 12, backgroundColor: color.ink.default }} /> : null}
+                  <Text variant="heading">{option.emoji}</Text>
                 </View>
                 <Stack gap={1} grow>
                   <Text variant="body" weight="semibold">{option.word}</Text>
                   <Text variant="micro" tone="muted">{option.note}</Text>
                 </Stack>
+                <View
+                  className="items-center justify-center rounded-pill"
+                  style={{ width: 24, height: 24, borderWidth: 2.5, borderColor: picked ? color.ink.default : color.line.strong }}
+                >
+                  {picked ? <View className="rounded-pill" style={{ width: 11, height: 11, backgroundColor: color.ink.default }} /> : null}
+                </View>
               </Pressable>
             );
           })}
+        </Stack>
+
+        {/* One level down: your own hours, and who sees anything at all. */}
+        <Stack gap={3}>
+          <Text variant="micro" tone="subtle">FINE-TUNE</Text>
+          <Door
+            emoji="🎛️"
+            title="Custom hours"
+            sub={sharing === 'custom'
+              ? shareRules.week.map((w, i) => (w ? DAY_LETTER[i] : '·')).join(' ')
+              : 'Pick the days and hours you share'}
+            onPress={() => router.push('/sharing/hours' as Href)}
+            extra={<HoursStrip week={shareRules.week} on={sharing === 'custom'} />}
+          />
+          <Door
+            emoji="👀"
+            title="Who sees your times"
+            sub={hidden.length === 0
+              ? `Everyone in your circle · ${friends.length}`
+              : `${seeing.length} of ${friends.length} · hidden from ${friends.filter((p) => hidden.includes(p.id)).map((p) => p.name).join(', ')}`}
+            onPress={() => router.push('/sharing/people' as Href)}
+          />
         </Stack>
 
         {/* Their view of you, live. The whole reason this screen is trustworthy. */}
@@ -93,25 +132,34 @@ export default function Sharing() {
           <Text variant="micro" tone="subtle">
             {someone ? `${someone.name.split(' ')[0].toUpperCase()}'S VIEW OF YOUR WEEK` : 'WHAT A FRIEND WOULD SEE'}
           </Text>
+          {friends.length > 1 ? (
+            <Stack direction="row" gap={3}>
+              {friends.map((person) => (
+                <Pressable
+                  key={person.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: person.id === viewer }}
+                  accessibilityLabel={`See it as ${person.name}`}
+                  onPress={() => { tapFeedback(); setViewer(person.id); }}
+                  className="items-center gap-1 active:opacity-60"
+                  style={{ opacity: person.id === viewer ? 1 : 0.5 }}
+                >
+                  <Avatar initials={person.initials} band={person.band} size={38} stale={hidden.includes(person.id)} />
+                  <Text variant="micro" tone={person.id === viewer ? 'default' : 'subtle'}>
+                    {hidden.includes(person.id) ? '🚫 ' : ''}{person.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </Stack>
+          ) : null}
           <Card tone={windows ? 'recovery' : 'sunken'} gap={3}>
             {windows ? (
-              preview.map(({ date, free }) => (
-                <Stack key={date} direction="row" gap={3} align="center">
-                  <Text variant="caption" weight="semibold" style={{ width: 62 }}>
-                    {date === today ? 'Today' : dayName(date).slice(0, 3)}
-                  </Text>
-                  <Text variant="micro" tone={free.length ? 'recovery' : 'subtle'} className="flex-1">
-                    {free.length
-                      ? free.map((slot) => `${formatHour(slot.start)}–${formatHour(slot.end)}`).join(' · ')
-                      : 'nothing'}
-                  </Text>
-                </Stack>
-              ))
+              <WeekPreview week={preview} today={today} />
             ) : (
               <Stack direction="row" gap={4} align="center">
                 <Sticker name="cloud" size={34} />
                 <Text variant="callout" tone="muted" className="flex-1">
-                  Nothing. Your calendar is private.
+                  {blocked ? `Nothing. Your times are hidden from ${someone!.name}.` : 'Nothing. Your calendar is private.'}
                 </Text>
               </Stack>
             )}
@@ -119,10 +167,67 @@ export default function Sharing() {
           <Text variant="footnote" tone="subtle">
             Never a title, a deadline or who you are with. There is no field for it.
           </Text>
+          {sharing === 'custom' ? (
+            <Text variant="micro" tone="subtle">
+              Custom: {shareRules.ahead === 7 ? 'one week' : 'two weeks'} ahead · free windows of {shareRules.minHours}h or more
+            </Text>
+          ) : null}
         </Stack>
 
         <View className="h-2" />
       </Stack>
     </Screen>
+  );
+}
+
+function Door({
+  emoji, title, sub, onPress, extra,
+}: { emoji: string; title: string; sub: string; onPress: () => void; extra?: ReactNode }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${sub}`}
+      onPress={() => { tapFeedback(); onPress(); }}
+      className="active:opacity-70"
+    >
+      <Stack gap={3} className="rounded-lg border border-line-hairline bg-raised px-4 py-4">
+        <Stack direction="row" gap={4} align="center">
+          <View className="items-center justify-center rounded-pill bg-sunken" style={{ width: 40, height: 40 }}>
+            <Text variant="heading">{emoji}</Text>
+          </View>
+          <Stack gap={1} grow>
+            <Text variant="body" weight="semibold">{title}</Text>
+            <Text variant="micro" tone="muted">{sub}</Text>
+          </Stack>
+          <Text variant="heading" tone="subtle">›</Text>
+        </Stack>
+        {extra}
+      </Stack>
+    </Pressable>
+  );
+}
+
+/** The custom week at a glance: seven little bars, filled where you share. */
+function HoursStrip({ week, on }: { week: Array<{ start: number; end: number } | null>; on: boolean }) {
+  return (
+    <Stack direction="row" gap={1} style={{ opacity: on ? 1 : 0.45 }}>
+      {week.map((window, i) => (
+        <Stack key={i} gap={1} align="center" className="flex-1">
+          <View style={{ width: '100%', height: 26, borderRadius: radius.sm, backgroundColor: color.surface.sunken, overflow: 'hidden' }}>
+            {window ? (
+              <View
+                style={{
+                  position: 'absolute', left: 0, right: 0,
+                  top: `${((window.start - 7) / 16) * 100}%`,
+                  height: `${((window.end - window.start) / 16) * 100}%`,
+                  backgroundColor: color.band.recovery.fill,
+                }}
+              />
+            ) : null}
+          </View>
+          <Text variant="micro" tone="subtle">{DAY_LETTER[i]}</Text>
+        </Stack>
+      ))}
+    </Stack>
   );
 }

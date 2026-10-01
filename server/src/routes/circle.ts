@@ -48,7 +48,7 @@ circle.get('/', async (c) => {
   const people = await db
     .select({
       id: user.id, name: user.name,
-      initials: profiles.initials, visibility: profiles.visibility,
+      initials: profiles.initials, visibility: profiles.visibility, hiddenFrom: profiles.hiddenFrom,
       band: presence.band, charge: presence.charge, status: presence.status,
       heavyForDays: presence.heavyForDays, updatedAt: presence.updatedAt,
     })
@@ -74,10 +74,13 @@ circle.get('/', async (c) => {
     updatedMinsAgo: p.updatedAt ? Math.round((now - p.updatedAt.getTime()) / 60000) : null,
     /*
      * Windows are already filtered by the publisher's own setting when they were
-     * written, so 'off' simply has no rows. Filtering here as well would be a
-     * second place for the rule to live and a second place to get it wrong.
+     * written, so 'off' simply has no rows. The one per-viewer rule - "hide my
+     * times from this person" - can only be applied here, on read, because it is
+     * the only place that knows who is asking.
      */
-    free: windows.filter((w) => w.userId === p.id).map((w) => ({ date: w.date, start: w.start, end: w.end })),
+    free: (p.hiddenFrom ?? []).includes(me)
+      ? []
+      : windows.filter((w) => w.userId === p.id).map((w) => ({ date: w.date, start: w.start, end: w.end })),
   }));
 
   return c.json({ circle: out });

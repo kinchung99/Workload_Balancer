@@ -10,6 +10,7 @@ export { Chip } from './primitives/Chip';
 export { Toggle } from './primitives/Toggle';
 export { Divider } from './primitives/Divider';
 export { DreadDots, DreadPicker } from './primitives/DreadDots';
+export { DreadSlider, DREAD_WORD } from './primitives/DreadSlider';
 export { ItemRow } from './primitives/ItemRow';
 export { Slider } from './primitives/Slider';
 export { Checkbox } from './primitives/Checkbox';
@@ -25,6 +26,7 @@ export { StepDots } from './primitives/StepDots';
 
 export { BandSwatch, PatternFill, BAND_FILL } from './charts/BandPattern';
 export { Bar } from './charts/Bar';
+export { Ring, type RingSegment } from './charts/Ring';
 export { ForecastStrip, type ForecastDay } from './charts/ForecastStrip';
 export { Battery, BatteryMini } from './charts/Battery';
 export { WeekGrid } from './charts/WeekGrid';

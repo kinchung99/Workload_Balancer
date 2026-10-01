@@ -10,7 +10,7 @@
  * `new Date()` so the demo reads the same on every phone in every timezone.
  */
 import type {
-  CircleMember, Contact, Errand, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry, SimAction,
+  CircleMember, Contact, Errand, Group, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry, SimAction,
 } from '@/lib/types';
 import type { PhoneContact } from '@/lib/sharing';
 import { addDays } from '@/lib/dates';
@@ -293,6 +293,12 @@ export const circle: CircleMember[] = [
       { date: d(W11, 5), start: 12, end: 22 },
     ],
   },
+];
+
+/** Two groups, so the groups row and `/group/...` have something real to show. */
+export const groups: Group[] = [
+  { id: 'study-crew', name: 'Study crew', emoji: '📚', members: ['amin', 'ravi'] },
+  { id: 'flat-4b', name: 'Flat 4B', emoji: '🏠', members: ['jo', 'aisyah', 'ravi'] },
 ];
 
 /**

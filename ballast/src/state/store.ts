@@ -10,22 +10,23 @@ import { persist } from 'zustand/middleware';
 import { SCHEMA_VERSION, STORAGE_KEY, migrateSaved, storage } from './storage';
 import type {
   BucketKey, CircleMember, Contact, ContributionTag, DayReport, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
-  MoodQuadrant, ClassFlag, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
-  RecoveryEntry, SimAction, Trade, Mix,
+  MoodQuadrant, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
+  RecoveryEntry, SimAction, Trade, Mix, CustomFlag, FlagId, Group, ShareRules, ShareWindow,
 } from '@/lib/types';
-import type { PhoneContact, Visibility } from '@/lib/sharing';
+import { DEFAULT_SHARE_RULES, type PhoneContact, type ShareMode } from '@/lib/sharing';
 import type { Collection, MeDTO, PendingRequestDTO } from '@shared/contract';
 import { DEFAULT_CEILINGS, DEFAULT_OVERALL_CEILING } from '@/lib/load';
 import { mergeInto } from './snapshot';
 import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
 import { completionCredit } from '@/lib/errands';
+import { customFlagId } from '@/lib/timetable';
 import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
   CEILINGS, OVERALL_CEILING, TODAY, circle as seedCircle, contacts as seedContacts,
   customActions as seedCustomActions, errands as seedErrands, meals as seedMeals, modules as seedModules,
-  moodHistory, phoneContacts as seedPhoneContacts, recoveryLedger, seedItems,
+  moodHistory, phoneContacts as seedPhoneContacts, recoveryLedger, seedItems, groups as seedGroups,
 } from '@/data/seed';
 
 interface State {
@@ -78,7 +79,13 @@ interface State {
   /** The address book, as the app would see it. See `phoneContacts` in the seed. */
   phoneContacts: PhoneContact[];
   /** How much of your week your circle can see. Yours, changeable, off included. */
-  sharing: Visibility;
+  sharing: ShareMode;
+  /** Custom sharing: which hours of which days, and who sees nothing at all. */
+  shareRules: ShareRules;
+  /** Reasons of the student's own for a class to matter more than its hours. */
+  customFlags: CustomFlag[];
+  /** Friends you plan with often. */
+  groups: Group[];
   /**
    * The signed-in account, or null.
    *
@@ -119,7 +126,17 @@ interface State {
   applyTrades: (trades: Trade[]) => void;
   dropSwap: (id: string) => void;
   addFriend: (contactId: string) => void;
-  setSharing: (visibility: Visibility) => void;
+  setSharing: (visibility: ShareMode) => void;
+  setShareRules: (patch: Partial<ShareRules>) => void;
+  setShareDay: (day: number, window: ShareWindow) => void;
+  toggleHiddenFrom: (friendId: string) => void;
+  addCustomFlag: (flag: Omit<CustomFlag, 'id'>) => string;
+  removeCustomFlag: (id: string) => void;
+  setModuleEmoji: (moduleId: string, emoji: string) => void;
+  createGroup: (group: Omit<Group, 'id'>) => string;
+  updateGroup: (id: string, patch: Partial<Omit<Group, 'id'>>) => void;
+  toggleGroupMember: (groupId: string, friendId: string) => void;
+  deleteGroup: (id: string) => void;
   setAccount: (account: MeDTO | null) => void;
   setStatus: (status: string | null) => void;
   goLive: (account: MeDTO, today: string) => void;
@@ -144,6 +161,8 @@ interface State {
     options?: { replace?: boolean },
   ) => void;
   unscheduleSession: (sessionId: string) => void;
+  /** Move or resize one booked sitting. The day, the time and the length are each optional. */
+  updateSession: (sessionId: string, patch: { date?: string; startHour?: number; hours?: number }) => void;
   setSessionNote: (sessionId: string, note: string) => void;
   completeSitting: (sessionId: string) => void;
   logUnbookedHours: (id: string, hours: number) => void;
@@ -160,7 +179,7 @@ interface State {
   pushSittings: (parentId: string, from: string, to: string) => void;
   setModuleDread: (moduleId: string, dread: DreadLevel) => void;
   setModuleImportance: (moduleId: string, importance: 1 | 2 | 3) => void;
-  toggleClassFlag: (itemId: string, flag: ClassFlag) => void;
+  toggleClassFlag: (itemId: string, flag: FlagId) => void;
   markAttendance: (moduleId: string, attended: boolean) => void;
   importTimetable: (items: Item[], modules: Module[]) => void;
   reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number, verdict?: DayReport['verdict']) => void;
@@ -210,6 +229,9 @@ export const useStore = create<State>()(
   // Free evenings by default, which is what makes the planning side work at all.
   // Off is one tap away and is genuinely off, not "off but still discoverable".
   sharing: 'evenings',
+  shareRules: DEFAULT_SHARE_RULES,
+  customFlags: [],
+  groups: seedGroups,
   account: null,
   mode: 'demo',
   requests: [],
@@ -229,8 +251,19 @@ export const useStore = create<State>()(
       return { items: [...state.items, { ...item, id: `user-${Date.now()}` }] };
     }),
 
+  /**
+   * How much you mind it, and so what it costs.
+   *
+   * Sittings copy their parent's dread when booked, so changing it here used to
+   * re-price the assignment and leave its booked hours at the old price. The
+   * ones still ahead follow it now; a sitting already done keeps what it cost.
+   */
   setDread: (id, dread) =>
-    set((state) => ({ items: state.items.map((i) => (i.id === id ? { ...i, dread } : i)) })),
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === id || (i.parentId === id && !i.sessionDone) ? { ...i, dread } : i,
+      ),
+    })),
 
   /**
    * What "apply" actually does: moves the calendar blocks and batches the
@@ -320,6 +353,7 @@ export const useStore = create<State>()(
       sleepHours: null, showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: DEFAULT_CEILINGS, overallCeiling: DEFAULT_OVERALL_CEILING,
       sharing: 'evenings', offHour: 17,
+      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: [],
     }),
 
   /** Back to the interface study. What the public link shows, and what the checks assert. */
@@ -337,6 +371,7 @@ export const useStore = create<State>()(
       requests: [], booked: [], dayReports: [], invites: [], moments: [], sleepHours: null, status: null,
       showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: CEILINGS, overallCeiling: OVERALL_CEILING, sharing: 'evenings', offHour: 17,
+      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups,
     }),
 
   /**
@@ -379,6 +414,11 @@ export const useStore = create<State>()(
         if (typeof settings.sharing === 'string') patch.sharing = settings.sharing as State['sharing'];
         if (Array.isArray(settings.customActions)) patch.customActions = settings.customActions as State['customActions'];
         if (typeof settings.onboarded === 'boolean') patch.onboarded = settings.onboarded;
+        if (Array.isArray(settings.customFlags)) patch.customFlags = settings.customFlags as CustomFlag[];
+        if (Array.isArray(settings.groups)) patch.groups = settings.groups as Group[];
+        if (settings.shareRules && typeof settings.shareRules === 'object') {
+          patch.shareRules = { ...DEFAULT_SHARE_RULES, ...(settings.shareRules as Partial<ShareRules>) };
+        }
       }
 
       return patch;
@@ -518,6 +558,67 @@ export const useStore = create<State>()(
       }),
     })),
 
+  setModuleEmoji: (moduleId, emoji) =>
+    set((state) => ({ modules: state.modules.map((m) => (m.id === moduleId ? { ...m, emoji } : m)) })),
+
+  /** A flag of your own. Returns its id so the class it was made on can wear it at once. */
+  addCustomFlag: (flag) => {
+    const id = customFlagId(flag.protect);
+    const label = flag.label.trim().slice(0, 24);
+    set((state) => ({ customFlags: [...state.customFlags, { ...flag, label, id }] }));
+    return id;
+  },
+
+  /** Deleting a flag takes it off every class too - nothing keeps a reason that no longer exists. */
+  removeCustomFlag: (id) =>
+    set((state) => ({
+      customFlags: state.customFlags.filter((f) => f.id !== id),
+      items: state.items.map((item) =>
+        item.flags?.includes(id) ? { ...item, flags: item.flags.filter((f) => f !== id) } : item,
+      ),
+    })),
+
+  setShareRules: (patch) => set((state) => ({ shareRules: { ...state.shareRules, ...patch } })),
+
+  setShareDay: (day, window) =>
+    set((state) => ({
+      shareRules: { ...state.shareRules, week: state.shareRules.week.map((w, i) => (i === day ? window : w)) },
+    })),
+
+  toggleHiddenFrom: (friendId) =>
+    set((state) => {
+      const hidden = state.shareRules.hiddenFrom;
+      return {
+        shareRules: {
+          ...state.shareRules,
+          hiddenFrom: hidden.includes(friendId) ? hidden.filter((id) => id !== friendId) : [...hidden, friendId],
+        },
+      };
+    }),
+
+  createGroup: (group) => {
+    const id = `group-${Date.now()}`;
+    set((state) => ({
+      groups: [...state.groups, { ...group, id, name: group.name.trim().slice(0, 32) || 'New group', members: [...new Set(group.members)] }],
+    }));
+    return id;
+  },
+
+  updateGroup: (id, patch) =>
+    set((state) => ({ groups: state.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) })),
+
+  toggleGroupMember: (groupId, friendId) =>
+    set((state) => ({
+      groups: state.groups.map((g) =>
+        g.id !== groupId ? g : {
+          ...g,
+          members: g.members.includes(friendId) ? g.members.filter((m) => m !== friendId) : [...g.members, friendId],
+        },
+      ),
+    })),
+
+  deleteGroup: (id) => set((state) => ({ groups: state.groups.filter((g) => g.id !== id) })),
+
   markAttendance: (moduleId, attended) =>
     set((state) => ({
       modules: state.modules.map((m) =>
@@ -593,21 +694,18 @@ export const useStore = create<State>()(
     })),
 
   /**
-   * Book the sittings a plan proposed. Replaces any previous plan for the same
-   * piece of work, so re-planning does not leave the old sessions behind.
-   */
-  /**
    * Book sittings of a longer piece of work.
    *
-   * `replace` is for the planner, which proposes a whole schedule; adding one
-   * sitting by hand keeps the ones already there.
+   * `replace` is for re-planning from scratch: the sittings still ahead go and
+   * the new plan takes their place. The ones already done stay - they are what
+   * moved the bar, and deleting them is how a day forgot it had happened.
    */
   scheduleSessions: (parentId, sessions, options) =>
     set((state) => {
       const parent = state.items.find((item) => item.id === parentId);
       if (!parent) return {};
       const kept = options?.replace
-        ? state.items.filter((item) => item.parentId !== parentId)
+        ? state.items.filter((item) => item.parentId !== parentId || item.sessionDone)
         : state.items;
       const existing = kept.filter((item) => item.parentId === parentId).length;
       return {
@@ -634,6 +732,27 @@ export const useStore = create<State>()(
   /** Giving a sitting back. The unplanned part of the bar grows again. */
   unscheduleSession: (sessionId) =>
     set((state) => ({ items: state.items.filter((item) => item.id !== sessionId) })),
+
+  /**
+   * Move a booked sitting, or change how long it is.
+   *
+   * Giving it back and booking again lost the note and reshuffled the list; a
+   * sitting you want on Wednesday instead is the same sitting. A done one stays
+   * where it happened.
+   */
+  updateSession: (sessionId, patch) =>
+    set((state) => ({
+      items: state.items.map((item) => {
+        if (item.id !== sessionId || !item.parentId || item.sessionDone) return item;
+        const hours = patch.hours !== undefined ? Math.max(0.5, Math.round(patch.hours * 2) / 2) : item.hours;
+        return {
+          ...item,
+          date: patch.date ?? item.date,
+          startHour: 'startHour' in patch ? patch.startHour : item.startHour,
+          hours,
+        };
+      }),
+    })),
 
   setSessionNote: (sessionId, note) =>
     set((state) => ({
@@ -803,6 +922,7 @@ export const useStore = create<State>()(
       recovery: recoveryLedger, booked: [], dayReports: [],
       sleepHours: null, invites: [], moments: [], offHour: 17, customActions: seedCustomActions, modules: seedModules,
       circle: seedCircle, phoneContacts: seedPhoneContacts, sharing: 'evenings',
+      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups,
       // Ceilings too. They move when you report a hard day below your line, and
       // reset clears the day reports that moved them - leaving the lowered line
       // in place with the evidence for it gone made every later reading read

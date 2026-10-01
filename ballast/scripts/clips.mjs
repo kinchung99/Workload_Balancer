@@ -4,7 +4,7 @@
  * against real footage instead of a stopwatch and an imagination.
  *
  * `npm run shots` photographs still screens. This drives the app — taps the
- * timetable flags, presses "Book 2 sittings for me", toggles the sharing screen
+ * timetable flags, suggests and books the sittings, toggles the sharing screen
  * — and captures frames while it happens, at the exact per-beat timings in
  * docs/video/plan.html. The output is a player you open in a browser: press
  * space, read the script aloud, and find out on the spot whether you are ahead
@@ -132,12 +132,13 @@ const SCENES = [
         { do: 'goto', arg: '/item/algo-set', secs: 3 },
         { do: 'scroll', arg: 220, secs: 5 },
       ] },
-      { id: 'd', secs: 12, label: 'book 2 sittings for me', steps: [
-        { do: 'click', arg: 'Book 2 sittings for me', secs: 8 },
-        { do: 'scroll', arg: 420, secs: 4 },
+      { id: 'd', secs: 12, label: 'suggest, then book the sittings', steps: [
+        { do: 'click', arg: '✨ Suggest 2 sittings', secs: 5 },
+        { do: 'click', arg: 'Book 2 sittings · 3h', secs: 4 },
+        { do: 'scroll', arg: 420, secs: 3 },
       ] },
       { id: 'e', secs: 5, label: 'did some without booking it', steps: [
-        { do: 'click', arg: '+1h', secs: 5 },
+        { do: 'click', arg: 'Log 1h', secs: 5 },
       ] },
     ],
   },

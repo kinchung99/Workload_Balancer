@@ -135,6 +135,14 @@ export type Visibility = (typeof VISIBILITIES)[number];
  */
 export const publishSchema = z.object({
   visibility: visibilitySchema,
+  /**
+   * People in your circle who see no times at all, whatever the level.
+   *
+   * Applied on read in the circle route rather than by publishing a different
+   * set per person: one set of windows, and a short list of who may not look.
+   * Absent means nobody is hidden, which is how every older client behaves.
+   */
+  hiddenFrom: z.array(z.string().min(1).max(128)).max(500).optional(),
   windows: z.array(z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     start: z.number().min(0).max(24),
@@ -199,6 +207,71 @@ export const inviteReplySchema = z.object({
   inviteId: z.string().min(1),
   response: z.enum(['yes', 'no']),
 });
+
+/* ----------------------------------------------------------------- compose */
+
+/**
+ * Writing a message with Claude.
+ *
+ * The one place the server sees anything about a student's week, so the shape
+ * is deliberately the shortest description of the moment that can still write a
+ * good message: what it is about, who it is to, and what is in the way - the
+ * words on the screen the student is looking at, and nothing else. Nothing here
+ * is stored; the route answers and forgets.
+ */
+export const COMPOSE_KINDS = ['decline', 'checkin', 'invite'] as const;
+export const TONE_IDS = ['warm', 'brief', 'honest', 'formal', 'playful'] as const;
+export type ToneId = (typeof TONE_IDS)[number];
+export const LENGTHS = ['short', 'medium', 'long'] as const;
+export type MessageLength = (typeof LENGTHS)[number];
+
+export const composeContextSchema = z.object({
+  /** Getting out of something, checking on a friend, or proposing a plan. */
+  kind: z.enum(COMPOSE_KINDS),
+  /** What it is about, as it reads on screen: "Aisyah's birthday dinner". */
+  subject: z.string().min(1).max(120),
+  /** Who it is going to: a first name, "my lecturer", "the group". */
+  to: z.string().min(1).max(60),
+  /** When, in words: "Thu 20 Nov, 7pm". */
+  when: z.string().max(60).optional(),
+  commitment: z.enum(['hard', 'soft', 'self']).optional(),
+  /** What is in the way, in words: "Group presentation on Wednesday". */
+  pressure: z.string().max(160).optional(),
+  /** How full the week is, as the battery's load percent. */
+  weekPercent: z.number().int().min(0).max(300).optional(),
+  dread: z.number().int().min(1).max(5).optional(),
+  /** Their battery, for a check-in. Never their tasks - there are none to send. */
+  theirCharge: z.number().int().min(0).max(100).optional(),
+});
+export type ComposeContext = z.infer<typeof composeContextSchema>;
+
+export const composeIdeasSchema = z.object({ context: composeContextSchema });
+
+export const composeDraftSchema = z.object({
+  context: composeContextSchema,
+  intent: z.object({
+    title: z.string().min(1).max(60),
+    detail: z.string().max(160).optional(),
+  }),
+  tone: z.enum(TONE_IDS),
+  length: z.enum(LENGTHS).default('medium'),
+  /** The draft being adjusted, when this is a tweak rather than a first go. */
+  previous: z.string().max(1500).optional(),
+  /** The tweak: "shorter", "warmer", "offer a new date". */
+  adjust: z.string().max(120).optional(),
+});
+export type ComposeDraftRequest = z.infer<typeof composeDraftSchema>;
+
+/** One thing the message could be for, as a card the student taps. */
+export interface ComposeIdea {
+  id: string;
+  title: string;
+  emoji: string;
+  detail: string;
+}
+
+export interface ComposeIdeasResponse { ideas: ComposeIdea[] }
+export interface ComposeDraftResponse { message: string }
 
 /* ----------------------------------------------------------------- profile */
 

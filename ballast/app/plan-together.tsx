@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 import { PageHeader, Screen, Stack } from '@/components';
 import { SCREEN } from '@design/screens';
-import { SocialPlanner } from '@/features/areas/SocialPlanner';
+import { Planner } from '@/features/social/Planner';
 
 /**
  * Plan something together — the feature with no equivalent anywhere.
@@ -11,13 +12,13 @@ import { SocialPlanner } from '@/features/areas/SocialPlanner';
  * capacity — only availability. An empty Thursday evening and an empty Thursday
  * evening are not the same offer if one of you is at 8%.
  *
- * So this does the coordinating that four busy people will never do themselves:
- * it takes the evenings they have shared, intersects them with the real gaps in
- * your own week, and offers only the windows that work for everybody. Their
- * battery sits next to their name the whole time, because inviting the person at
- * 8% to a day trip is not a kindness.
+ * This is the one-off version: whoever you pick, today. Groups you plan with
+ * often live on the Friends tab and open the same planner with the group as
+ * the who.
  */
 export default function PlanTogether() {
+  const [people, setPeople] = useState<string[]>(['amin', 'ravi']);
+
   return (
     <Screen back="/friends" backLabel="Friends">
       <Stack gap={5} className="pt-2">
@@ -26,11 +27,12 @@ export default function PlanTogether() {
           eyebrow="Plan something"
           title="Find an evening"
         />
-
-
-        <SocialPlanner />
-
-
+        <Planner
+          people={people}
+          onAdd={(id) => setPeople((prev) => [...prev, id])}
+          onRemove={(id) => setPeople((prev) => prev.filter((p) => p !== id))}
+          onUseGroup={(group) => setPeople(group.members)}
+        />
         <View className="h-2" />
       </Stack>
     </Screen>

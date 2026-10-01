@@ -161,13 +161,22 @@ const EXPECTATIONS = [
     'IF YOU BOOK IT', 'WHERE IT LANDS',       // battery and timeline before committing
     'Book Today at 12pm',                     // defaults into the window a walk belongs in
   ]],
-  ['decline/w11-birthday.html', 'Drafter', ['The app writes it. It never sends it.',"Aisyah's birthday dinner", 'Warm', 'Brief', 'Fully honest', "Actually, I'm going", 'Open in WhatsApp']],
+  ['decline/w11-birthday.html', 'Drafter', [
+    'The app writes it. It never sends it.', "Aisyah's birthday dinner",
+    'What do you want to say?', 'IDEAS ON YOUR PHONE',      // no server in the export: the phone's own ideas
+    'Say no, I\u2019m overloaded', 'Come for part of it', 'Something else',
+    'Pick a tone', 'Warm', 'Brief', 'Fully honest', 'Formal', 'Playful', 'Detailed',
+    'Pick what to say first',                                // nothing is written until you choose
+    "Actually, I'm going", 'Open in WhatsApp',
+  ]],
+  ['message.html', 'Message', ['Write a message', 'Pick a friend or a plan first.']],
   ['widget.html', 'Widget', ['Ballast', 'week 10', 'One thing today. The networks lab report', 'How was today?', '47%', 'Draining', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
   ['timetable.html', 'Timetable · week', [
     'Week', 'Modules', 'Import',              // three views of one screen, not a sequence
     'TIMETABLE', 'This week',
     'Operating Systems lecture', 'Kilburn LT1', 'lecture',
     'Gives exam tips', 'Sets coursework', 'Register',   // why an hour is worth more
+    'FLAGS \u00b7 WHY A CLASS MATTERS', 'New flag',     // and reasons of your own
     'Import from your portal',
   ]],
   ['timetable/modules.html', 'Timetable · modules', [
@@ -175,6 +184,7 @@ const EXPECTATIONS = [
     'YOUR MODULES', 'CS2040', 'Distributed Systems',
     'Dread 4',                                          // dread lives on the module
     'Below the 80% the department expects.',
+    'Tap for dread, importance, register', 'THIS WEEK', 'NO REGISTER', '89%',
   ]],
   ['timetable/import.html', 'Timetable · import', [
     'Paste it from your portal', 'One class per line',
@@ -193,15 +203,24 @@ const EXPECTATIONS = [
     // page rather than here - collapsed is the whole design of these lists.
     'Tap to change what your circle sees',
     'Find friends', '3 of your contacts are here',
+    'GROUPS \u00b7 2', 'New group', 'Study crew', 'Flat 4B',   // the people you plan with most
     'Plan something together',
   ]],
   ['plan-together.html', 'Plan together', [
     'PLAN SOMETHING', 'Find an evening',
     'WHO', 'Amin', '62%', 'Aisyah', '8%',      // their capacity, next to the name
+    'ADD SOMEONE', 'Remove Amin', 'Study crew', // who is editable, every time
+    'Who\u2019s free when', 'Green works for everyone',   // the heatmap
     'WHAT', 'Dinner \u00b7 2h', 'Day trip \u00b7 6h',
     'WHEN EVERYONE IS FREE',                   // the windows that work for all of you
     'Wed 12 Nov', '6pm – 8pm', 'Pick a time',
   ]],
+  ['group/study-crew.html', 'A group', [
+    'Study crew', 'GROUP \u00b7 3 PEOPLE', 'You, Amin, Ravi',
+    'Who\u2019s free when', 'WHEN EVERYONE IS FREE', 'Wed 12 Nov',
+    'Delete this group',
+  ]],
+  ['group/new.html', 'New group', ['New group', 'WHO\u2019S IN', 'Pick at least one friend']],
   /*
    * The public prototype ships with no API URL, so this is the branch it shows -
    * and asserting it is the point. A build with no server must still open every
@@ -227,6 +246,15 @@ const EXPECTATIONS = [
     // The preview is the whole point: their view of you, in their name.
     "AMIN'S VIEW OF YOUR WEEK", '5pm\u201311pm',
     'Never a title, a deadline or who you are with. There is no field for it.',
+    'FINE-TUNE', 'Custom hours', 'Who sees your times', 'Everyone in your circle',
+  ]],
+  ['sharing/hours.html', 'Sharing · hours', [
+    'Custom hours', 'Not on yet', 'START FROM', 'Weeknights', 'Weekends',
+    'SHORTEST WINDOW WORTH SHOWING', 'HOW FAR AHEAD', 'Use custom hours',
+  ]],
+  ['sharing/people.html', 'Sharing · people', [
+    'Who sees your times', 'Hidden friends still see your battery.',
+    'Everyone', 'Only Study crew', 'Sees your free times',
   ]],
   ['find-friends.html', 'Find friends', [
     '4 IN YOUR CIRCLE', 'Find your people',
@@ -274,10 +302,12 @@ const EXPECTATIONS = [
   ['item/algo-set.html', 'One item', [
     'DUE THU 13 NOV', 'Algorithms problem set',
     '12 load', 'Soft', 'No time yet',
-    '3h still to do', '1h done \u00b7 0h booked \u00b7 3h loose',
-    'Book 2 sittings for me',                 // every verb for this thing, in one place
-    'DID SOME WITHOUT BOOKING IT?',
+    '3h still to do', '1h done', '0h booked', '3h loose', '25%',   // the ring and its legend
+    '3h still loose', '2 sittings fit before Thu 13 Nov',
+    'Suggest 2 sittings',                     // proposes first; nothing is booked unseen
+    'Did some without booking it?', 'Log 1h', 'All of it \u00b7 3h',
     'How much are you dreading it?', 'Changing this re-prices the whole week.',
+    'Not keen', 'THIS TASK', 'NO CHANGE',     // dread 3, and what changing it does
     'Write a message to get out of it',
   ]],
   ['checkin.html', 'Check in', [
@@ -319,6 +349,11 @@ const EXITS = [
   ['checkin.html', 'You'],
   ['plan-together.html', 'Friends'],
   ['sharing.html', 'Friends'],
+  ['sharing/hours.html', 'What they see'],
+  ['sharing/people.html', 'What they see'],
+  ['group/study-crew.html', 'Friends'],
+  ['group/new.html', 'Friends'],
+  ['message.html', 'Friends'],
   ['account.html', 'You'],
   ['profile.html', 'You'],
   ['settings.html', 'You'],

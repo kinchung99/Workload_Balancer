@@ -133,7 +133,7 @@ export interface Item {
    * A lecture is an hour of load like any other until it is the one where the
    * exam hints get given. Marking it changes what the app will let you move.
    */
-  flags?: ClassFlag[];
+  flags?: FlagId[];
 }
 
 export type SessionKind = 'lecture' | 'lab' | 'tutorial' | 'seminar';
@@ -147,6 +147,25 @@ export type SessionKind = 'lecture' | 'lab' | 'tutorial' | 'seminar';
  */
 export type ClassFlag = 'tips' | 'coursework' | 'attendance';
 
+/** A built-in flag, or the id of one the student made. */
+export type FlagId = ClassFlag | (string & {});
+
+/**
+ * A reason of the student's own.
+ *
+ * Three built-in reasons cover the common cases and miss the rest: "lab safety
+ * sign-off", "the one where we pick groups", "bring the laptop". Protecting is
+ * opt-in - most flags are a note to self, and only the ones that say so stop
+ * the app from ever proposing to move the class.
+ */
+export interface CustomFlag {
+  id: string;
+  label: string;
+  emoji: string;
+  /** Never suggest moving or skipping a class carrying this flag. */
+  protect: boolean;
+}
+
 export interface Module {
   id: string;
   code: string;
@@ -159,6 +178,8 @@ export interface Module {
   held: number;
   /** Percentage the department expects. Null when nobody is counting. */
   requiredAttendance: number | null;
+  /** The module's own picture, picked by the student. Decoration only. */
+  emoji?: string;
 }
 
 /**
@@ -286,6 +307,45 @@ export interface Invite {
   startHour: number;
   hours: number;
   people: string[];
+  /** The group it was planned in, when it was. */
+  groupId?: string;
+}
+
+/**
+ * A group of friends you plan with often.
+ *
+ * A group chat without the chat: a name, a picture and who is in it. Opening one
+ * shows when everybody in it is free, which is the only thing a group chat is
+ * ever trying to find out.
+ */
+export interface Group {
+  id: string;
+  name: string;
+  emoji: string;
+  /** Circle member ids. You are always in it and never listed. */
+  members: string[];
+}
+
+/** One weekday's shareable hours. Null means that day is never shared. */
+export type ShareWindow = { start: number; end: number } | null;
+
+/**
+ * Sharing, beyond the three presets.
+ *
+ * The presets are right for most people and wrong for some: the student whose
+ * Sunday mornings are nobody's business, the one who only wants to be asked
+ * out on Fridays. This says exactly which hours of which days may be offered,
+ * how short a window is worth showing, and who sees nothing at all.
+ */
+export interface ShareRules {
+  /** Seven entries, Monday first. */
+  week: ShareWindow[];
+  /** Shorter free windows than this are left out. */
+  minHours: number;
+  /** How far ahead your free time is published. */
+  ahead: 7 | 14;
+  /** Friends who see no times, whichever mode is on. */
+  hiddenFrom: string[];
 }
 
 /** What the parser pulled out of one sentence. Every field is one tap from being fixed. */

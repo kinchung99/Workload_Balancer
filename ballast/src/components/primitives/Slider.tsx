@@ -22,6 +22,8 @@ export interface SliderProps {
   readout: string;
 }
 
+const KNOB = 28;
+
 const TRACK_FILL = {
   steady: color.band.steady.fill,
   heavy: color.band.heavy.fill,
@@ -53,9 +55,15 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
     return next;
   };
 
+  /**
+   * The knob is 28pt wide and stays inside the track, so its centre travels
+   * width - 28. Mapping `x / width` instead left the top notch half a knob past
+   * the right edge.
+   */
   const fromX = (x: number) => {
     if (widthRef.current <= 0) return valueRef.current;
-    return emit(quantise(min + (x / widthRef.current) * (max - min)));
+    const travel = Math.max(1, widthRef.current - KNOB);
+    return emit(quantise(min + ((x - KNOB / 2) / travel) * (max - min)));
   };
 
   const pan = useRef(
@@ -68,6 +76,7 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
   ).current;
 
   const ratio = max === min ? 0 : (value - min) / (max - min);
+  const travel = Math.max(0, width - KNOB);
 
   return (
     <View
@@ -92,14 +101,14 @@ export function Slider({ value, min, max, step, onChange, tone = 'neutral', labe
       <View className="h-2 w-full rounded-pill bg-track" />
       <View
         pointerEvents="none"
-        style={{ position: 'absolute', height: 8, width: ratio * width, backgroundColor: TRACK_FILL[tone], borderRadius: 999 }}
+        style={{ position: 'absolute', height: 8, width: ratio * travel + KNOB / 2, backgroundColor: TRACK_FILL[tone], borderRadius: 999 }}
       />
       <View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: Math.max(0, ratio * width - 14),
-          height: 28, width: 28, borderRadius: 999,
+          left: ratio * travel,
+          height: KNOB, width: KNOB, borderRadius: 999,
           backgroundColor: color.control.knob,
           borderWidth: 2, borderColor: TRACK_FILL[tone],
         }}
