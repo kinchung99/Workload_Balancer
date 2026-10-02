@@ -10,7 +10,7 @@
  * every student already has that text, and a parser that runs offline beats an
  * OCR round-trip that needs a camera, a permission dialogue and a network.
  */
-import { addDays, dayIndex } from './dates';
+import { addDays, dayIndex, daysBetween } from './dates';
 import { loadOf } from './load';
 import type { ClassFlag, CustomFlag, FlagId, Item, Module, SessionKind } from './types';
 
@@ -54,6 +54,10 @@ const protects = (flag: FlagId): boolean => flag === 'tips' || flag === 'attenda
 export const isProtectedClass = (item: Item): boolean =>
   !!item.moduleId && (item.flags ?? []).some(protects);
 
+/** The student's own flags that belong on this module's classes. */
+export const flagsFor = (moduleId: string | undefined, custom: CustomFlag[]): CustomFlag[] =>
+  custom.filter((flag) => !flag.moduleId || flag.moduleId === moduleId);
+
 /** Any flag, built-in or the student's own, as words and a picture. Null if it was deleted. */
 export function flagInfo(flag: FlagId, custom: CustomFlag[] = []): { label: string; short: string; emoji: string; protect: boolean } | null {
   if ((BUILT_IN_FLAGS as string[]).includes(flag)) {
@@ -96,6 +100,35 @@ export function moduleWeek(items: Item[], moduleId: string, days: string[]) {
     hours: Math.round(sessions.reduce((total, item) => total + item.hours, 0) * 10) / 10,
     load: Math.round(sessions.reduce((total, item) => total + loadOf(item), 0) * 10) / 10,
   };
+}
+
+/**
+ * Where the module is in its run: "week 10 of 12".
+ *
+ * Null until the student has said how many weeks it runs, because a term
+ * length the app guessed would make every number below it a guess too.
+ */
+export function moduleTerm(module: Module, today: string): { week: number; weeks: number } | null {
+  if (!module.weeks || !module.startDate) return null;
+  const week = Math.floor(daysBetween(module.startDate, today) / 7) + 1;
+  return { week: Math.max(1, Math.min(module.weeks, week)), weeks: module.weeks };
+}
+
+/**
+ * The best attendance still possible: every class left signed into.
+ *
+ * Classes left are this week's not yet marked, plus the same number of classes
+ * a week for every week still to run. Null where nobody counts, or while the
+ * module's length is unknown.
+ */
+export function bestCase(module: Module, items: Item[], days: string[], today: string): number | null {
+  const term = moduleTerm(module, today);
+  if (module.requiredAttendance === null || !term) return null;
+  const thisWeek = classesInWeek(items, days).filter((item) => item.moduleId === module.id);
+  const open = thisWeek.filter((item) => !item.outcome).length;
+  const left = open + Math.max(0, term.weeks - term.week) * thisWeek.length;
+  const held = module.held + left;
+  return held === 0 ? 100 : Math.round(((module.attended + left) / held) * 100);
 }
 
 export const attendanceRate = (module: Module): number =>
@@ -175,7 +208,9 @@ export function parseLine(line: string): ParsedClass | null {
     .replace(/\b(lecture|lab|practical|workshop|tutorial|seminar|exercise)s?\b/i, ' ')
     .replace(/[|,;:]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
-    .trim();
+    .trim()
+    // "Algorithms Lab in Lab A": the room went, and must take its "in" with it.
+    .replace(/\s+(?:in|at|room|rm)$/i, '');
 
   return {
     day,
@@ -207,6 +242,37 @@ export function parseTimetable(text: string): ImportResult {
 }
 
 /** Turn parsed lines into real items on the week that `anchor` falls in. */
+/**
+ * The modules a pasted timetable describes, one per code (or name).
+ *
+ * Each gets a picture: the one the student picked on the import screen, or a
+ * guess from its name. Picked once, at import, because that is the one moment
+ * the student is looking at the list of their modules with nothing else to do.
+ */
+export function modulesFrom(
+  items: Item[],
+  pictures: Record<string, string> = {},
+  weeks: Record<string, number> = {},
+  startDate?: string,
+): Module[] {
+  return [...new Set(items.map((item) => item.moduleId!).filter(Boolean))].map((id) => {
+    const first = items.find((item) => item.moduleId === id)!;
+    const module: Module = {
+      id,
+      code: id.replace('imported-', '').toUpperCase().slice(0, 8),
+      name: first.title.replace(/\s\w+$/, ''),
+      dread: 2,
+      importance: 2,
+      attended: 0,
+      held: 0,
+      requiredAttendance: null,
+      weeks: weeks[id] ?? 12,
+      startDate,
+    };
+    return { ...module, emoji: pictures[id] ?? moduleEmoji(module) };
+  });
+}
+
 export function toItems(parsed: ParsedClass[], anchor: string, dread: 1 | 2 | 3 | 4 | 5): Item[] {
   const monday = addDays(anchor, -dayIndex(anchor));
   return parsed.map((entry, index) => ({

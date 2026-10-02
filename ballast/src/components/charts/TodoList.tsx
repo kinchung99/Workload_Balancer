@@ -96,9 +96,9 @@ export function TodoList({ todo, items, today, date, onOpen }: TodoListProps) {
                 </Stack>
               </Stack>
 
-              <Text variant="micro" tone="subtle">
-                {sittings.length ? `${ticked}/${sittings.length} sittings done · tap to change` : 'Tap to plan it'}
-              </Text>
+              {sittings.length ? (
+                <Text variant="micro" tone="subtle">✍️ {ticked}/{sittings.length} sittings done</Text>
+              ) : null}
             </Stack>
           </Pressable>
         );

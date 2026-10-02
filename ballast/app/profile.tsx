@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Avatar, Button, Card, Chip, PageHeader, Screen, Stack, Text,
@@ -12,17 +12,20 @@ import { api } from '@/lib/api';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 import { useReading } from '@/state/selectors';
+import { moodEmoji } from '@/lib/logs';
+import { FACES, canPickPhoto, pickPhoto } from '@/lib/photo';
+import { PersonRow } from '@/features/social/PersonRow';
 
 /** Short enough to read at a glance in a list, which is the only place it appears. */
 const STATUS_MAX = 60;
 
 /**
- * Edit profile — the four things other people actually see.
+ * Edit profile — the things other people actually see.
  *
- * Every social app has this screen and it is always the same four fields: the
- * picture, the name, the line, and the private contact detail. Ours swaps the
- * picture for initials on a coloured ring, because a photo is a whole upload
- * pipeline and a storage bill for something a circle of four already recognises.
+ * Every social app has this screen and it is always the same fields: the
+ * picture, the name, the line, and the private contact detail. The picture is a
+ * photo from your phone, squared and shrunk before it is kept, or one of a row
+ * of faces for anyone who would rather not; initials on your ring otherwise.
  *
  * The preview at the top is the point. You are editing how you appear **in your
  * friends' list**, so the screen shows you that row rather than a form and a
@@ -30,7 +33,7 @@ const STATUS_MAX = 60;
  */
 export default function Profile() {
   const router = useRouter();
-  const { account, setAccount, status, setStatus } = useStore();
+  const { account, setAccount, status, setStatus, pic, setPic, moods } = useStore();
   const reading = useReading();
   const band = bandFor(reading.overall);
 
@@ -40,6 +43,10 @@ export default function Profile() {
   const [phone, setPhone] = useState(account?.phone ?? '');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Known only in the browser, so decided after the first paint - the page the
+  // server rendered and the one the browser takes over then match.
+  const [canUpload, setCanUpload] = useState(false);
+  useEffect(() => setCanUpload(canPickPhoto), []);
 
   // What the circle will show. Typed initials win; otherwise they follow the name.
   const shown = (initials.trim() || initialsFrom(name || 'You')).slice(0, 2).toUpperCase();
@@ -82,22 +89,61 @@ export default function Profile() {
         <PageHeader {...SCREEN.you} eyebrow="Edit profile" title="How you appear" />
 
         {/* The live preview: this is your row in somebody else's circle. */}
-        <Stack gap={3}>
+        <Card tone={band} gap={3}>
           <Text variant="micro" tone="subtle">WHAT YOUR FRIENDS SEE</Text>
-          <Card tone={band} gap={4}>
-            <Stack direction="row" gap={4} align="center">
-              <Avatar initials={shown} band={band} size={56} />
-              <Stack gap={1} grow>
-                <Stack direction="row" gap={3} align="center">
-                  <Text variant="body" weight="semibold">{name.trim() || 'Your name'}</Text>
-                  <Text variant="body" weight="semibold">{reading.charge}%</Text>
-                </Stack>
-                <Text variant="micro" tone="subtle">just now</Text>
-                {line.trim() ? <Text variant="micro" tone="muted">“{line.trim()}”</Text> : null}
-              </Stack>
-            </Stack>
-          </Card>
-        </Stack>
+          <PersonRow
+            name={name.trim() || 'Your name'}
+            initials={shown}
+            band={band}
+            charge={reading.charge}
+            pic={pic}
+            mood={moodEmoji(moods)}
+            status={line.trim() || null}
+            line="just now"
+            active
+          />
+        </Card>
+
+        {/* Your picture: a photo, a face, or your initials. */}
+        <Card gap={4}>
+          <Stack direction="row" align="center" justify="between">
+            <Text variant="micro" tone="subtle">PICTURE</Text>
+            {pic ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Remove picture" onPress={() => { tapFeedback(); setPic(null); }} className="min-h-min justify-center active:opacity-60">
+                <Text variant="caption" weight="semibold" className="underline">Remove</Text>
+              </Pressable>
+            ) : null}
+          </Stack>
+          {canUpload ? (
+            <Button
+              label="📷 Upload a photo"
+              kind="secondary"
+              onPress={async () => {
+                const photo = await pickPhoto();
+                if (photo) { setPic(photo); successFeedback(); }
+              }}
+            />
+          ) : null}
+          <Stack direction="row" gap={2} wrap>
+            {FACES.map((face) => (
+              <Pressable
+                key={face}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: pic === face }}
+                accessibilityLabel={`Picture ${face}`}
+                onPress={() => { tapFeedback(); setPic(face); }}
+                className="items-center justify-center rounded-pill active:opacity-60"
+                style={{
+                  width: 46, height: 46,
+                  backgroundColor: pic === face ? color.decor.lemon : color.surface.sunken,
+                  borderWidth: pic === face ? 2 : 0, borderColor: color.ink.default,
+                }}
+              >
+                <Text variant="heading">{face}</Text>
+              </Pressable>
+            ))}
+          </Stack>
+        </Card>
 
         <Card gap={5}>
           <Field label="NAME" value={name} onChange={(v) => { setName(v); setSaved(false); }} placeholder="Amira Hassan" autoComplete="name" />
@@ -118,7 +164,6 @@ export default function Profile() {
               accessibilityLabel="Initials"
               className="min-h-row rounded-md border-2 border-line-hairline bg-decor-cream px-4 py-3 text-body text-ink-default"
             />
-            <Text variant="micro" tone="subtle">Leave it blank to follow your name.</Text>
           </Stack>
 
           <Stack gap={2}>
@@ -159,23 +204,8 @@ export default function Profile() {
             placeholder="60123456789"
             keyboardType="phone-pad"
           />
-          {/*
-            The one place a phone number needs explaining, said where it is typed
-            rather than in a policy nobody opens.
-          */}
-          <Text variant="micro" tone="muted">
-            Only used to open WhatsApp from this phone. Never shared with anyone, never uploaded to find you.
-          </Text>
+          <Text variant="micro" tone="muted">🔒 Only for opening WhatsApp. Never shared.</Text>
         </Card>
-
-        {!account ? (
-          <Card tone="sunken" gap={2}>
-            <Text variant="footnote" weight="semibold">You are not signed in.</Text>
-            <Text variant="micro" tone="muted">
-              Your status saves on this device. Sign in for it to reach your circle.
-            </Text>
-          </Card>
-        ) : null}
 
         <View className="h-2" />
       </Stack>

@@ -13,6 +13,7 @@
 import Constants from 'expo-constants';
 import type {
   CircleMemberDTO, ComposeContext, ComposeDraftRequest, ComposeDraftResponse, ComposeIdeasResponse,
+  RestContext, RestIdeasResponse,
   InviteDTO, InviteRequest, MeDTO, PendingRequestDTO, Presence, PublishRequest, SyncDoc, SyncResponse, Visibility,
 } from '@shared/contract';
 
@@ -173,6 +174,10 @@ export const api = {
     post<ComposeIdeasResponse>('/api/compose/ideas', { context }, WRITING_TIMEOUT),
   composeDraft: (body: ComposeDraftRequest) =>
     post<ComposeDraftResponse>('/api/compose/draft', body, WRITING_TIMEOUT),
+
+  /** Five things that might help. Numbers and taps only; falls back to the phone's own list. */
+  restIdeas: (context: Omit<RestContext, 'vibes' | 'exclude'> & Partial<Pick<RestContext, 'vibes' | 'exclude'>>) =>
+    post<RestIdeasResponse>('/api/suggest/recovery', { context }, WRITING_TIMEOUT),
 };
 
 export type { CircleMemberDTO, InviteDTO, MeDTO, PendingRequestDTO, Visibility };

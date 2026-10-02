@@ -9,8 +9,7 @@ export { Button } from './primitives/Button';
 export { Chip } from './primitives/Chip';
 export { Toggle } from './primitives/Toggle';
 export { Divider } from './primitives/Divider';
-export { DreadDots, DreadPicker } from './primitives/DreadDots';
-export { DreadSlider, DREAD_WORD } from './primitives/DreadSlider';
+export { DrainBadge, DrainPicker } from './primitives/DrainPicker';
 export { ItemRow } from './primitives/ItemRow';
 export { Slider } from './primitives/Slider';
 export { Checkbox } from './primitives/Checkbox';
@@ -18,8 +17,11 @@ export { MoodGrid, QUADRANTS, quadrantLabel, quadrantTone } from './primitives/M
 export { AreaTile } from './primitives/AreaTile';
 export { DatePicker } from './primitives/DatePicker';
 export { Reveal } from './primitives/Reveal';
+export { Disclosure } from './primitives/Disclosure';
+export { MarkBadge } from './primitives/MarkBadge';
+export { Door } from './primitives/Door';
 export { AreaIcon } from './primitives/AreaIcon';
-export { Avatar } from './primitives/Avatar';
+export { Avatar, isPhoto } from './primitives/Avatar';
 export { AreaDial, DialStepper, DrainFace } from './primitives/AreaDial';
 export { Sticker, type StickerName } from './primitives/Sticker';
 export { StepDots } from './primitives/StepDots';
@@ -39,4 +41,5 @@ export { TodoList } from './charts/TodoList';
 
 export { Screen, ScreenHeader } from './layout/Screen';
 export { PageHeader } from './layout/PageHeader';
+export { Section } from './layout/Section';
 export { StepNav } from './layout/StepNav';

@@ -75,3 +75,43 @@ export const BAND_WORD: Record<BandName, string> = {
   heavy: 'running empty',
   recovery: 'resting',
 };
+
+// ---------------------------------------------------------------- a circle of eighty
+// Four friends fit on a screen. Eighty do not, so every list of people starts
+// with the few you actually talk to, then everyone else A to Z, with a search.
+
+/** The people you message and plan with most, most first. */
+export function frequentFriends(people: CircleMember[], count = 6): CircleMember[] {
+  return people
+    .filter((p) => !p.isYou && (p.frequency ?? 0) > 0)
+    .sort((a, b) => (b.frequency ?? 0) - (a.frequency ?? 0) || a.name.localeCompare(b.name))
+    .slice(0, count);
+}
+
+/** Everyone, A to Z, under their first letter. */
+export function byLetter(people: CircleMember[]): Array<{ letter: string; people: CircleMember[] }> {
+  const sorted = people.filter((p) => !p.isYou).sort((a, b) => a.name.localeCompare(b.name));
+  const groups: Array<{ letter: string; people: CircleMember[] }> = [];
+  for (const person of sorted) {
+    const letter = person.name[0]?.toUpperCase() ?? '#';
+    const last = groups[groups.length - 1];
+    if (last && last.letter === letter) last.people.push(person);
+    else groups.push({ letter, people: [person] });
+  }
+  return groups;
+}
+
+/** Names that match what was typed, anywhere in the name, ignoring case. Best matches first. */
+export function searchPeople(people: CircleMember[], query: string): CircleMember[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return people
+    .filter((p) => !p.isYou && p.name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      // A name starting with it beats one merely containing it.
+      const aStarts = a.name.toLowerCase().split(' ').some((word) => word.startsWith(q));
+      const bStarts = b.name.toLowerCase().split(' ').some((word) => word.startsWith(q));
+      if (aStarts !== bStarts) return aStarts ? -1 : 1;
+      return (b.frequency ?? 0) - (a.frequency ?? 0) || a.name.localeCompare(b.name);
+    });
+}

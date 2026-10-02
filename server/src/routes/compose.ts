@@ -1,5 +1,5 @@
 /**
- * Writing a message with Claude.
+ * Writing with Claude: messages, and what might help.
  *
  * The drafter used to be three templates with the blanks filled in, which reads
  * as a template the moment anyone receives two of them. Saying no, asking for an
@@ -22,15 +22,19 @@
  *    events that are not in the context. A message that lies for you is one you
  *    have to keep lying about.
  *
- * Signed-in only (guests count), and rate-limited per person, because an open
- * proxy to a paid model is a bill somebody else writes.
+ * The same seam also answers "what would help" on the recovery screen: five
+ * concrete things to do, drawn from how full each area of the week is and what
+ * the student is in the mood for. Numbers and taps only - no task, no name.
+ *
+ * Signed-in only (guests count), and rate-limited per person across both, because
+ * an open proxy to a paid model is a bill somebody else writes.
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
-  composeDraftSchema, composeIdeasSchema,
-  type ComposeContext, type ComposeDraftRequest, type ComposeIdea,
+  REST_AREAS, composeDraftSchema, composeIdeasSchema, restIdeasSchema,
+  type ComposeContext, type ComposeDraftRequest, type ComposeIdea, type RestContext, type RestIdea,
 } from '../../../shared/contract.js';
 import type { Env } from '../types.js';
 
@@ -38,6 +42,8 @@ import type { Env } from '../types.js';
 export interface Writer {
   ideas(context: ComposeContext): Promise<ComposeIdea[]>;
   draft(request: ComposeDraftRequest): Promise<string>;
+  /** Five things that might help, for the recovery screen. */
+  rest(context: RestContext): Promise<RestIdea[]>;
 }
 
 /** The model declined. Answered as 422 so the app falls back to its own drafts. */
@@ -53,6 +59,46 @@ Rules:
 - Be kind to the reader and to the student. No guilt-tripping, no grovelling, no therapy language.
 - Use the names and details given. When the subject belongs to the person you are writing to ("Aisyah's birthday dinner", sent to Aisyah), call it theirs ("your birthday dinner").
 - Do not mention load percentages, batteries, dread scores or this app.`;
+
+const REST_SYSTEM = `You suggest recovery activities for a university student whose week is overloaded. They will pick one and put it in their calendar today.
+
+Rules:
+- Concrete and doable today: say what to do and roughly how long. Use generic places ("a park nearby", "the library garden"), never invent a specific named venue.
+- Mostly free or cheap. Nothing that needs booking ahead, a long journey or special equipment.
+- Rest the areas of the week that are full. Prefer activities that draw on the area that still has room - if mental is full and physical has room, a walk beats a puzzle.
+- Respect what they said they are in the mood for.
+- Not medical or clinical advice. No therapy language, no "self-care" cliches, nothing involving alcohol or anything risky.
+- Varied: five genuinely different ideas, not five versions of a walk.`;
+
+const fmt = (hour: number): string => {
+  const whole = Math.floor(hour);
+  const minutes = Math.round((hour - whole) * 60);
+  const suffix = whole >= 12 ? 'pm' : 'am';
+  const display = whole % 12 === 0 ? 12 : whole % 12;
+  return minutes ? `${display}:${String(minutes).padStart(2, '0')}${suffix}` : `${display}${suffix}`;
+};
+
+const VIBE_WORDS = {
+  outside: 'outside', indoors: 'indoors', alone: 'on their own', people: 'with other people',
+  free: 'costing nothing', low: 'low energy',
+} as const;
+
+/** The week as a few plain lines of numbers. Only what the schema allowed in. */
+function describeRest(context: RestContext): string {
+  const areas = Object.entries(context.areas) as Array<[keyof RestContext['areas'], number]>;
+  const fullest = [...areas].sort((a, b) => b[1] - a[1])[0];
+  const roomiest = [...areas].filter(([key]) => (REST_AREAS as readonly string[]).includes(key)).sort((a, b) => a[1] - b[1])[0];
+  const lines = [
+    `Battery: ${context.charge}% left (lower means more drained).`,
+    `How full each area of the week is, against the student's own limit: ${areas.map(([key, value]) => `${key} ${value}%`).join(', ')}. Over 100% is over their limit.`,
+    `Fullest: ${fullest[0]}. Most room to give back to: ${roomiest[0]}.`,
+  ];
+  if (context.sleepHours !== undefined) lines.push(`Slept last night: ${context.sleepHours} hours.`);
+  if (context.free?.length) lines.push(`Free on the day: ${context.free.map((w) => `${fmt(w.start)}-${fmt(w.end)}`).join(', ')}.`);
+  if (context.vibes.length) lines.push(`In the mood for something ${context.vibes.map((v) => VIBE_WORDS[v]).join(', ')}.`);
+  if (context.exclude.length) lines.push(`Already suggested, so do not repeat or rephrase: ${context.exclude.join('; ')}.`);
+  return lines.join('\n');
+}
 
 /** The moment, as a few plain lines. Only what the schema allowed in. */
 function describe(context: ComposeContext): string {
@@ -128,6 +174,54 @@ const draftFormat = {
   },
 };
 
+const restFormat = {
+  type: 'json_schema' as const,
+  schema: {
+    type: 'object',
+    properties: {
+      ideas: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'The activity, starting with a verb. At most 32 characters.' },
+            emoji: { type: 'string', description: 'One emoji that fits.' },
+            detail: { type: 'string', description: 'One line: what exactly, and why it fits today. At most 70 characters.' },
+            area: { type: 'string', enum: [...REST_AREAS], description: 'The area of the week it gives back to.' },
+            minutes: { type: 'integer', description: 'How long, between 10 and 120.' },
+            from: { type: 'integer', description: 'Earliest hour of the day it suits, 24h, between 7 and 22.' },
+            to: { type: 'integer', description: 'Latest hour it should finish by, 24h, between 8 and 23.' },
+            tags: { type: 'array', items: { type: 'string' }, description: 'One to three short tags, e.g. "Costs nothing", "Under an hour", "Alone".' },
+          },
+          required: ['title', 'emoji', 'detail', 'area', 'minutes', 'from', 'to', 'tags'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['ideas'],
+    additionalProperties: false,
+  },
+};
+
+const restShape = z.object({
+  ideas: z.array(z.object({
+    title: z.string().min(1),
+    emoji: z.string().min(1),
+    detail: z.string(),
+    area: z.enum(REST_AREAS),
+    minutes: z.number(),
+    from: z.number(),
+    to: z.number(),
+    tags: z.array(z.string()),
+  })).min(1),
+});
+
+const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, Math.round(value)));
+
+/** A stable id from a title, so the same idea booked twice is the same idea. */
+export const ideaId = (title: string): string =>
+  `idea-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
+
 const ideasShape = z.object({
   ideas: z.array(z.object({ title: z.string().min(1), emoji: z.string().min(1), detail: z.string() })).min(1),
 });
@@ -142,13 +236,17 @@ const draftShape = z.object({ message: z.string().min(1) });
  * on Anthropic's recommended model inside the same call instead of failing.
  */
 export function claudeWriter(client = new Anthropic({ timeout: 20_000, maxRetries: 1 })): Writer {
-  const ask = async (prompt: string, format: typeof ideasFormat | typeof draftFormat): Promise<unknown> => {
+  const ask = async (
+    prompt: string,
+    format: typeof ideasFormat | typeof draftFormat | typeof restFormat,
+    system = SYSTEM,
+  ): Promise<unknown> => {
     const response = await client.beta.messages.create({
       model: MODEL,
       max_tokens: 4000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      system: SYSTEM,
+      system,
       output_config: { effort: 'low', format },
       messages: [{ role: 'user', content: prompt }],
     });
@@ -189,6 +287,32 @@ export function claudeWriter(client = new Anthropic({ timeout: 20_000, maxRetrie
       const raw = await ask(parts.join('\n\n'), draftFormat);
       return draftShape.parse(raw).message.trim();
     },
+
+    async rest(context) {
+      const raw = await ask(
+        `${describeRest(context)}\n\nSuggest five different recovery activities for today, best fit first.`,
+        restFormat,
+        REST_SYSTEM,
+      );
+      const seen = new Set(context.exclude.map((title) => title.toLowerCase()));
+      return restShape.parse(raw).ideas
+        .filter((idea) => !seen.has(idea.title.toLowerCase()))
+        .slice(0, 6)
+        .map((idea) => {
+          const from = clamp(idea.from, 6, 22);
+          return {
+            id: ideaId(idea.title),
+            title: idea.title.slice(0, 40),
+            detail: idea.detail.slice(0, 100),
+            emoji: [...idea.emoji][0] ?? '🌿',
+            area: idea.area,
+            minutes: clamp(idea.minutes, 10, 180),
+            from,
+            to: Math.max(from + 1, clamp(idea.to, 7, 23)),
+            tags: idea.tags.map((tag) => tag.slice(0, 20)).filter(Boolean).slice(0, 3),
+          };
+        });
+    },
   };
 }
 
@@ -223,14 +347,19 @@ function allow(userId: string, now = Date.now()): boolean {
 
 /* ------------------------------------------------------------------ routes */
 
-export function composeRoutes(writer: Writer | null) {
+/** No key, no model; too many calls, a pause. The same gate in front of every route here. */
+function gated(writer: Writer | null) {
   const routes = new Hono<Env>();
-
   routes.use('*', async (c, next) => {
     if (!writer) return c.json({ error: 'ai_not_configured' }, 503);
     if (!allow(c.get('userId'))) return c.json({ error: 'slow_down' }, 429);
     await next();
   });
+  return routes;
+}
+
+export function composeRoutes(writer: Writer | null) {
+  const routes = gated(writer);
 
   routes.post('/ideas', async (c) => {
     const parsed = composeIdeasSchema.safeParse(await c.req.json().catch(() => null));
@@ -248,6 +377,24 @@ export function composeRoutes(writer: Writer | null) {
     if (!parsed.success) return c.json({ error: 'bad_request', detail: parsed.error.issues[0]?.message }, 400);
     try {
       return c.json({ message: await writer!.draft(parsed.data) });
+    } catch (err) {
+      const { status, error } = failure(err);
+      return c.json({ error }, status);
+    }
+  });
+
+  return routes;
+}
+
+/** `/api/suggest/recovery` — what might help, five at a time. */
+export function suggestRoutes(writer: Writer | null) {
+  const routes = gated(writer);
+
+  routes.post('/recovery', async (c) => {
+    const parsed = restIdeasSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: 'bad_request', detail: parsed.error.issues[0]?.message }, 400);
+    try {
+      return c.json({ ideas: await writer!.rest(parsed.data.context) });
     } catch (err) {
       const { status, error } = failure(err);
       return c.json({ error }, status);

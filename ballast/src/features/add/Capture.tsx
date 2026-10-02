@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  AreaDial, AreaIcon, Battery, Burst, Button, Card, Chip, DatePicker, Reveal,
+  AreaDial, AreaIcon, Battery, Burst, Button, Card, Chip, DatePicker, DrainPicker, Reveal,
   Screen, Stack, StepDots, Sticker, Text, type StickerName,
 } from '@/components';
 import { color } from '@design/tokens';
@@ -18,12 +18,13 @@ import type { BucketKey, CommitmentKind, Item, Mix } from '@/lib/types';
 import { useStore } from '@/state/store';
 import { categorise } from '@/lib/errands';
 import { WANT_CHOICES } from '@/lib/swap';
+import { AREA_HINT, drainCosts, toggleArea, withDrain } from '@/lib/drain';
 import { readingFrom, useItemsWithLogs, useReading } from '@/state/selectors';
 
 const HOUR_OPTIONS = [0.5, 1, 2, 3, 4, 6, 8];
 const PREP_OPTIONS = [2, 4, 6, 9, 12, 16, 20, 30];
 const PREP_STEP = 2;
-const STEPS = ['What', 'How big', 'What it takes', 'When'];
+const STEPS = ['What', 'How big', 'How draining', 'When'];
 
 /** The four pages, as URL segments. `/add/takes` opens straight on the dials. */
 export const STEP_SLUGS = ['what', 'size', 'takes', 'when'] as const;
@@ -52,7 +53,7 @@ const QUICK: Array<{
 const ART: Record<number, { sticker: StickerName; title: string; sub: string; wash: string }> = {
   0: { sticker: 'wave', title: "What's on?", sub: "However you'd say it out loud.", wash: color.decor.lemon },
   1: { sticker: 'clock', title: 'How big is it?', sub: 'Turn up, or work first?', wash: color.decor.sky },
-  2: { sticker: 'sparkle', title: 'What does it take?', sub: 'Drag the faces. Five parts of you.', wash: color.decor.candy },
+  2: { sticker: 'battery', title: 'How draining is it?', sub: 'Same hours, different cost. One tap.', wash: color.decor.candy },
   3: { sticker: 'calendar', title: 'When?', sub: 'Pick a day. A time if you know it.', wash: color.decor.mint },
 };
 
@@ -74,8 +75,13 @@ const DIAL_ORDER: BucketKey[] = ['mental', 'time', 'physical', 'social', 'errand
  * The second is the model. A task used to land in ONE of the five areas, which
  * is the assumption that lets a week read sixty percent while the person is
  * finished — a group presentation is not "mental", it is mental and time and a
- * social cost nobody would have thought to name. Page three asks all five, with
- * a face on each, and the load lands in the proportions you give.
+ * social cost nobody would have thought to name.
+ *
+ * Page three asks it the way the rest of the app does: one "how draining is
+ * it?" picker with the battery price under each face, then a tap on each part of
+ * you it drains. The five dials that used to fill the page are still there for
+ * anyone who wants them, folded under "Fine-tune" - five sliders as the first
+ * thing a new student sees was the page people skipped.
  */
 export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const router = useRouter();
@@ -150,6 +156,20 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
     };
     return readingFrom([...scheduleItems, candidate], today, ceilings);
   }, [ready, text, bucket, spentHours, dread, commit, needsPrep, due, day, liveMix, want, time, scheduleItems, today, ceilings]);
+
+  /**
+   * What this would cost the week's battery at each level of drain, with the
+   * areas split as they are now. Printed under the faces on page three.
+   */
+  const costs = useMemo(() => drainCosts(
+    scheduleItems,
+    (level) => [{
+      id: 'preview-add', title: 'preview', bucket, hours: spentHours, dread: level, commitment: commit,
+      date: needsPrep ? due : day, mix: withDrain(liveMix, level, bucket),
+    }],
+    needsPrep ? due : day,
+    ceilings,
+  ), [scheduleItems, bucket, spentHours, commit, needsPrep, due, day, liveMix, ceilings]);
 
   /** The reading on show: with the new thing folded in once there is one. */
   const shown = after ?? reading;
@@ -390,40 +410,67 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
         {/* ---------------------------------------------------------------- */}
         {step === 2 ? (
           <Stack gap={4}>
-            {/* The live consequence, pinned above the controls so every drag
-                visibly does something. */}
-            <Card tone={load === 0 ? 'sunken' : bandTone(after?.overall ?? 0)} gap={3}>
-              <Stack direction="row" align="center" justify="between">
-                <Stack gap={1}>
-                  <Text variant="micro" tone="subtle">THIS ONE WEIGHS</Text>
-                  <Text variant="display">{load}</Text>
-                </Stack>
-                <Stack gap={2} align="end">
-                  <Text variant="caption" tone="muted">{fmtHours(spentHours)} × dread {dread}</Text>
-                  {areasChosen.length > 1 ? (
-                    <Text variant="footnote" weight="semibold">{describeMix(liveMix, bucket)}</Text>
-                  ) : null}
-                </Stack>
-              </Stack>
+            {/* The same question, asked the same way, as everywhere else in the app. */}
+            <Card gap={4}>
+              <DrainPicker
+                question="Pick the face that fits"
+                value={dread}
+                onChange={(level) => { setMixTouched(true); setMix((prev) => withDrain(prev, level, bucket)); }}
+                costs={costs}
+                hours={spentHours}
+              />
+            </Card>
 
+            {/* Where it lands. A tap each, not five sliders. */}
+            <Card gap={3}>
+              <Text variant="heading">Where does it drain you?</Text>
+              <Stack direction="row" gap={2} wrap>
+                {DIAL_ORDER.map((area) => {
+                  const on = liveMix[area] > 0;
+                  return (
+                    <Pressable
+                      key={area}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on }}
+                      accessibilityLabel={`${BUCKET_LABEL[area]}, ${AREA_HINT[area]}`}
+                      onPress={() => { tapFeedback(); setMixTouched(true); setMix((prev) => toggleArea(prev, area, dread)); }}
+                      className="items-center gap-1 rounded-lg border-2 px-2 py-3 active:opacity-70"
+                      style={{
+                        width: '31%',
+                        backgroundColor: on ? color.area[area].wash : color.surface.raised,
+                        borderColor: on ? color.area[area].ink : color.line.hairline,
+                      }}
+                    >
+                      <AreaIcon area={area} size={22} />
+                      <Text variant="caption" weight="semibold">{BUCKET_LABEL[area]}</Text>
+                      <Text variant="micro" tone="subtle">{AREA_HINT[area]}</Text>
+                      {on ? (
+                        <View className="absolute items-center justify-center rounded-pill" style={{ top: 6, right: 6, width: 18, height: 18, backgroundColor: color.area[area].ink }}>
+                          <Text variant="micro" tone="inverse">✓</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </Stack>
               {shares ? (
                 <Stack direction="row" gap={2} wrap>
                   {areasChosen.map((key) => (
                     <View key={key} className="flex-row items-center gap-2 rounded-pill px-3 py-2" style={{ backgroundColor: color.area[key].wash }}>
                       <AreaIcon area={key} size={15} />
-                      <Text variant="micro">{BUCKET_LABEL[key]} {Math.round(load * shares[key] * 10) / 10}</Text>
+                      <Text variant="micro">{BUCKET_LABEL[key]} {Math.round(shares[key] * 100)}%</Text>
                     </View>
                   ))}
                 </Stack>
-              ) : (
-                <Text variant="footnote" tone="muted">Nothing set yet — drag at least one face.</Text>
-              )}
+              ) : null}
             </Card>
 
-            {DIAL_ORDER.map((area) => (
-              <AreaDial key={area} area={area} value={liveMix[area]} onChange={(next) => setArea(area, next)} />
-            ))}
-
+            {/* The five dials, for anyone who wants to say "a lot of head, a bit of time". */}
+            <Reveal label="Fine-tune each area">
+              {DIAL_ORDER.map((area) => (
+                <AreaDial key={area} area={area} value={liveMix[area]} onChange={(next) => setArea(area, next)} />
+              ))}
+            </Reveal>
           </Stack>
         ) : null}
 

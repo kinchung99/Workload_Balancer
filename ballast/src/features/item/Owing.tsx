@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { Button, Card, Chip, Ring, Slider, Stack, Sticker, Text } from '@/components';
+import { Button, Card, Chip, Ring, Slider, Stack, Text } from '@/components';
 import { color, radius } from '@design/tokens';
-import { formatShort } from '@/lib/dates';
-import { daysLeft, isAtRisk, remaining, scheduledHours, unplanned } from '@/lib/prep';
+import { isAtRisk, remaining, scheduledHours, unplanned } from '@/lib/prep';
 import { durationLabel } from '@/lib/sittings';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
@@ -15,14 +14,14 @@ import { Cheer } from './Cheer';
  *
  * Same three numbers the bar always showed, and the same colours - steady for
  * done, blue for booked, bare track for loose - drawn big enough to read before
- * anything else on the screen.
+ * anything else on the screen. It sits inside the page's Progress panel, which
+ * carries the deadline, so the ring itself says nothing about dates.
  */
 export function OwingSummary({ item, items, today }: { item: Item; items: Item[]; today: string }) {
   const total = item.prepHours ?? 0;
   const done = item.prepDone ?? 0;
   const booked = scheduledHours(item, items);
   const loose = unplanned(item, items);
-  const left = daysLeft(item, today);
   const risk = isAtRisk(item, items, today);
   const percent = total ? Math.round((done / total) * 100) : 0;
 
@@ -46,12 +45,8 @@ export function OwingSummary({ item, items, today }: { item: Item; items: Item[]
           <Legend fill={color.surface.track} label={`${loose}h loose`} />
         </Stack>
       </Stack>
-      <Stack direction="row" gap={2} wrap>
-        <Chip label={left === 0 ? 'Due today' : `${left} day${left === 1 ? '' : 's'} left`} tone={left <= 1 ? 'heavy' : 'busy'} readOnly />
-        <Chip label={`Due ${formatShort(item.deadline ?? item.date)}`} readOnly />
-      </Stack>
       {risk ? (
-        <Text variant="footnote" tone="heavy">Not enough free time left. Something has to move.</Text>
+        <Text variant="footnote" tone="heavy">Not enough free time left before it’s due.</Text>
       ) : null}
     </Card>
   );
@@ -77,7 +72,7 @@ function Legend({ fill, label }: { fill: string; label: string }) {
 export function LogTime({ item }: { item: Item }) {
   const { logUnbookedHours } = useStore();
   const left = remaining(item);
-  const top = Math.max(0.5, Math.floor(left * 2) / 2);
+  const top = Math.max(0.25, Math.floor(left * 4) / 4);
   const [hours, setHours] = useState(Math.min(1, top));
   const [cheer, setCheer] = useState<{ id: number; title: string; sub: string } | null>(null);
 
@@ -100,21 +95,11 @@ export function LogTime({ item }: { item: Item }) {
     successFeedback();
     const rest = Math.max(0, Math.round((left - amount) * 10) / 10);
     setCheer({ id: Date.now(), title: `+${durationLabel(amount)} on the bar`, sub: rest ? `${durationLabel(rest)} to go` : 'All done.' });
-    setHours(Math.min(1, Math.max(0.5, Math.floor(rest * 2) / 2)));
+    setHours(Math.min(1, Math.max(0.25, Math.floor(rest * 4) / 4)));
   };
 
   return (
-    <Card gap={4}>
-      <Stack direction="row" gap={3} align="center">
-        <View className="items-center justify-center rounded-pill" style={{ width: 48, height: 48, backgroundColor: color.decor.lemon }}>
-          <Sticker name="clock" size={32} />
-        </View>
-        <Stack gap={1} grow>
-          <Text variant="heading">Did some without booking it?</Text>
-          <Text variant="footnote" tone="muted">Slide to what you did.</Text>
-        </Stack>
-      </Stack>
-
+    <Stack gap={4}>
       {cheer ? <Cheer key={cheer.id} title={cheer.title} sub={cheer.sub} /> : null}
 
       <Stack direction="row" align="end" justify="between">
@@ -133,12 +118,12 @@ export function LogTime({ item }: { item: Item }) {
         <View style={{ flexGrow: Math.max(0, total - done - value) || 0.0001 }} />
       </View>
 
-      {left >= 0.5 ? (
+      {left >= 0.25 ? (
         <Slider
           value={Math.min(value, top)}
-          min={0.5}
+          min={0.25}
           max={top}
-          step={0.5}
+          step={0.25}
           tone="steady"
           label="Hours you did without booking"
           readout={durationLabel(value)}
@@ -154,6 +139,6 @@ export function LogTime({ item }: { item: Item }) {
       </Stack>
 
       <Button label={value === left ? `Log ${durationLabel(value)} · finish it` : `Log ${durationLabel(value)}`} kind="steady" onPress={() => log(value)} />
-    </Card>
+    </Stack>
   );
 }

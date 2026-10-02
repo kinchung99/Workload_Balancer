@@ -1,15 +1,15 @@
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Card, PageHeader, Screen, Stack, Sticker, Text, type StickerName,
+  Avatar, Card, Door, PageHeader, Screen, Section, Stack, Sticker, Text,
 } from '@/components';
-import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { bandFor } from '@/lib/load';
 import { VISIBILITY_SHORT } from '@/lib/sharing';
 import { restOwedFrom, useStore } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { prioritise } from '@/lib/priority';
+import { moodEmoji } from '@/lib/logs';
 import { tapFeedback } from '@/lib/haptics';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
@@ -29,7 +29,7 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recove
  */
 export default function You() {
   const router = useRouter();
-  const { recovery, account, circle, requests, sharing, status, mode } = useStore();
+  const { recovery, account, circle, requests, sharing, status, pic, moods } = useStore();
   const reading = useReading();
   const items = useItemsWithLogs();
   const { first } = prioritise(items, useStore.getState().today);
@@ -41,14 +41,6 @@ export default function You() {
 
   const name = account?.name ?? 'You';
   const initials = account?.initials ?? 'Y';
-
-  const rows: Array<{ sticker: StickerName; wash: string; title: string; sub: string; to: Href; badge?: number }> = [
-    { sticker: 'sun', wash: color.decor.lemon, title: 'Check in', sub: 'Mood, sleep, food, good things', to: '/checkin' },
-    { sticker: 'battery', wash: color.decor.mint, title: 'Recovery', sub: `${owed}h owed`, to: '/recover' },
-    { sticker: 'moon', wash: color.decor.sky, title: 'Tonight', sub: 'Plan an evening', to: '/tonight/night' },
-    { sticker: 'class', wash: color.decor.lemon, title: 'Timetable', sub: 'Classes and flags', to: '/timetable' },
-    { sticker: 'star', wash: color.decor.candy, title: 'What to do first', sub: `${first.length} ranked`, to: '/priority' },
-  ];
 
   return (
     <Screen>
@@ -70,7 +62,7 @@ export default function You() {
         {/* The profile card: who you are, how you are, and what you share. */}
         <Card tone={band} gap={5}>
           <Stack direction="row" gap={5} align="center">
-            <Avatar initials={initials} band={band} size={84} charge={reading.charge} />
+            <Avatar initials={initials} band={band} size={84} charge={reading.charge} pic={pic} mood={moodEmoji(moods)} />
             <Stack gap={1} grow>
               <Text variant="title">{name}</Text>
               {account ? (
@@ -118,7 +110,7 @@ export default function You() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={account ? 'Your circle' : 'Sign in'}
-              onPress={() => { tapFeedback(); router.push(account ? '/friends' : '/account'); }}
+              onPress={() => { tapFeedback(); router.push(account ? '/friends' : '/welcome'); }}
               className="min-h-row flex-1 items-center justify-center rounded-pill border-2 border-line-strong bg-raised active:opacity-70"
             >
               <Text variant="caption" weight="bold">{account ? 'Your circle' : 'Sign in'}</Text>
@@ -141,7 +133,6 @@ export default function You() {
                   <Text variant="heading">
                     {waiting} {waiting === 1 ? 'person wants' : 'people want'} to be in your circle
                   </Text>
-                  <Text variant="micro" tone="muted">Tap to answer</Text>
                 </Stack>
                 <Text variant="heading" tone="recovery">›</Text>
               </Stack>
@@ -149,33 +140,18 @@ export default function You() {
           </Pressable>
         ) : null}
 
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">YOUR WEEK</Text>
-          {rows.map((row) => (
-            <Pressable
-              key={row.title}
-              accessibilityRole="button"
-              accessibilityLabel={`${row.title}. ${row.sub}`}
-              onPress={() => { tapFeedback(); router.push(row.to); }}
-              className="min-h-row flex-row items-center gap-4 rounded-lg border-2 border-line-hairline bg-raised px-4 py-4 active:opacity-70"
-            >
-              <View className="items-center justify-center rounded-pill" style={{ width: 44, height: 44, backgroundColor: row.wash }}>
-                <Sticker name={row.sticker} size={28} />
-              </View>
-              <Stack gap={1} grow>
-                <Text variant="body" weight="semibold">{row.title}</Text>
-                <Text variant="micro" tone="subtle">{row.sub}</Text>
-              </Stack>
-              <Text variant="heading" tone="subtle">›</Text>
-            </Pressable>
-          ))}
-        </Stack>
+        {/* Two kinds of place to go, kept apart: looking after yourself, and
+            organising the week. Each door wears its own family's colour. */}
+        <Section family="rest" title="Recharge">
+          <Door family="you" sticker="sun" title="Check in" sub="Mood, sleep, food" onPress={() => router.push('/checkin')} />
+          <Door family="rest" sticker="battery" title="Recovery" sub={`${owed}h owed`} onPress={() => router.push('/recover')} />
+          <Door family="rest" sticker="moon" title="Tonight" sub="Plan an evening" onPress={() => router.push('/tonight/night' as Href)} />
+        </Section>
 
-        {mode === 'demo' ? (
-          <Text variant="footnote" tone="subtle">
-            This is the sample week. Sign in for your own.
-          </Text>
-        ) : null}
+        <Section family="week" title="Your week">
+          <Door family="week" sticker="class" title="Timetable" sub="Classes and flags" onPress={() => router.push('/timetable')} />
+          <Door family="focus" title="What to do first" sub={`${first.length} ranked`} onPress={() => router.push('/priority')} />
+        </Section>
 
         <View className="h-4" />
       </Stack>

@@ -18,6 +18,17 @@ import { addDays } from '@/lib/dates';
 export const TODAY = '2025-11-10';
 export const WEEK_NUMBER = 10;
 
+/**
+ * The seeded Monday's clock: half past two in the afternoon.
+ *
+ * Fixed for the same reason the date is. At 2:30pm the morning's lecture and
+ * tutorial are over and waiting to be marked, the afternoon's work is under
+ * way, and the evening shift is still ahead - every state a block can be in,
+ * on one screen, on every phone, at any hour.
+ */
+export const DEMO_DAY = TODAY;
+export const DEMO_HOUR = 14.5;
+
 const W10 = TODAY;                 // Mon 10 Nov
 const W11 = addDays(TODAY, 7);     // Mon 17 Nov
 
@@ -49,11 +60,13 @@ export const OVERALL_CEILING = 78;
  * Dread lives on the module rather than the class, because you do not dread
  * Tuesday - you dread networks. Changing it here changes every class in it.
  */
+const TERM_START = addDays(TODAY, -63);   // Mon 8 Sep, week 1
+
 export const modules: Module[] = [
-  { id: 'os',  code: 'CS2040', name: 'Operating Systems',   dread: 4, importance: 3, attended: 8,  held: 9,  requiredAttendance: 80 },
-  { id: 'net', code: 'CS2035', name: 'Networks',            dread: 2, importance: 3, attended: 11, held: 12, requiredAttendance: 80 },
-  { id: 'alg', code: 'CS2011', name: 'Algorithms',          dread: 3, importance: 2, attended: 7,  held: 9,  requiredAttendance: 80 },
-  { id: 'ds',  code: 'CS3012', name: 'Distributed Systems', dread: 3, importance: 2, attended: 6,  held: 9,  requiredAttendance: null },
+  { id: 'os',  code: 'CS2040', name: 'Operating Systems',   dread: 4, importance: 3, attended: 8,  held: 9,  requiredAttendance: 80, weeks: 12, startDate: TERM_START },
+  { id: 'net', code: 'CS2035', name: 'Networks',            dread: 2, importance: 3, attended: 11, held: 12, requiredAttendance: 80, weeks: 12, startDate: TERM_START },
+  { id: 'alg', code: 'CS2011', name: 'Algorithms',          dread: 3, importance: 2, attended: 7,  held: 9,  requiredAttendance: 80, weeks: 12, startDate: TERM_START },
+  { id: 'ds',  code: 'CS3012', name: 'Distributed Systems', dread: 3, importance: 2, attended: 6,  held: 9,  requiredAttendance: null, weeks: 11, startDate: TERM_START },
 ];
 
 /**
@@ -110,6 +123,14 @@ function klass(
 }
 
 export const seedItems: Item[] = [
+  // ---------------------------------------------------------------- yesterday
+  // Sunday, which nobody marked. The app marks it the morning after - assumed
+  // done, and kept on Home where any of it can be changed.
+  { id: 'sun-laundry', title: 'Laundry and shopping',     bucket: 'errands', hours: 2,    dread: 2, commitment: 'self', date: d(W10, -1), startHour: 11 },
+  { id: 'sun-call',    title: 'Call home',                bucket: 'social',  hours: 1,    dread: 2, commitment: 'self', date: d(W10, -1), startHour: 15 },
+  { id: 'sun-cook',    title: 'Cook and prep for the week', bucket: 'errands', hours: 2,  dread: 2, commitment: 'self', date: d(W10, -1), startHour: 17 },
+  { id: 'sun-reading', title: 'Set reading, week 10',     bucket: 'mental',  hours: 2,    dread: 2, commitment: 'self', date: d(W10, -1), startHour: 19.5 },
+
   ...classes(W10, ''),
   ...classes(W11, 'w11-'),
   // ---------------------------------------------------------------- week 10
@@ -189,10 +210,10 @@ export const seedItems: Item[] = [
  * permission dialogue that eats an hour and demos identically either way.
  */
 export const recoveryLedger: RecoveryEntry[] = [
-  { id: 'sleep',    label: 'Sleep',           detail: '6.1h average, 1.4h under your own baseline', hours: -9 },
-  { id: 'movement', label: 'Movement',        detail: 'Two walks in nine days',                     hours: -4 },
-  { id: 'downtime', label: 'Downtime',        detail: 'Sunday afternoon, uninterrupted',            hours: 2 },
-  { id: 'dayoff',   label: 'Last full day off', detail: '23 days ago',                              hours: null },
+  { id: 'sleep',    label: 'Sleep',           detail: '6.1h average, 1.4h under your own baseline', hours: -9, emoji: '😴', tag: '6.1h a night' },
+  { id: 'movement', label: 'Movement',        detail: 'Two walks in nine days',                     hours: -4, emoji: '🚶', tag: '2 walks in 9 days' },
+  { id: 'downtime', label: 'Downtime',        detail: 'Sunday afternoon, uninterrupted',            hours: 2,  emoji: '🛋️', tag: 'Sunday afternoon' },
+  { id: 'dayoff',   label: 'Last full day off', detail: '23 days ago',                              hours: null, emoji: '📅', tag: '23 days ago' },
 ];
 
 export const DEFICIT_DAYS = 9;
@@ -230,19 +251,81 @@ export const customActions: SimAction[] = [
 ];
 
 export const prescriptions: Prescription[] = [
-  { id: 'river', title: 'Walk the river loop', detail: '40 minutes. Free. Six minutes from your block. No phone needed.', refills: 'physical', credit: 2, slot: 'today at 5pm', preferred: [12, 19], tags: ['Costs nothing', 'Under an hour', 'Alone'], best: true },
-  { id: 'nap',   title: 'Nap, 25 minutes',     detail: 'Between your 2pm and your shift', refills: 'mental',   credit: 3, slot: 'this afternoon', preferred: [13, 16] },
-  { id: 'pool',  title: 'Campus pool, Thursday', detail: 'Already in your calendar',      refills: 'physical', credit: 4, slot: 'Thursday, 7am', preferred: [7, 10] },
-  { id: 'empty', title: 'An evening with nothing in it', detail: 'Wednesday is now free', refills: 'mental',   credit: 6, slot: 'Wednesday evening', preferred: [18, 22] },
+  { id: 'river', title: 'Walk the river loop', detail: '40 minutes. Free. Six minutes from your block. No phone needed.', refills: 'physical', credit: 2, slot: 'today at 5pm', preferred: [12, 19], tags: ['Costs nothing', 'Under an hour', 'Alone'], best: true, emoji: '🏞️' },
+  { id: 'nap',   title: 'Nap, 25 minutes',     detail: 'Between your 2pm and your shift', refills: 'mental',   credit: 3, slot: 'this afternoon', preferred: [13, 16], emoji: '😴', minutes: 30 },
+  { id: 'pool',  title: 'Campus pool, Thursday', detail: 'Already in your calendar',      refills: 'physical', credit: 4, slot: 'Thursday, 7am', preferred: [7, 10], emoji: '🏊' },
+  { id: 'empty', title: 'An evening with nothing in it', detail: 'Wednesday is now free', refills: 'mental',   credit: 6, slot: 'Wednesday evening', preferred: [18, 22], emoji: '🛋️' },
 ];
+
+/**
+ * The rest of a real circle: fifty-six more people.
+ *
+ * Four friends made every list on the social side look finished, and none of
+ * it would have survived a real student's eighty. These are generated, not
+ * hand-written - the same rule for each so the demo is identical on every
+ * phone - and deliberately ordinary: most fine, some busy, a few running low,
+ * many not opened today, few talked to often. Search, "frequent first" and the
+ * pickers are built against this, not against four.
+ */
+const MORE_NAMES = [
+  'Hana Yusof', 'Daniel Lim', 'Mei Ling Tan', 'Arjun Nair', 'Sofia Rossi', 'Irfan Hakim', 'Chloe Wong',
+  'Marcus Lee', 'Nur Aina', 'Ethan Goh', 'Kavya Raj', 'Zara Ahmed', 'Lucas Teo', 'Aiman Rashid', 'Emily Chan',
+  'Farah Aziz', 'Jason Ong', 'Siti Hajar', 'Ryan Koh', 'Ananya Iyer', 'Haziq Omar', 'Grace Tan', 'Kenji Sato',
+  'Liyana Zainal', 'Oliver Brown', 'Yasmin Idris', 'Bryan Chua', 'Nadhirah Salleh', 'Ivan Petrov', 'Jia Hui Lau',
+  'Amir Faiz', 'Rachel Ng', 'Samuel Ade', 'Aisha Karim', 'Kai Wen Ho', 'Maya Patel', 'Faris Hamdan', 'Clara Lopez',
+  'Jun Hao Lee', 'Dina Sufian', 'Noah Smith', 'Elena Novak', 'Hakim Zulkifli', 'Tasha Lim', 'Vikram Rao',
+  'Ainul Mardhiah', 'Leo Chen', 'Sarah Hussein', 'Wan Afiq', 'Isabel Cruz', 'Yong Jie Tan', 'Ruby Thomas',
+  'Adam Harith', 'Nicole Yap', 'Zhi Wei Ng', 'Mira Halim',
+];
+const MORE_PICS = ['🧑🏻‍🎓', '👩🏽‍🎨', '🧑🏾‍💻', '👨🏻‍🍳', '👩🏻‍💼', '🧑🏽‍🔬', '🧕🏻', '👨🏾‍🎤', '🦊', '🐼', '🐨', '🐯', '🌻', '🍄', '🎧', '⚡'];
+const MORE_MOODS = ['😊', '😴', '🤓', '😅', '🥲', '😌', '🔥', '🫡', '😮‍💨', '🙂'];
+const MORE_STATUS = [
+  'Gym, then library', 'Deadline Friday', 'Free tonight', 'Back home this week', 'Exams in two weeks',
+  'Working weekends', 'Finally slept', 'Group project chaos', 'Taking it slow',
+];
+
+/** The same value for the same person every time: a tiny deterministic hash. */
+const pickFor = (seed: number, salt: number, size: number) => ((seed * 9301 + salt * 49297) % 233280) % size;
+
+const MORE_FRIENDS: CircleMember[] = MORE_NAMES.map((name, i) => {
+  const roll = pickFor(i + 1, 1, 100);
+  const band: CircleMember['band'] = roll < 56 ? 'steady' : roll < 84 ? 'busy' : roll < 94 ? 'heavy' : 'recovery';
+  const charge = band === 'steady' ? 56 + pickFor(i + 1, 2, 35)
+    : band === 'busy' ? 26 + pickFor(i + 1, 3, 28)
+    : band === 'heavy' ? 11 + pickFor(i + 1, 4, 13)
+    : 62 + pickFor(i + 1, 5, 20);
+  // Most opened the app today; plenty have not for days.
+  const minutes = pickFor(i + 1, 6, 10) < 6 ? 8 + pickFor(i + 1, 7, 1300) : 1600 + pickFor(i + 1, 8, 9000);
+  const words = name.split(' ');
+  const evenings = pickFor(i + 1, 9, 3) === 0 ? [] : [
+    { date: d(W10, 2 + pickFor(i + 1, 10, 4)), start: 17 + pickFor(i + 1, 11, 3), end: 21 + pickFor(i + 1, 12, 2) },
+    { date: d(W11, 1 + pickFor(i + 1, 13, 5)), start: 17 + pickFor(i + 1, 14, 3), end: 21 + pickFor(i + 1, 15, 2) },
+  ];
+  return {
+    id: `friend-${words.join('-').toLowerCase()}`,
+    name,
+    initials: `${words[0][0]}${(words[1] ?? '')[0] ?? ''}`,
+    band,
+    charge,
+    heavyForDays: band === 'heavy' ? 1 + pickFor(i + 1, 16, 3) : undefined,
+    updatedMinsAgo: minutes,
+    status: pickFor(i + 1, 17, 5) < 2 ? MORE_STATUS[pickFor(i + 1, 18, MORE_STATUS.length)] : undefined,
+    mood: MORE_MOODS[pickFor(i + 1, 19, MORE_MOODS.length)],
+    pic: MORE_PICS[pickFor(i + 1, 20, MORE_PICS.length)],
+    // A few you talk to; most you do not, which is what a circle of sixty is.
+    frequency: i === 0 ? 9 : i === 1 ? 7 : i === 2 ? 5 : pickFor(i + 1, 21, 4),
+    phone: `6012${String(3456705 + i).padStart(7, '0')}`,
+    free: evenings,
+  };
+});
 
 /**
  * Seeded: needs other people.
  *
- * A band, a charge, how old the reading is, one line they wrote, and the
- * evenings they chose to publish. That is the entire payload - there is no field
- * here for a task, a deadline or a mood, which is what makes the calendar side
- * of this app safe to turn on.
+ * A band, a charge, how old the reading is, one line they wrote, a face and an
+ * emoji for how they feel - both picked by them - and the evenings they chose to
+ * publish. That is the entire payload - there is no field here for a task or a
+ * deadline, which is what makes the calendar side of this app safe to turn on.
  *
  * `phone` is what the message button hands to WhatsApp. Kept on the record
  * rather than typed each time, and never sent anywhere by this app: it goes into
@@ -252,7 +335,7 @@ export const circle: CircleMember[] = [
   { id: 'you', name: 'You', initials: 'A', band: 'busy', isYou: true, charge: 47, updatedMinsAgo: 5 },
   {
     id: 'amin', name: 'Amin', initials: 'Am', band: 'steady', charge: 62,
-    updatedMinsAgo: 22, status: 'Finally handed it in', phone: '60123456701',
+    updatedMinsAgo: 22, status: 'Finally handed it in', phone: '60123456701', mood: '🥳', pic: '🧑🏽‍💻', frequency: 14,
     free: [
       { date: d(W10, 2), start: 18, end: 22 },
       { date: d(W10, 4), start: 19, end: 23 },
@@ -264,7 +347,7 @@ export const circle: CircleMember[] = [
   },
   {
     id: 'jo', name: 'Jo', initials: 'J', band: 'busy', charge: 24,
-    updatedMinsAgo: 4380, status: 'Two labs and a shift', phone: '60123456702',
+    updatedMinsAgo: 4380, status: 'Two labs and a shift', phone: '60123456702', mood: '😵‍💫', pic: '👩🏻‍🔬', frequency: 8,
     free: [
       { date: d(W10, 2), start: 20, end: 22 },
       { date: d(W10, 5), start: 15, end: 19 },
@@ -274,7 +357,7 @@ export const circle: CircleMember[] = [
   },
   {
     id: 'aisyah', name: 'Aisyah', initials: 'Ai', band: 'heavy', heavyForDays: 11, charge: 8,
-    updatedMinsAgo: 95, phone: '60123456703',
+    updatedMinsAgo: 95, phone: '60123456703', mood: '🫠', pic: '🧕🏽', frequency: 6,
     free: [
       { date: d(W10, 5), start: 17, end: 21 },
       { date: d(W11, 3), start: 19, end: 22 },
@@ -283,7 +366,7 @@ export const circle: CircleMember[] = [
   },
   {
     id: 'ravi', name: 'Ravi', initials: 'R', band: 'steady', charge: 71,
-    updatedMinsAgo: 140, status: 'Free most of this week', phone: '60123456704',
+    updatedMinsAgo: 140, status: 'Free most of this week', phone: '60123456704', mood: '😎', pic: '🧑🏾‍🎤', frequency: 11,
     free: [
       { date: d(W10, 2), start: 17, end: 23 },
       { date: d(W10, 3), start: 18, end: 22 },
@@ -293,12 +376,19 @@ export const circle: CircleMember[] = [
       { date: d(W11, 5), start: 12, end: 22 },
     ],
   },
+  ...MORE_FRIENDS,
 ];
 
 /** Two groups, so the groups row and `/group/...` have something real to show. */
 export const groups: Group[] = [
-  { id: 'study-crew', name: 'Study crew', emoji: '📚', members: ['amin', 'ravi'] },
-  { id: 'flat-4b', name: 'Flat 4B', emoji: '🏠', members: ['jo', 'aisyah', 'ravi'] },
+  {
+    id: 'study-crew', name: 'Study crew', emoji: '📚', members: ['amin', 'ravi'],
+    activities: [{ id: 'act-library', label: 'Library session', emoji: '📖', hours: 3 }],
+  },
+  {
+    id: 'flat-4b', name: 'Flat 4B', emoji: '🏠', members: ['jo', 'aisyah', 'ravi'],
+    activities: [{ id: 'act-movie', label: 'Movie night', emoji: '🎬', hours: 3 }],
+  },
 ];
 
 /**

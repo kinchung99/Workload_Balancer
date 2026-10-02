@@ -14,8 +14,9 @@
  * where it is.
  */
 import { BUCKET_LABEL, isMovable, loadOf } from './load';
-import { daysLeft, isAtRisk, needsPrep, remaining } from './prep';
-import { daysBetween } from './dates';
+import { MAX_SESSION, MIN_SESSION, STUDY_WINDOW, daysLeft, isAtRisk, needsPrep, remaining, sittingStarts, unplanned, workDays } from './prep';
+import { addDays, daysBetween } from './dates';
+import { freeSlots, slotHours } from './schedule';
 import { isProtectedClass } from './timetable';
 import { wantOf } from './swap';
 import { DEFAULT_WEIGHTS } from './review';
@@ -141,6 +142,8 @@ const isActionable = (item: Item, today: string): boolean =>
   !item.isRecovery &&
   !item.parentId &&
   !item.sessionDone &&
+  // Already answered for - done, or marked as not happening.
+  !item.outcome &&
   (needsPrep(item) || (item.date >= today && (item.deadline === undefined || needsPrep(item))));
 
 /**
@@ -175,3 +178,147 @@ export function prioritise(
 /** "Mental · 8 load" — the one line under a title. */
 export const rankedDetail = (row: Ranked): string =>
   `${BUCKET_LABEL[row.item.bucket]} · ${row.saves} load`;
+
+/* ------------------------------------------------------- the top of the list */
+
+/** One push behind a row's place, and how hard it pushes: one to three. */
+export interface Push {
+  key: 'risk' | 'deadline' | 'promise' | 'matters' | 'size';
+  emoji: string;
+  label: string;
+  strength: 1 | 2 | 3;
+}
+
+/**
+ * Why something is first, as the three things pushing it hardest.
+ *
+ * The score is a product of five factors, which is right for ranking and
+ * unreadable as a number. Each factor becomes a line with one to three dots -
+ * "Due today, three dots; hard deadline, three; four hours of work, two" - so
+ * the order can be checked at a glance instead of taken on trust.
+ */
+export function whyFirst(row: Ranked, items: Item[], today: string, biggest: number): Push[] {
+  const { item } = row;
+  const owing = row.kind === 'owing';
+  const days = owing ? daysLeft(item, today) : Math.max(0, daysBetween(today, item.date));
+  const pushes: Push[] = [];
+
+  if (row.reasons.includes('Not enough time left')) {
+    pushes.push({ key: 'risk', emoji: '🚨', label: 'Not enough free time left to finish', strength: 3 });
+  }
+  const urgency = urgencyFactor(days);
+  if (urgency >= 0.8) {
+    pushes.push({
+      key: 'deadline', emoji: '⏰',
+      label: days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `Due in ${days} days`,
+      strength: urgency >= 2.2 ? 3 : urgency >= 1.15 ? 2 : 1,
+    });
+  }
+  if (item.commitment === 'hard') pushes.push({ key: 'promise', emoji: '🤝', label: 'Hard deadline', strength: 3 });
+  else if (item.commitment === 'soft') pushes.push({ key: 'promise', emoji: '🤝', label: 'Others expect it', strength: 1 });
+  if ((item.importance ?? 2) === 3) pushes.push({ key: 'matters', emoji: '⭐', label: 'Really matters', strength: 3 });
+
+  const weight = owing ? remaining(item) * 3 : Math.abs(loadOf(item));
+  const share = biggest > 0 ? weight / biggest : 0;
+  if (share > 0) {
+    pushes.push({
+      key: 'size', emoji: '📦',
+      label: owing ? `${remaining(item)}h of work to go` : `A ${item.hours < 1 ? `${Math.round(item.hours * 60)}m` : `${item.hours}h`} block`,
+      strength: share >= 0.66 ? 3 : share >= 0.33 ? 2 : 1,
+    });
+  }
+
+  return pushes.sort((a, b) => b.strength - a.strength).slice(0, 3);
+}
+
+/** How heavy a row is, the way the score sees it - for scaling "size" between rows. */
+export const rowWeight = (row: Ranked): number =>
+  row.kind === 'owing' ? remaining(row.item) * 3 : Math.abs(loadOf(row.item));
+
+/**
+ * Hours this still needs a slot for.
+ *
+ * Owing work: the hours neither done nor booked. Something with no time yet:
+ * its length. Something already at a time has its slot, so it needs none.
+ */
+export function hoursNeeded(row: Ranked, items: Item[]): number {
+  if (row.kind === 'owing') return unplanned(row.item, items);
+  if (row.kind === 'loose') return row.item.hours;
+  return 0;
+}
+
+/**
+ * When it could actually happen: the first real gap, before it is due, long
+ * enough for the next piece of it. "Fits Tuesday at 7pm" is the difference
+ * between a priority and a plan.
+ *
+ * Gaps inside normal working hours win, on any day before the deadline; a 7am
+ * or a 10pm slot is only offered when nothing else fits. Offering dawn because
+ * it happens to be today is how a suggestion gets ignored.
+ */
+export function nextFit(
+  row: Ranked,
+  items: Item[],
+  today: string,
+  nowHour?: number,
+): { date: string; start: number; hours: number; booked: boolean } | null {
+  const { item } = row;
+  if (row.kind === 'fixed') return { date: item.date, start: item.startHour!, hours: item.hours, booked: true };
+
+  let piece: number;
+  let dates: string[];
+  if (row.kind === 'owing') {
+    const left = unplanned(item, items);
+    if (left <= 0) return null;
+    piece = Math.min(MAX_SESSION, Math.max(MIN_SESSION, Math.ceil(left * 2) / 2));
+    dates = workDays(item, today);
+  } else {
+    piece = item.hours;
+    dates = [item.date < today ? today : item.date];
+  }
+
+  const [from, to] = STUDY_WINDOW;
+  const options = dates.map((date) => ({ date, starts: sittingStarts(items, date, piece, date === today ? nowHour : undefined) }));
+  for (const { date, starts } of options) {
+    const inside = starts.find((h) => h >= from && h + piece <= to);
+    if (inside !== undefined) return { date, start: inside, hours: piece, booked: false };
+  }
+  const anywhere = options.find(({ starts }) => starts.length);
+  return anywhere ? { date: anywhere.date, start: anywhere.starts[0], hours: piece, booked: false } : null;
+}
+
+export interface DayAhead {
+  date: string;
+  /** Free hours that day, between 7am and 11pm. */
+  free: number;
+  /** Rank numbers (1 is first) of what is due that day. */
+  due: number[];
+}
+
+/**
+ * The next week at a glance: free time per day, what lands when, and whether
+ * the hours still needed fit in the hours still free.
+ *
+ * The verdict is deliberately blunt. "It fits, with eight hours spare" and
+ * "short by three hours" are the two sentences a ranked list cannot say on its
+ * own, and the second is the reason to look at what could move.
+ */
+export function weekAhead(
+  rows: Ranked[],
+  items: Item[],
+  today: string,
+  span = 7,
+): { days: DayAhead[]; needed: number; free: number; verdict: 'fits' | 'tight' | 'short' } {
+  const days = Array.from({ length: span }, (_, i) => addDays(today, i)).map((date) => ({
+    date,
+    free: Math.round(freeSlots(items, date, 0.5).reduce((total, slot) => total + slotHours(slot), 0) * 10) / 10,
+    due: rows
+      .map((row, index) => ({ rank: index + 1, date: row.item.deadline ?? row.item.date }))
+      .filter((entry) => entry.date === date)
+      .map((entry) => entry.rank),
+  }));
+  const needed = Math.round(rows.reduce((total, row) => total + hoursNeeded(row, items), 0) * 10) / 10;
+  const free = Math.round(days.reduce((total, day) => total + day.free, 0) * 10) / 10;
+  const verdict = needed > free ? 'short' : needed > free * 0.7 ? 'tight' : 'fits';
+  return { days, needed, free, verdict };
+}

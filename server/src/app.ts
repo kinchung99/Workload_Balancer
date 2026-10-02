@@ -25,7 +25,7 @@ import { circle } from './routes/circle.js';
 import { invites } from './routes/invites.js';
 import { sharing } from './routes/sharing.js';
 import { sync } from './routes/sync.js';
-import { composeRoutes, defaultWriter, type Writer } from './routes/compose.js';
+import { composeRoutes, defaultWriter, suggestRoutes, type Writer } from './routes/compose.js';
 
 export function createApp(
   db: Database,
@@ -94,6 +94,7 @@ export function createApp(
   app.use('/api/sharing/*', requireUser);
   app.use('/api/invites/*', requireUser);
   app.use('/api/compose/*', requireUser);
+  app.use('/api/suggest/*', requireUser);
 
   /**
    * Who am I, and what am I sharing.
@@ -172,6 +173,7 @@ export function createApp(
   app.route('/api/sharing', sharing);
   app.route('/api/invites', invites);
   app.route('/api/compose', composeRoutes(writer));
+  app.route('/api/suggest', suggestRoutes(writer));
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

@@ -35,8 +35,11 @@ export const COMMITMENT_LABEL: Record<Item['commitment'], string> = {
  * rather than spending it. Booking rest raises the battery, which is the only
  * behaviour that makes the feature mean anything.
  */
-export const loadOf = (item: Pick<Item, 'hours' | 'dread' | 'loadOverride' | 'isRecovery'>): number => {
+export const loadOf = (item: Pick<Item, 'hours' | 'dread' | 'loadOverride' | 'isRecovery' | 'outcome'>): number => {
   if (item.loadOverride !== undefined) return Math.round(item.loadOverride * 10) / 10;
+  // Marked as not happening - a skipped class, a shift that fell through. It
+  // took nothing out of you, so it stops counting.
+  if (item.outcome === 'missed') return 0;
   const raw = Math.round(item.hours * item.dread * 10) / 10;
   return item.isRecovery ? -raw : raw;
 };

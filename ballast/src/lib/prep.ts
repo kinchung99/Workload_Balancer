@@ -26,7 +26,7 @@ export const remaining = (item: Item): number =>
 export const scheduledHours = (item: Item, items: Item[]): number =>
   Math.round(
     items
-      .filter((i) => i.parentId === item.id && !i.sessionDone)
+      .filter((i) => i.parentId === item.id && !i.sessionDone && i.outcome !== 'missed')
       .reduce((total, i) => total + i.hours, 0) * 10,
   ) / 10;
 

@@ -55,6 +55,21 @@ const MOOD_LOAD: Record<MoodQuadrant, number> = {
   'high-pleasant': -8,
 };
 
+/** How a check-in reads as one emoji, for the corner of your picture. */
+export const MOOD_EMOJI: Record<MoodQuadrant, string> = {
+  'high-pleasant': '😄',
+  'low-pleasant': '😌',
+  'high-unpleasant': '😣',
+  'low-unpleasant': '😔',
+};
+
+/** Your latest check-in, as an emoji. Nothing until you have checked in once. */
+export function moodEmoji(moods: MoodCheckIn[]): string | undefined {
+  // Newest first; on the same day, the one logged last.
+  const latest = [...moods].reverse().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0];
+  return latest ? MOOD_EMOJI[latest.quadrant] : undefined;
+}
+
 export interface LogState {
   today: string;
   sleepHours: number | null;

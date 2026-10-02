@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, Divider, PageHeader, Screen, Stack, Text, Toggle, WeekStrip,
+  Battery, Button, Card, Chip, Disclosure, PageHeader, Screen, Section, Stack, Text, Toggle, WeekStrip,
 } from '@/components';
 import { SCREEN } from '@design/screens';
 import { bandFor, overallPercent, percentByBucket } from '@/lib/load';
@@ -141,19 +141,13 @@ export default function Rebalance() {
           </Card>
 
           {applied.freed.length ? (
-            <Stack gap={3}>
-              <Text variant="micro" tone="subtle">DAYS THAT GOT LIGHTER</Text>
-              <Card pad={0} gap={0} className="px-5">
-                {applied.freed.map((line, index) => (
-                  <Stack key={line}>
-                    {index > 0 ? <Divider /> : null}
-                    <View className="py-4">
-                      <Text variant="body">{line}</Text>
-                    </View>
-                  </Stack>
-                ))}
-              </Card>
-            </Stack>
+            <Section family="week" title="Days that got lighter" meta={`${applied.freed.length}`}>
+              {applied.freed.map((line) => (
+                <View key={line} className="rounded-md bg-raised px-4 py-3">
+                  <Text variant="body">{line}</Text>
+                </View>
+              ))}
+            </Section>
           ) : null}
 
           <Card tone="sunken" gap={2}>
@@ -197,7 +191,7 @@ export default function Rebalance() {
         </>
       }
     >
-      <Stack gap={6} className="pt-4">
+      <Stack gap={5} className="pt-4">
         <PageHeader
           {...SCREEN.rebalance}
           eyebrow="Next week"
@@ -205,17 +199,8 @@ export default function Rebalance() {
           sub="Toggle a trade and watch the battery move."
         />
 
-        <SwapCard
-          swap={swap}
-          refusal={refusal}
-          onSwap={() => {
-            if (!swap) return;
-            dropSwap(swap.drop.id);
-            successFeedback();
-          }}
-        />
-
-        <Card gap={5}>
+        {/* The answer first: what next week reads now, and after your picks. */}
+        <Card gap={4}>
           <Stack direction="row" gap={4} align="center">
             <Text variant="display" tone="subtle" className="line-through">{chargeOf(before)}%</Text>
             <Text variant="display" tone={TONE[bandFor(after)]}>{chargeOf(after)}%</Text>
@@ -238,10 +223,65 @@ export default function Rebalance() {
           </Text>
         </Card>
 
-        {/* Which days this actually buys you back. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">NEXT WEEK, IF YOU APPLY</Text>
-          <Card gap={4}>
+        <SwapCard
+          swap={swap}
+          refusal={refusal}
+          onSwap={() => {
+            if (!swap) return;
+            dropSwap(swap.drop.id);
+            successFeedback();
+          }}
+        />
+
+        {/* The trades: one card each, a switch on every one. */}
+        <Section family="focus" title="What you could put down" sticker="scales" meta={`${chosen} on`}>
+          {trades.map((trade) => {
+            const item = byId[trade.itemId.split(',')[0]];
+            return (
+              <Stack
+                key={trade.id}
+                direction="row"
+                gap={4}
+                align="center"
+                justify="between"
+                className={`min-h-row rounded-lg border px-4 py-3 ${trade.locked ? 'border-line-hairline bg-sunken' : 'border-line-hairline bg-raised'}`}
+              >
+                <Stack gap={1} grow>
+                  <Text variant="body" weight="semibold">{trade.title}</Text>
+                  {/* When it is, so a trade is a decision about a real day. */}
+                  {item ? (
+                    <Text variant="micro" tone="subtle">
+                      {formatShort(item.date)}
+                      {item.startHour !== undefined
+                        ? ` · ${formatHour(item.startHour)}–${formatHour(endHour(item))}`
+                        : ' · no slot yet'}
+                    </Text>
+                  ) : null}
+                  <Text variant="footnote" tone={trade.locked ? 'subtle' : 'muted'}>{trade.detail}</Text>
+                </Stack>
+                <Toggle
+                  label={trade.title}
+                  state={
+                    trade.locked ? 'locked'
+                    : trade.protected && !selected[trade.id] ? 'protected'
+                    : selected[trade.id] ? 'on' : 'off'
+                  }
+                  onPress={() => setSelected((prev) => ({ ...prev, [trade.id]: !prev[trade.id] }))}
+                />
+              </Stack>
+            );
+          })}
+        </Section>
+
+        {/* Which days this buys back - the answer in the row, the picture inside. */}
+        <Disclosure
+          lead="📅"
+          title="Which days get lighter"
+          summary={freed.length
+            ? freed.slice(0, 2).map((day) => `${formatShort(day.date)} −${day.hours}h`).join(' · ') + (freed.length > 2 ? ` +${freed.length - 2}` : '')
+            : 'Nothing selected yet'}
+        >
+          <Stack gap={4}>
             <WeekStrip items={previewWeek} days={days} today={today} />
             {freed.length ? (
               <Stack direction="row" gap={2} wrap>
@@ -249,60 +289,10 @@ export default function Rebalance() {
                   <Chip key={day.date} label={`${formatShort(day.date)} −${day.hours}h`} tone="steady" readOnly />
                 ))}
               </Stack>
-            ) : (
-              <Text variant="footnote" tone="subtle">Nothing selected, so nothing changes yet.</Text>
-            )}
-          </Card>
-        </Stack>
+            ) : null}
+          </Stack>
+        </Disclosure>
 
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">WHAT YOU COULD PUT DOWN</Text>
-          <Card pad={0} gap={0} className="px-5">
-            {trades.map((trade, index) => {
-              const item = byId[trade.itemId.split(',')[0]];
-              return (
-                <Stack key={trade.id}>
-                  {index > 0 ? <Divider /> : null}
-                  <Stack direction="row" gap={4} align="center" justify="between" className="min-h-row py-4">
-                    <Stack gap={2} grow>
-                      <Text variant="body" weight="semibold">{trade.title}</Text>
-                      {/* When it is, so a trade is a decision about a real day. */}
-                      {item ? (
-                        <Text variant="micro" tone="subtle">
-                          {formatShort(item.date)}
-                          {item.startHour !== undefined
-                            ? ` · ${formatHour(item.startHour)}–${formatHour(endHour(item))}`
-                            : ' · no slot yet'}
-                        </Text>
-                      ) : null}
-                      <Text variant="footnote" tone={trade.locked ? 'subtle' : 'muted'}>{trade.detail}</Text>
-                    </Stack>
-                    <Toggle
-                      label={trade.title}
-                      state={
-                        trade.locked ? 'locked'
-                        : trade.protected && !selected[trade.id] ? 'protected'
-                        : selected[trade.id] ? 'on' : 'off'
-                      }
-                      onPress={() => setSelected((prev) => ({ ...prev, [trade.id]: !prev[trade.id] }))}
-                    />
-                  </Stack>
-                </Stack>
-              );
-            })}
-          </Card>
-        </Stack>
-
-        {chosen > 0 ? (
-          <Card tone="recovery" gap={2}>
-            <Text variant="callout">
-              <Text variant="callout" weight="semibold" tone="recovery">Wednesday evening opens up.</Text>{' '}
-              <Text variant="callout" tone="muted">Your first free evening in eleven days.</Text>
-            </Text>
-          </Card>
-        ) : null}
-
-        <Text variant="footnote" tone="subtle">Drafts the messages. Never sends them.</Text>
         <View className="h-2" />
       </Stack>
     </Screen>

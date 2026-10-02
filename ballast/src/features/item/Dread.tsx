@@ -1,71 +1,48 @@
-import { useRef } from 'react';
-import { View } from 'react-native';
-import { Card, DreadSlider, Stack, Text } from '@/components';
-import { formatShort, isSameWeek, startOfWeek } from '@/lib/dates';
-import { loadOf } from '@/lib/load';
+import { useMemo, useRef } from 'react';
+import { Disclosure, DrainBadge, DrainPicker } from '@/components';
+import { DRAIN, costLabel, drainCosts } from '@/lib/drain';
 import { tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
-import { readingFrom } from '@/state/selectors';
 import type { Dread, Item } from '@/lib/types';
 
 /**
- * How much you mind it - and, now, what that does.
+ * How draining this one is - and what that costs.
  *
- * "Changing this re-prices the whole week" was a promise the screen never
- * showed being kept. The two tiles under the slider keep it: this task's load
- * and the week's battery, each against what it was when you opened the page.
+ * Folded, it is one row: the face, the word, and what it costs the week
+ * ("Tiring · −4% of that week's battery"), which is the part worth reading on
+ * the way past. Open, it is the same picker the whole app uses, with the price
+ * of every answer under its face and the one it started at marked "was".
  */
-export function DreadCard({ item, items }: { item: Item; items: Item[] }) {
-  const { setDread, ceilings, today } = useStore();
-  // What it was when you arrived, so every change reads as a change.
+export function DrainDisclosure({ item, items }: { item: Item; items: Item[] }) {
+  const { setDread, ceilings } = useStore();
+  // What it was when you arrived, so a change reads as a change.
   const opened = useRef(item.dread).current;
 
   const anchor = item.deadline ?? item.date;
-  const asOpened = items.map((i) =>
-    i.id === item.id || (i.parentId === item.id && !i.sessionDone) ? { ...i, dread: opened } : i,
-  );
-  const chargeNow = readingFrom(items, anchor, ceilings).charge;
-  const chargeThen = readingFrom(asOpened, anchor, ceilings).charge;
-  const loadNow = loadOf(item);
-  const loadThen = loadOf({ ...item, dread: opened });
-  const week = isSameWeek(anchor, today) ? 'THIS WEEK' : `WEEK OF ${formatShort(startOfWeek(anchor)).toUpperCase()}`;
+  const costs = useMemo(() => {
+    // The week without this task and the sittings still ahead of it - the parts
+    // whose price this answer sets.
+    const mine = (i: Item) => i.id === item.id || (i.parentId === item.id && !i.sessionDone);
+    const base = items.filter((i) => !mine(i));
+    const own = items.filter(mine);
+    return drainCosts(base, (level) => own.map((i) => ({ ...i, dread: level })), anchor, ceilings);
+  }, [items, item.id, anchor, ceilings]);
 
   return (
-    <Card gap={4}>
-      <Stack gap={2}>
-        <Text variant="heading">How much are you dreading it?</Text>
-        <Text variant="footnote" tone="muted">Changing this re-prices the whole week.</Text>
-      </Stack>
-      <DreadSlider value={item.dread} onChange={(next: Dread) => { setDread(item.id, next); tapFeedback(); }} />
-      <Stack direction="row" gap={3}>
-        <Tile label="THIS TASK" value={`${loadNow} load`} was={`${loadThen}`} delta={Math.round((loadNow - loadThen) * 10) / 10} worseWhen="up" />
-        <Tile label={`${week} · BATTERY`} value={`${chargeNow}%`} was={`${chargeThen}%`} delta={chargeNow - chargeThen} unit="%" worseWhen="down" />
-      </Stack>
-    </Card>
-  );
-}
-
-/** A reading and how far it has moved since you opened the page. */
-function Tile({
-  label, value, was, delta, unit = '', worseWhen,
-}: {
-  label: string;
-  value: string;
-  was: string;
-  delta: number;
-  unit?: string;
-  /** Load going up is bad; battery going down is bad. */
-  worseWhen: 'up' | 'down';
-}) {
-  const worse = worseWhen === 'up' ? delta > 0 : delta < 0;
-  const box = delta === 0 ? 'bg-sunken' : worse ? 'bg-heavy-wash' : 'bg-steady-wash';
-  return (
-    <View className={`flex-1 gap-1 rounded-md px-3 py-3 ${box}`}>
-      <Text variant="micro" tone="subtle">{label}</Text>
-      <Text variant="heading">{value}</Text>
-      <Text variant="micro" tone={delta === 0 ? 'subtle' : worse ? 'heavy' : 'steady'}>
-        {delta === 0 ? 'NO CHANGE' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)}${unit} · WAS ${was}`}
-      </Text>
-    </View>
+    <Disclosure
+      lead={<DrainBadge value={item.dread} />}
+      title="How draining is it?"
+      summary={`${DRAIN[item.dread].word} · ${costLabel(costs[item.dread])} of that week’s battery`}
+    >
+      <DrainPicker
+        question="Pick the face that fits"
+        value={item.dread}
+        onChange={(next: Dread) => { setDread(item.id, next); tapFeedback(); }}
+        costs={costs}
+        hours={item.hours}
+        was={opened}
+        costOf="of that week’s battery"
+      />
+    </Disclosure>
   );
 }

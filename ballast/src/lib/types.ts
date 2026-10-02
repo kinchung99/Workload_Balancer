@@ -111,6 +111,27 @@ export interface Item {
   sessionDone?: boolean;
   /** What you mean to get through in this sitting. Yours, in your words. */
   note?: string;
+
+  // --- what happened, once its time came -----------------------------------
+  /**
+   * Marked after the fact: done, partly done, or did not happen.
+   *
+   * Absent means nobody has said yet. A class reads it as signed in or not, a
+   * sitting as how much got done, an errand as done or moved - see
+   * `lib/marking.ts` for the question each kind of thing asks.
+   */
+  outcome?: Outcome;
+  /** How much of it got done, 0 to 1. Only meaningful on a partial outcome. */
+  fraction?: number;
+  /**
+   * Marked by the app the morning after, because nobody answered.
+   *
+   * Assumed done rather than left hanging, and kept reviewable: the student can
+   * keep it, change it, or say it did not happen.
+   */
+  autoMarked?: boolean;
+  /** Hours a marked sitting moved its work forward by, so changing the answer can undo it exactly. */
+  creditedHours?: number;
   /**
    * Where this lands across all five areas, when one heading was not enough.
    *
@@ -138,6 +159,9 @@ export interface Item {
 
 export type SessionKind = 'lecture' | 'lab' | 'tutorial' | 'seminar';
 
+/** What happened to a thing once its time came. */
+export type Outcome = 'done' | 'partial' | 'missed';
+
 /**
  * The three reasons a class is worth more than its hours.
  *
@@ -164,6 +188,12 @@ export interface CustomFlag {
   emoji: string;
   /** Never suggest moving or skipping a class carrying this flag. */
   protect: boolean;
+  /**
+   * The module it belongs to. "Lab sign-off" means something in Algorithms and
+   * nothing in a lecture-only module, so a flag is offered on its own module's
+   * classes and nowhere else. Absent only on flags made before modules owned them.
+   */
+  moduleId?: string;
 }
 
 export interface Module {
@@ -178,6 +208,10 @@ export interface Module {
   held: number;
   /** Percentage the department expects. Null when nobody is counting. */
   requiredAttendance: number | null;
+  /** How many weeks it runs for. Set by the student, at import or after. */
+  weeks?: number;
+  /** The Monday of its first week, so "week 10 of 12" can be worked out. */
+  startDate?: string;
   /** The module's own picture, picked by the student. Decoration only. */
   emoji?: string;
 }
@@ -207,6 +241,10 @@ export interface RecoveryEntry {
   detail: string;
   /** Hours. Negative means you are down. */
   hours: number | null;
+  /** A picture for the row. Decoration only. */
+  emoji?: string;
+  /** The detail in a few words, for the ledger's one line. */
+  tag?: string;
 }
 
 /** One card on the matched-prescription screen. */
@@ -223,6 +261,10 @@ export interface Prescription {
   preferred?: readonly [number, number];
   tags?: string[];
   best?: boolean;
+  /** A picture for the card. Decoration only. */
+  emoji?: string;
+  /** How long it is meant to take, which sets the default length. */
+  minutes?: number;
 }
 
 /** A specific thing you could put down, and the exact price of it. */
@@ -263,6 +305,18 @@ export interface CircleMember {
   updatedMinsAgo?: number;
   /** One short line they wrote themselves. Never generated, never inferred. */
   status?: string;
+  /** How they said they feel, as one emoji they picked. */
+  mood?: string;
+  /**
+   * Their picture: a photo (any image URI) or an emoji they chose instead.
+   * Absent falls back to initials on the coloured ring.
+   */
+  pic?: string;
+  /**
+   * How often you message or plan with them - the last month's count. It is
+   * what puts the few people you actually talk to on top of a list of eighty.
+   */
+  frequency?: number;
   /**
    * Their number, for handing a message to WhatsApp.
    *
@@ -324,6 +378,22 @@ export interface Group {
   emoji: string;
   /** Circle member ids. You are always in it and never listed. */
   members: string[];
+  /** What this group usually does together, so planning starts from it. */
+  activities?: PlanActivity[];
+}
+
+/**
+ * Something you plan with people: "Badminton, 2h", "Library session, 3h".
+ *
+ * The built-in list is dinner, a walk, a film. The thing a particular group
+ * actually does every week is never on it, so it can be added once and offered
+ * every time after.
+ */
+export interface PlanActivity {
+  id: string;
+  label: string;
+  emoji: string;
+  hours: number;
 }
 
 /** One weekday's shareable hours. Null means that day is never shared. */

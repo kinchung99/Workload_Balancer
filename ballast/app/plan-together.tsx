@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import { PageHeader, Screen, Stack } from '@/components';
 import { SCREEN } from '@design/screens';
 import { Planner } from '@/features/social/Planner';
+import { useStore } from '@/state/store';
 
 /**
  * Plan something together — the feature with no equivalent anywhere.
@@ -12,12 +12,13 @@ import { Planner } from '@/features/social/Planner';
  * capacity — only availability. An empty Thursday evening and an empty Thursday
  * evening are not the same offer if one of you is at 8%.
  *
- * This is the one-off version: whoever you pick, today. Groups you plan with
- * often live on the Friends tab and open the same planner with the group as
- * the who.
+ * This is the one-off version: tap whoever is coming this time, or start from a
+ * group. Groups you plan with often live on the Friends tab and open the same
+ * planner with their members as the faces to pick from.
  */
 export default function PlanTogether() {
-  const [people, setPeople] = useState<string[]>(['amin', 'ravi']);
+  const { circle, groups } = useStore();
+  const friends = circle.filter((person) => !person.isYou);
 
   return (
     <Screen back="/friends" backLabel="Friends">
@@ -27,12 +28,7 @@ export default function PlanTogether() {
           eyebrow="Plan something"
           title="Find an evening"
         />
-        <Planner
-          people={people}
-          onAdd={(id) => setPeople((prev) => [...prev, id])}
-          onRemove={(id) => setPeople((prev) => prev.filter((p) => p !== id))}
-          onUseGroup={(group) => setPeople(group.members)}
-        />
+        <Planner pool={friends} initial={['amin', 'ravi']} quickGroups={groups} />
         <View className="h-2" />
       </Stack>
     </Screen>

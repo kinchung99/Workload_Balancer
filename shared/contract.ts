@@ -273,6 +273,59 @@ export interface ComposeIdea {
 export interface ComposeIdeasResponse { ideas: ComposeIdea[] }
 export interface ComposeDraftResponse { message: string }
 
+/* ---------------------------------------------------------------- recovery */
+
+/**
+ * Asking Claude what would help.
+ *
+ * Built from numbers and choices only: how full each of the five areas is, the
+ * battery, last night's sleep if it was logged, the free hours on the day, and
+ * the moods the student tapped. Not one task title, not one name - "mental is
+ * full, physical has room" is the whole reason a walk beats a nap today, and it
+ * needs nothing else.
+ */
+export const VIBE_IDS = ['outside', 'indoors', 'alone', 'people', 'free', 'low'] as const;
+export type VibeId = (typeof VIBE_IDS)[number];
+/** The areas rest can give back to. Time and errands are spent, not refilled. */
+export const REST_AREAS = ['mental', 'physical', 'social'] as const;
+export type RestArea = (typeof REST_AREAS)[number];
+
+const areaPercent = z.number().int().min(0).max(400);
+
+export const restContextSchema = z.object({
+  /** Each area's load as a percent of the student's own limit for it. */
+  areas: z.object({
+    mental: areaPercent, time: areaPercent, physical: areaPercent, social: areaPercent, errands: areaPercent,
+  }),
+  charge: z.number().int().min(0).max(100),
+  sleepHours: z.number().min(0).max(16).optional(),
+  /** Free windows on the day, in hours. Never what fills the rest. */
+  free: z.array(z.object({ start: z.number().min(0).max(24), end: z.number().min(0).max(24) })).max(12).optional(),
+  vibes: z.array(z.enum(VIBE_IDS)).max(VIBE_IDS.length).default([]),
+  /** Ideas already shown or booked, so asking again brings something new. */
+  exclude: z.array(z.string().max(80)).max(60).default([]),
+});
+export type RestContext = z.infer<typeof restContextSchema>;
+
+export const restIdeasSchema = z.object({ context: restContextSchema });
+
+/** One thing that might help, as a card the student can take or swipe past. */
+export interface RestIdea {
+  id: string;
+  title: string;
+  detail: string;
+  emoji: string;
+  /** The area it gives back to. */
+  area: RestArea;
+  minutes: number;
+  /** The hours it belongs in - a nap at 7am is not a nap. */
+  from: number;
+  to: number;
+  tags: string[];
+}
+
+export interface RestIdeasResponse { ideas: RestIdea[] }
+
 /* ----------------------------------------------------------------- profile */
 
 export const profileSchema = z.object({

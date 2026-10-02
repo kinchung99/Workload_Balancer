@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Button, Card, PageHeader, Screen, Stack, Sticker, Text, type StickerName,
+  Avatar, Button, Card, Disclosure, PageHeader, Screen, Section, Stack, Sticker, Text, type StickerName,
 } from '@/components';
-import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
+import { FAMILY, type Family } from '@design/families';
 import { bandFor } from '@/lib/load';
 import { VISIBILITY_WORD } from '@/lib/sharing';
 import { api } from '@/lib/api';
@@ -28,7 +28,7 @@ import { useReading } from '@/state/selectors';
  */
 export default function Settings() {
   const router = useRouter();
-  const { account, sharing, mode, circle, reset, goDemo } = useStore();
+  const { account, sharing, mode, circle, reset, endSession, pic } = useStore();
   const reading = useReading();
   const band = bandFor(reading.overall);
   const [busy, setBusy] = useState(false);
@@ -38,35 +38,41 @@ export default function Settings() {
   const signOut = async () => {
     setBusy(true);
     await api.signOut();
-    goDemo();
+    endSession();
     setBusy(false);
     successFeedback();
-    router.replace('/you');
+    router.replace('/welcome');
   };
 
+  // One panel per family, so "account", "who sees what" and "your week" read
+  // as three different things before a word of them is.
   const groups: Array<{
     title: string;
-    rows: Array<{ sticker: StickerName; wash: string; label: string; value: string; to: Href }>;
+    family: Family;
+    rows: Array<{ sticker: StickerName; label: string; value: string; to: Href }>;
   }> = [
     {
-      title: 'ACCOUNT',
+      title: 'Account',
+      family: 'you',
       rows: [
-        { sticker: 'wave', wash: color.decor.lilac, label: 'Edit profile', value: account?.name ?? 'Name, status, initials', to: '/profile' },
-        { sticker: 'people', wash: color.decor.candy, label: 'Your circle', value: friends ? `${friends} ${friends === 1 ? 'friend' : 'friends'}` : 'Nobody yet', to: '/friends' },
-        { sticker: 'chat', wash: color.decor.mint, label: 'Find friends', value: 'Add by email', to: '/find-friends' },
+        { sticker: 'wave', label: 'Edit profile', value: account?.name ?? 'Name, status, initials', to: '/profile' },
+        { sticker: 'people', label: 'Your circle', value: friends ? `${friends} ${friends === 1 ? 'friend' : 'friends'}` : 'Nobody yet', to: '/friends' },
+        { sticker: 'chat', label: 'Find friends', value: 'Add by email', to: '/find-friends' },
       ],
     },
     {
-      title: 'PRIVACY',
+      title: 'Privacy',
+      family: 'people',
       rows: [
-        { sticker: 'calendar', wash: color.decor.sky, label: 'What your circle sees', value: VISIBILITY_WORD(sharing), to: '/sharing' },
+        { sticker: 'calendar', label: 'What your circle sees', value: VISIBILITY_WORD(sharing), to: '/sharing' },
       ],
     },
     {
-      title: 'YOUR WEEK',
+      title: 'Your week',
+      family: 'week',
       rows: [
-        { sticker: 'class', wash: color.decor.lemon, label: 'Timetable', value: 'Classes and flags', to: '/timetable' },
-        { sticker: 'sun', wash: color.decor.lemon, label: 'Check in', value: 'Mood, sleep, food', to: '/checkin' },
+        { sticker: 'class', label: 'Timetable', value: 'Classes and flags', to: '/timetable' },
+        { sticker: 'sun', label: 'Check in', value: 'Mood, sleep, food', to: '/checkin' },
       ],
     },
   ];
@@ -80,12 +86,12 @@ export default function Settings() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={account ? `Signed in as ${account.name}` : 'Sign in'}
-          onPress={() => { tapFeedback(); router.push(account ? '/profile' : '/account'); }}
+          onPress={() => { tapFeedback(); router.push(account ? '/profile' : '/welcome'); }}
           className="active:opacity-70"
         >
           <Card tone={account ? band : 'sunken'} gap={4}>
             <Stack direction="row" gap={4} align="center">
-              <Avatar initials={account?.initials ?? '?'} band={account ? band : undefined} stale={!account} size={56} />
+              <Avatar initials={account?.initials ?? '?'} band={account ? band : undefined} stale={!account} size={56} pic={pic} />
               <Stack gap={1} grow>
                 <Text variant="body" weight="semibold">{account?.name ?? 'Not signed in'}</Text>
                 <Text variant="micro" tone="muted">
@@ -98,8 +104,7 @@ export default function Settings() {
         </Pressable>
 
         {groups.map((group) => (
-          <Stack key={group.title} gap={3}>
-            <Text variant="micro" tone="subtle">{group.title}</Text>
+          <Section key={group.title} family={group.family} title={group.title}>
             <Card pad={0} gap={0} className="px-4">
               {group.rows.map((row, index) => (
                 <Pressable
@@ -111,7 +116,7 @@ export default function Settings() {
                     index > 0 ? 'border-t border-line-hairline' : ''
                   }`}
                 >
-                  <View className="items-center justify-center rounded-pill" style={{ width: 36, height: 36, backgroundColor: row.wash }}>
+                  <View className="items-center justify-center rounded-pill" style={{ width: 36, height: 36, backgroundColor: FAMILY[group.family].wash }}>
                     <Sticker name={row.sticker} size={22} />
                   </View>
                   <Text variant="body" weight="semibold" className="flex-1">{row.label}</Text>
@@ -120,29 +125,15 @@ export default function Settings() {
                 </Pressable>
               ))}
             </Card>
-          </Stack>
+          </Section>
         ))}
 
-        {/* Data: the promises, and the way out of them. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">YOUR DATA</Text>
-          <Card tone="sunken" gap={3}>
-            <Stack direction="row" gap={3} align="center">
-              <Sticker name="heart" size={28} />
-              <Text variant="footnote" weight="semibold" className="flex-1">
-                Your tasks are never read by the server.
-              </Text>
-            </Stack>
-            <Text variant="micro" tone="muted">
-              It stores them and hands them back. Every number in this app is worked out on your phone, which
-              is why it all still works with no signal.
-            </Text>
-          </Card>
-        </Stack>
+        {/* Data: the promise in the row, the why one tap in. */}
+        <Text variant="footnote" tone="subtle" className="text-center">🔒 Your tasks are never read by the server.</Text>
 
         {/* Quiet, last, and not dressed up as a danger zone. */}
         <Stack gap={3}>
-          <Button label="Replay intro" kind="quiet" onPress={() => { tapFeedback(); router.push('/welcome'); }} />
+          <Button label="Run setup again" kind="quiet" onPress={() => { tapFeedback(); router.push('/setup/timetable' as Href); }} />
           {mode === 'demo' ? (
             <Button label="Reset the sample week" kind="quiet" onPress={() => { reset(); router.replace('/'); }} />
           ) : null}
@@ -153,7 +144,11 @@ export default function Settings() {
               onPress={() => { if (!busy) void signOut(); }}
             />
           ) : (
-            <Button label="Sign in" kind="secondary" onPress={() => { tapFeedback(); router.push('/account'); }} />
+            <Button
+              label="Leave the sample week"
+              kind="secondary"
+              onPress={() => { tapFeedback(); endSession(); router.replace('/welcome'); }}
+            />
           )}
         </Stack>
 

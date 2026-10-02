@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { successFeedback } from '@/lib/haptics';
+import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, DayTimeline, Divider, PageHeader, Reveal, Screen, Slider, Sticker, Stack,
+  Battery, Button, Card, Chip, DayTimeline, Disclosure, PageHeader, Screen, Section, Slider, Sticker, Stack,
   StepDots, StepNav, Text,
 } from '@/components';
 import { SCREEN } from '@design/screens';
 import {
   ACTIONS, OFF_HOURS, PRESETS, customAction, initialSim, note, pointsOf, project, readout, totalPoints,
 } from '@/lib/simulate';
-import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
+import { chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
@@ -22,15 +22,17 @@ import { useReading } from '@/state/selectors';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 const STEPS = ['Which night', 'What you do', 'Book it'];
+/** A face for each kind of night, so the three read apart at a glance. */
+const PRESET_EMOJI: Record<string, string> = { recover: '🌿', balanced: '⚖️', push: '🔥' };
 
 /** The three pages, as URL segments. `/tonight/book` opens on the slots. */
 export const STEP_SLUGS = ['night', 'what', 'book'] as const;
 
 /** One drawing and one question per page. */
 const ART = [
-  { sticker: 'moon', title: 'Which night?', sub: 'One evening at a time.' },
-  { sticker: 'sparkle', title: 'What would you do?', sub: 'Drag one and watch the battery move.' },
-  { sticker: 'clock', title: 'Book it?', sub: 'Nothing is saved until you press the button.' },
+  { sticker: 'moon', title: 'Which night?' },
+  { sticker: 'sparkle', title: 'What would you do?' },
+  { sticker: 'clock', title: 'Book it?' },
 ] as const;
 
 /**
@@ -135,17 +137,13 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
           </>
         }
       >
-        <Stack gap={6} className="pt-4">
+        <Stack gap={5} className="pt-4">
           <PageHeader
             sticker="star"
             wash={SCREEN.tonight.wash}
             eyebrow="In your week"
             title={`${committed.blocks} thing${committed.blocks === 1 ? '' : 's'} booked.`}
-            sub="Protected time, at the hours you picked."
           />
-          <Text variant="title" accessibilityRole="header" accessibilityLiveRegion="polite">
-            {committed.blocks} block{committed.blocks === 1 ? '' : 's'} booked.
-          </Text>
           <Card tone="steady" gap={4}>
             <Stack direction="row" gap={4} align="center">
               <Sticker name="star" size={48} />
@@ -156,12 +154,11 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
             </Stack>
           </Card>
 
-          <Stack gap={3}>
-            <Text variant="micro" tone="subtle">TODAY, UPDATED</Text>
+          <Section family="week" title={`${dayName}, updated`} sticker="clock">
             <Card gap={4}>
               <DayTimeline items={items} date={day} showGaps={false} />
             </Card>
-          </Stack>
+          </Section>
         </Stack>
       </Screen>
     );
@@ -175,15 +172,15 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
         <StepNav
           step={step}
           last={2}
-          canNext={step < 2 || !!toBook.length || sleepChanged}
+          canNext={step === 0 || (step === 1 ? delta !== 0 : !!toBook.length || sleepChanged)}
           nextLabel={
             step === 0
               ? `Plan ${dayName.toLowerCase()}`
               : step === 1
-                ? delta === 0 ? 'Move a slider first' : `See what ${delta > 0 ? '+' : ''}${delta} books`
+                ? delta === 0 ? 'Pick a night first' : `See what ${delta > 0 ? '+' : ''}${delta} books`
                 : toBook.length || sleepChanged
                   ? `${alreadyBooked.length ? 'Replace' : 'Book'} ${dayName.toLowerCase()} — ${toBook.length + (sleepChanged ? 1 : 0)} thing${toBook.length + (sleepChanged ? 1 : 0) === 1 ? '' : 's'}`
-                  : 'Move a slider first'
+                  : 'Pick a night first'
           }
           onBack={() => setStep(step - 1)}
           onNext={() => {
@@ -207,393 +204,361 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
         />
 
         {step === 0 ? (
-        <Stack gap={5}>
-        {/* Which evening, and when it starts being yours. */}
-        <Stack gap={3}>
-          <Stack direction="row" gap={2} wrap>
-            {[today, addDays(today, 1), addDays(today, 2)].map((option) => (
-              <Chip
-                key={option}
-                label={option === today ? 'Tonight' : option === addDays(today, 1) ? 'Tomorrow' : formatShort(option)}
-                tone={option === day ? 'selected' : 'plain'}
-                onPress={() => setDay(option)}
-              />
-            ))}
-          </Stack>
-          <Reveal label={`Free from ${formatHour(offHour)}`}>
-            <Text variant="footnote" tone="muted">Nothing is booked before this.</Text>
-            <Stack direction="row" gap={2} wrap>
-              {OFF_HOURS.map((hour) => (
-                <Chip
-                  key={hour}
-                  label={formatHour(hour)}
-                  tone={hour === offHour ? 'selected' : 'plain'}
-                  onPress={() => setOffHour(hour)}
+          <Stack gap={4}>
+            {/* Which evening: three big tiles, one tap. */}
+            <Stack direction="row" gap={3}>
+              {[today, addDays(today, 1), addDays(today, 2)].map((option) => {
+                const chosen = option === day;
+                const label = option === today ? 'Tonight' : option === addDays(today, 1) ? 'Tomorrow' : formatShort(option).slice(0, 3);
+                return (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: chosen }}
+                    accessibilityLabel={`${label}, ${formatShort(option)}`}
+                    onPress={() => { tapFeedback(); setDay(option); }}
+                    className={`min-h-row flex-1 items-center justify-center gap-1 rounded-lg border-2 px-2 py-4 active:opacity-70 ${
+                      chosen ? 'border-inverse bg-inverse' : 'border-line-hairline bg-raised'
+                    }`}
+                  >
+                    <Text variant="callout" weight="semibold" tone={chosen ? 'inverse' : 'default'}>{label}</Text>
+                    <Text variant="micro" tone={chosen ? 'inverse' : 'subtle'}>{formatShort(option).slice(4)}</Text>
+                  </Pressable>
+                );
+              })}
+            </Stack>
+
+            {/* When the evening starts being yours. */}
+            <Stack gap={2} className="rounded-lg bg-sunken px-4 py-3">
+              <Text variant="callout" weight="semibold">🕔 Free from {formatHour(offHour)}</Text>
+              <Stack direction="row" gap={2} wrap>
+                {OFF_HOURS.map((hour) => (
+                  <Chip
+                    key={hour}
+                    label={formatHour(hour)}
+                    tone={hour === offHour ? 'selected' : 'plain'}
+                    onPress={() => setOffHour(hour)}
+                  />
+                ))}
+              </Stack>
+            </Stack>
+
+            {/* What is already booked for that evening, and a way to take it back. */}
+            {alreadyBooked.length ? (
+              <Section family="rest" title="Already booked" meta={dayName}>
+                {alreadyBooked.map((block) => (
+                  <Stack key={block.id} direction="row" gap={3} align="center" className="rounded-md bg-raised px-4 py-3">
+                    <Text variant="body" weight="semibold" className="flex-1">{block.title}</Text>
+                    <Text variant="footnote" tone="muted">
+                      {formatHour(block.startHour ?? 0)}–{formatHour((block.startHour ?? 0) + block.hours)}
+                    </Text>
+                  </Stack>
+                ))}
+                <Button
+                  label="Clear this evening"
+                  kind="secondary"
+                  onPress={() => {
+                    clearPlan(day);
+                    successFeedback();
+                  }}
                 />
-              ))}
-            </Stack>
-          </Reveal>
-        </Stack>
-
-        {/* What is already booked for that evening, and a way to take it back. */}
-        {alreadyBooked.length ? (
-          <Card tone="recovery" gap={4}>
-            <Text variant="micro" tone="recovery">ALREADY BOOKED FOR {dayName.toUpperCase()}</Text>
-            <Stack gap={2}>
-              {alreadyBooked.map((block) => (
-                <Text key={block.id} variant="footnote" tone="muted">
-                  {block.title} · {formatHour(block.startHour ?? 0)}–{formatHour((block.startHour ?? 0) + block.hours)}
-                </Text>
-              ))}
-            </Stack>
-            <Button
-              label="Clear this evening"
-              kind="secondary"
-              onPress={() => {
-                clearPlan(day);
-                successFeedback();
-              }}
-            />
-          </Card>
-        ) : null}
-
-        </Stack>
+              </Section>
+            ) : null}
+          </Stack>
         ) : null}
 
         {step === 1 ? (
-        <Stack gap={5}>
-        {/* Most people are choosing a kind of night, not dialling in sliders. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">PICK A NIGHT</Text>
-          <Stack gap={3}>
-            {PRESETS.map((preset) => {
-              const points = totalPoints(preset.state, allActions);
-              const outcome = project(now, preset.state, allActions);
-              const active = ACTIONS.every((action) => sim[action.id] === preset.state[action.id]);
-              return (
-                <Pressable
-                  key={preset.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`${preset.label}. ${preset.note}. Would leave you at ${outcome} percent.`}
-                  onPress={() => {
-                    successFeedback();
-                    // Keep whatever the student added; a preset only sets the five.
-                    setSim((current) => ({ ...current, ...preset.state }));
-                  }}
-                  className={`min-h-row justify-center rounded-md border px-5 py-4 active:opacity-70 ${
-                    active ? 'border-inverse bg-sunken' : 'border-line-hairline'
-                  }`}
-                >
-                  <Stack direction="row" gap={4} align="center" justify="between">
-                    <Stack gap={1} grow>
-                      <Text variant="body" weight="semibold">{preset.label}</Text>
-                    </Stack>
-                    <Stack gap={1} align="end">
-                      <Text variant="heading" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'muted'}>
-                        {outcome}%
-                      </Text>
-                      <Text variant="micro" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
-                        {points > 0 ? `+${points}` : points}
-                      </Text>
-                    </Stack>
-                  </Stack>
-                </Pressable>
-              );
-            })}
-          </Stack>
-        </Stack>
-
-        {/* Now, and what the plan on this screen would make of it. */}
-        <Card gap={5}>
-          <Stack direction="row" gap={4} align="center" justify="between">
-            <Stack gap={3} grow>
-              <Text variant="micro" tone="subtle">NOW</Text>
-              <Battery charge={now} loadPercent={overall} width={110} height={54} label={`Now, ${now} percent`} />
-              <Stack gap={1}>
-                <Text variant="heading" tone={TONE[bandFor(overall)]}>{now}%</Text>
-                <Text variant="micro" tone="subtle">{CHARGE_LABEL[bandFor(overall)]}</Text>
+          <Stack gap={5}>
+            {/* Now, and what this evening would make of it - on top, so every
+                choice below visibly moves it. */}
+            <Card gap={3}>
+              <Stack direction="row" gap={3} align="center" justify="between">
+                <Stack gap={2} align="center" grow>
+                  <Text variant="micro" tone="subtle">NOW</Text>
+                  <Battery charge={now} loadPercent={overall} width={84} height={40} label={`Now, ${now} percent`} />
+                  <Text variant="heading" tone={TONE[bandFor(overall)]}>{now}%</Text>
+                </Stack>
+                <Chip
+                  label={delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta}`}
+                  tone={delta > 0 ? 'steady' : delta < 0 ? 'heavy' : 'plain'}
+                  readOnly
+                />
+                <Stack gap={2} align="center" grow>
+                  <Text variant="micro" tone="subtle">PROJECTED</Text>
+                  <Battery
+                    charge={projected}
+                    loadPercent={projectedLoad}
+                    width={84}
+                    height={40}
+                    label={`Projected, ${projected} percent`}
+                  />
+                  <Text
+                    variant="heading"
+                    tone={TONE[bandFor(projectedLoad)]}
+                    accessibilityLiveRegion="polite"
+                    accessibilityLabel={`Projected ${projected} percent, ${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta)} points`}
+                  >
+                    {projected}%
+                  </Text>
+                </Stack>
               </Stack>
-            </Stack>
+            </Card>
 
-            <Chip
-              label={delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta}`}
-              tone={delta > 0 ? 'steady' : delta < 0 ? 'heavy' : 'plain'}
-              readOnly
-            />
+            {/* Most people are choosing a kind of night, not dialling in sliders. */}
+            <Section family="rest" title="Pick a night" sticker="moon">
+              {PRESETS.map((preset) => {
+                const points = totalPoints(preset.state, allActions);
+                const outcome = project(now, preset.state, allActions);
+                const active = ACTIONS.every((action) => sim[action.id] === preset.state[action.id]);
+                return (
+                  <Pressable
+                    key={preset.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={`${preset.label}. ${preset.note}. Would leave you at ${outcome} percent.`}
+                    onPress={() => {
+                      successFeedback();
+                      // Keep whatever the student added; a preset only sets the five.
+                      setSim((current) => ({ ...current, ...preset.state }));
+                    }}
+                    className={`min-h-row justify-center rounded-lg border-2 px-4 py-3 active:opacity-70 ${
+                      active ? 'border-inverse bg-raised' : 'border-line-hairline bg-raised'
+                    }`}
+                  >
+                    <Stack direction="row" gap={3} align="center">
+                      <Text variant="title">{PRESET_EMOJI[preset.id] ?? '🌙'}</Text>
+                      <Stack gap={1} grow>
+                        <Text variant="body" weight="semibold">{preset.label}</Text>
+                        <Text variant="micro" tone="muted" numberOfLines={1}>{preset.note}</Text>
+                      </Stack>
+                      <Stack gap={1} align="end">
+                        <Text variant="heading" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'muted'}>
+                          {outcome}%
+                        </Text>
+                        <Text variant="micro" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
+                          {points > 0 ? `+${points}` : points}
+                        </Text>
+                      </Stack>
+                    </Stack>
+                  </Pressable>
+                );
+              })}
+            </Section>
 
-            <Stack gap={3} grow>
-              <Text variant="micro" tone="subtle">PROJECTED</Text>
-              <Battery
-                charge={projected}
-                loadPercent={projectedLoad}
-                width={110}
-                height={54}
-                label={`Projected, ${projected} percent`}
-              />
-              <Stack gap={1}>
-                <Text variant="heading" tone={TONE[bandFor(projectedLoad)]}>{projected}%</Text>
-                <Text variant="micro" tone="subtle">{CHARGE_LABEL[bandFor(projectedLoad)]}</Text>
-              </Stack>
-            </Stack>
-          </Stack>
-          <Text
-            variant="footnote"
-            tone="muted"
-            accessibilityLiveRegion="polite"
-            accessibilityLabel={`Projected ${projected} percent, ${delta > 0 ? 'up' : 'down'} ${Math.abs(delta)} points`}
-          >
-            {delta === 0
-              ? 'Drag a slider, or pick a night above.'
-              : delta > 0
-                ? `${delta} points better off.`
-                : `Costs you ${Math.abs(delta)} points.`}
-          </Text>
-        </Card>
-
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">YOUR ACTIONS</Text>
-          <Card pad={0} gap={0} className="px-5">
-            {allActions.map((action, index) => {
-              const current = value(action.id);
-              const { text, points } = note(action, current);
-              return (
-                <Stack key={action.id}>
-                  {index > 0 ? <Divider /> : null}
-                  <Stack gap={2} className="py-4">
-                    <Stack direction="row" justify="between" align="center" gap={3}>
-                      <Text variant="body" weight="semibold">{action.label}</Text>
-                      <Stack direction="row" gap={3} align="center">
+            {/* Every part of the evening on its own slider, your own activities
+                included - folded, because a preset is usually enough. */}
+            <Disclosure
+              lead="🎚️"
+              title="Fine-tune it"
+              summary={`Sleep ${readout(sleepAction, value(sleepAction.id))} · bed by ${formatHour(night.bed)}${customActions.length ? ` · ${customActions.length} of your own` : ''}`}
+            >
+              <Stack gap={4}>
+                {allActions.map((action) => {
+                  const current = value(action.id);
+                  const { points } = note(action, current);
+                  return (
+                    <Stack key={action.id} gap={2}>
+                      <Stack direction="row" justify="between" align="center" gap={3}>
+                        <Text variant="body" weight="semibold" className="flex-1">{action.label}</Text>
                         <Text variant="body" tone="muted">{readout(action, current)}</Text>
-                        {action.custom ? (
-                          <Chip label="Remove" onPress={() => removeCustomAction(action.id)} />
+                        {points !== 0 ? (
+                          <Text variant="micro" weight="semibold" tone={points > 0 ? 'steady' : 'heavy'}>
+                            {points > 0 ? '+' : ''}{points}
+                          </Text>
                         ) : null}
                       </Stack>
-                    </Stack>
-                    <Slider
-                      value={current}
-                      min={action.min}
-                      max={action.max}
-                      step={action.step}
-                      tone={action.ptsPerUnit > 0 ? 'steady' : 'heavy'}
-                      label={action.label}
-                      readout={readout(action, current)}
-                      onChange={(next) => setSim((prev) => ({ ...prev, [action.id]: next }))}
-                    />
-                    <Text variant="footnote" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
-                      {points !== 0 ? `${points > 0 ? '+' : ''}${points} pts · ` : ''}{text}
-                    </Text>
+                      <Slider
+                        value={current}
+                        min={action.min}
+                        max={action.max}
+                        step={action.step}
+                        tone={action.ptsPerUnit > 0 ? 'steady' : 'heavy'}
+                        label={action.label}
+                        readout={readout(action, current)}
+                        onChange={(next) => setSim((prev) => ({ ...prev, [action.id]: next }))}
+                      />
 
-                    {/* Sleep is the one slider whose number means nothing on its
-                        own. Six hours is fine or impossible depending entirely on
-                        when tonight finishes, so it says so before you choose. */}
-                    {action.logOnly ? (
-                      <Stack gap={2} className={`rounded-sm px-3 py-3 ${night.clash ? 'bg-heavy-wash' : 'bg-sunken'}`}>
-                        <Stack direction="row" gap={3} justify="between" align="center">
-                          <Stack gap={1}>
-                            <Text variant="micro" tone="subtle">BED BY</Text>
-                            <Text variant="heading" tone={night.clash ? 'heavy' : 'default'}>
-                              {formatHour(night.bed)}
+                      {/* Sleep is the one slider whose number means nothing on its
+                          own: six hours is fine or impossible depending on when
+                          tonight finishes, so it says when, not only how long. */}
+                      {action.logOnly ? (
+                        <Stack gap={2} className={`rounded-md px-3 py-3 ${night.clash ? 'bg-heavy-wash' : 'bg-sunken'}`}>
+                          <Stack direction="row" gap={3} justify="between" align="center">
+                            <Stack gap={1}>
+                              <Text variant="micro" tone="subtle">BED BY</Text>
+                              <Text variant="heading" tone={night.clash ? 'heavy' : 'default'}>{formatHour(night.bed)}</Text>
+                            </Stack>
+                            <Text variant="body" tone="subtle">→</Text>
+                            <Stack gap={1}>
+                              <Text variant="micro" tone="subtle">TO BE UP AT</Text>
+                              <Text variant="heading">{formatHour(night.wake)}</Text>
+                            </Stack>
+                            <Stack gap={1} align="end">
+                              <Text variant="micro" tone="subtle">FIRST THING</Text>
+                              <Text variant="footnote" tone="muted">
+                                {firstTomorrow ? formatHour(firstTomorrow.startHour!) : 'nothing booked'}
+                              </Text>
+                            </Stack>
+                          </Stack>
+                          {night.clash ? (
+                            <Text variant="footnote" tone="heavy">
+                              Tonight runs to {formatHour(night.lastEnd!)}, so {current}h won’t fit.
                             </Text>
-                          </Stack>
-                          <Text variant="body" tone="subtle">→</Text>
-                          <Stack gap={1}>
-                            <Text variant="micro" tone="subtle">TO BE UP AT</Text>
-                            <Text variant="heading">{formatHour(night.wake)}</Text>
-                          </Stack>
-                          <Stack gap={1} align="end">
-                            <Text variant="micro" tone="subtle">FIRST THING</Text>
-                            <Text variant="footnote" tone="muted">
-                              {firstTomorrow ? formatHour(firstTomorrow.startHour!) : 'nothing booked'}
-                            </Text>
-                          </Stack>
+                          ) : night.afterMidnight ? (
+                            <Text variant="footnote" tone="busy">That is past midnight — fine once, not as a habit.</Text>
+                          ) : (
+                            <Text variant="footnote" tone="steady">Fits: nothing runs past {formatHour(night.bed)}.</Text>
+                          )}
                         </Stack>
-                        {night.clash ? (
-                          <Text variant="footnote" tone="heavy">
-                            Tonight runs to {formatHour(night.lastEnd!)}, so {current}h is not available. Shorten
-                            the night, or move what runs late.
-                          </Text>
-                        ) : night.afterMidnight ? (
-                          <Text variant="footnote" tone="busy">
-                            That is past midnight — fine once, expensive as a habit.
-                          </Text>
-                        ) : (
-                          <Text variant="footnote" tone="steady">
-                            That fits: nothing tonight runs past {formatHour(night.bed)}.
-                          </Text>
-                        )}
-                      </Stack>
-                    ) : null}
-                  </Stack>
-                </Stack>
-              );
-            })}
-          </Card>
-        </Stack>
+                      ) : null}
 
-        {/* The shipped five are a starting point, not a claim about your life. */}
-        <Stack gap={3}>
-          <Stack direction="row" justify="between" align="center">
-            <Text variant="micro" tone="subtle">WHAT YOU ACTUALLY DO</Text>
-            <Chip
-              label={addingActivity ? 'Close' : 'Add your own'}
-              tone={addingActivity ? 'selected' : 'steady'}
-              onPress={() => setAddingActivity(!addingActivity)}
-            />
-          </Stack>
-          {addingActivity ? (
-            <Card gap={4}>
-              <TextInput
-                value={newLabel}
-                onChangeText={setNewLabel}
-                placeholder="Badminton, a night run, choir…"
-                placeholderTextColor={color.ink.subtle}
-                accessibilityLabel="What do you usually do in an evening"
-                className="min-h-min rounded-sm border border-line-strong bg-page px-4 py-3 text-body text-ink-default"
-              />
-              <Stack gap={2}>
-                <Text variant="micro" tone="subtle">HOW LONG, USUALLY</Text>
-                <Stack direction="row" gap={2} wrap>
-                  {[0.5, 1, 1.5, 2, 3].map((option) => (
-                    <Chip
-                      key={option}
-                      label={option < 1 ? `${option * 60}m` : `${option}h`}
-                      tone={option === newHours ? 'selected' : 'plain'}
-                      onPress={() => setNewHours(option)}
+                      {action.custom ? (
+                        <Stack direction="row">
+                          <Chip label="Remove" onPress={() => removeCustomAction(action.id)} />
+                        </Stack>
+                      ) : null}
+                    </Stack>
+                  );
+                })}
+
+                {/* The shipped five are a starting point, not a claim about your life. */}
+                {addingActivity ? (
+                  <Stack gap={3} className="rounded-md bg-sunken px-3 py-3">
+                    <TextInput
+                      value={newLabel}
+                      onChangeText={setNewLabel}
+                      placeholder="Badminton, a night run, choir…"
+                      placeholderTextColor={color.ink.subtle}
+                      accessibilityLabel="What do you usually do in an evening"
+                      className="min-h-min rounded-sm border border-line-strong bg-page px-4 py-3 text-body text-ink-default"
                     />
-                  ))}
-                </Stack>
+                    <Stack direction="row" gap={2} wrap>
+                      {[0.5, 1, 1.5, 2, 3].map((option) => (
+                        <Chip
+                          key={option}
+                          label={option < 1 ? `${option * 60}m` : `${option}h`}
+                          tone={option === newHours ? 'selected' : 'plain'}
+                          onPress={() => setNewHours(option)}
+                        />
+                      ))}
+                    </Stack>
+                    <Stack direction="row" gap={2}>
+                      <Button label="Cancel" kind="quiet" className="flex-1" onPress={() => setAddingActivity(false)} />
+                      <Button
+                        label={newLabel.trim() ? `Add ${newLabel.trim()}` : 'Name it first'}
+                        kind={newLabel.trim() ? 'primary' : 'secondary'}
+                        className="flex-1"
+                        onPress={() => {
+                          if (!newLabel.trim()) return;
+                          const id = newLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                          const action = customAction(id, newLabel.trim(), newHours, 'physical');
+                          addCustomAction(action);
+                          setSim((current) => ({ ...current, [action.id]: newHours }));
+                          successFeedback();
+                          setNewLabel('');
+                          setAddingActivity(false);
+                        }}
+                      />
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Chip label="＋ Add your own" tone="steady" onPress={() => setAddingActivity(true)} />
+                )}
               </Stack>
-              <Button
-                label={newLabel.trim() ? `Add ${newLabel.trim()} as a slider` : 'Name it first'}
-                kind={newLabel.trim() ? 'primary' : 'secondary'}
-                onPress={() => {
-                  if (!newLabel.trim()) return;
-                  const id = newLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-                  const action = customAction(id, newLabel.trim(), newHours, 'physical');
-                  addCustomAction(action);
-                  setSim((current) => ({ ...current, [action.id]: newHours }));
-                  successFeedback();
-                  setNewLabel('');
-                  setAddingActivity(false);
-                }}
-              />
-
-            </Card>
-          ) : (
-            <Text variant="footnote" tone="subtle">
-              {customActions.length
-                ? `${customActions.length} of your own above.`
-                : 'Badminton, a night run, band practice.'}
-            </Text>
-          )}
-        </Stack>
-        </Stack>
+            </Disclosure>
+          </Stack>
         ) : null}
 
         {step === 2 ? (
-        <Stack gap={5}>
-        {/* The projection again, because this is the page you press the button
-            on and "what does it cost me" is the whole question. */}
-        <Card tone={delta > 0 ? 'steady' : 'sunken'} gap={4}>
-          <Stack direction="row" gap={5} align="center">
-            <Battery
-              charge={projected}
-              loadPercent={projectedLoad}
-              width={96}
-              height={48}
-              label={`Projected, ${projected} percent`}
-            />
-            <Stack gap={1} grow>
-              <Stack direction="row" gap={3} align="center">
-                <Text variant="heading" tone="subtle">{now}%</Text>
-                <Text variant="heading" tone="subtle">→</Text>
-                <Text variant="display" tone={TONE[bandFor(projectedLoad)]}>{projected}%</Text>
-              </Stack>
-              <Text variant="micro" tone={delta > 0 ? 'steady' : delta < 0 ? 'heavy' : 'subtle'}>
-                {delta === 0 ? 'Nothing chosen yet' : `${delta > 0 ? '+' : ''}${delta} points`}
-              </Text>
-            </Stack>
-          </Stack>
-        </Card>
-
-        {/* The answer to "what happens if I press this". */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">WHAT THIS PUTS IN YOUR WEEK</Text>
-          <Card pad={0} gap={0} className="px-5">
-            {sleepChanged ? (
-              <Stack direction="row" gap={4} align="center" justify="between" className="min-h-row py-4">
-                <Stack gap={1} grow>
-                  <Text variant="body" weight="semibold">Sleep {value(sleepAction.id)}h</Text>
-                  <Text variant="footnote" tone={night.clash ? 'heavy' : 'subtle'}>
-                    Bed by {formatHour(night.bed)} to be up at {formatHour(night.wake)}
-                  </Text>
-                  {night.clash ? (
-                    <Text variant="micro" tone="heavy">
-                      Tonight runs to {formatHour(night.lastEnd!)} — that bedtime cannot happen.
-                    </Text>
-                  ) : night.afterMidnight ? (
-                    <Text variant="micro" tone="busy">That is past midnight.</Text>
-                  ) : null}
-                </Stack>
-                <Chip
-                  label={`${pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? '+' : ''}${pointsOf(sleepAction, sim[sleepAction.id])}`}
-                  tone={pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? 'steady' : 'heavy'}
-                  readOnly
+          <Stack gap={5}>
+            {/* The projection again, because this is the page you press the button
+                on and "what does it cost me" is the whole question. */}
+            <Card tone={delta > 0 ? 'steady' : 'sunken'} gap={4}>
+              <Stack direction="row" gap={5} align="center">
+                <Battery
+                  charge={projected}
+                  loadPercent={projectedLoad}
+                  width={96}
+                  height={48}
+                  label={`Projected, ${projected} percent`}
                 />
+                <Stack gap={1} grow>
+                  <Stack direction="row" gap={3} align="center">
+                    <Text variant="heading" tone="subtle">{now}%</Text>
+                    <Text variant="heading" tone="subtle">→</Text>
+                    <Text variant="display" tone={TONE[bandFor(projectedLoad)]}>{projected}%</Text>
+                  </Stack>
+                  <Text variant="micro" tone={delta > 0 ? 'steady' : delta < 0 ? 'heavy' : 'subtle'}>
+                    {delta === 0 ? 'Nothing chosen yet' : `${delta > 0 ? '+' : ''}${delta} points`}
+                  </Text>
+                </Stack>
               </Stack>
-            ) : null}
+            </Card>
 
-            {placed.map((block, index) => {
-              const options = startOptions(otherItems, day, block.hours, 24).filter((h) => h >= offHour);
-              const picking = pickingFor === block.id;
-              return (
-                <Stack key={block.id}>
-                  {(index > 0 || sleepChanged) ? <Divider /> : null}
-                  <Stack gap={3} className="py-4">
-                    <Stack direction="row" gap={4} align="center" justify="between">
+            {/* The answer to "what happens if I press this", one card per block. */}
+            <Section
+              family="rest"
+              title="What this books"
+              sticker="clock"
+              meta={toBook.length + (sleepChanged ? 1 : 0) ? `${toBook.length + (sleepChanged ? 1 : 0)} things` : undefined}
+            >
+              {sleepChanged ? (
+                <Stack direction="row" gap={4} align="center" className="rounded-lg border border-line-hairline bg-raised px-4 py-3">
+                  <Text variant="title">😴</Text>
+                  <Stack gap={1} grow>
+                    <Text variant="body" weight="semibold">Sleep {value(sleepAction.id)}h</Text>
+                    <Text variant="micro" tone={night.clash ? 'heavy' : night.afterMidnight ? 'busy' : 'subtle'}>
+                      {night.clash
+                        ? `Tonight runs to ${formatHour(night.lastEnd!)} — that bedtime can’t happen`
+                        : `Bed by ${formatHour(night.bed)} · up at ${formatHour(night.wake)}`}
+                    </Text>
+                  </Stack>
+                  <Chip
+                    label={`${pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? '+' : ''}${pointsOf(sleepAction, sim[sleepAction.id])}`}
+                    tone={pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? 'steady' : 'heavy'}
+                    readOnly
+                  />
+                </Stack>
+              ) : null}
+
+              {placed.map((block) => {
+                const options = startOptions(otherItems, day, block.hours, 24).filter((h) => h >= offHour);
+                const picking = pickingFor === block.id;
+                return (
+                  <Stack key={block.id} gap={3} className="rounded-lg border border-line-hairline bg-raised px-4 py-3">
+                    <Stack direction="row" gap={3} align="center">
                       <Stack gap={1} grow>
                         <Text variant="body" weight="semibold">{block.label}</Text>
-                        <Text variant="footnote" tone={block.startHour === undefined ? 'heavy' : 'subtle'}>
+                        <Text variant="micro" tone={block.startHour === undefined ? 'heavy' : 'subtle'}>
                           {block.startHour === undefined
                             ? `No gap after ${formatHour(offHour)} is long enough`
                             : `${formatHour(block.startHour)}–${formatHour(block.startHour + block.hours)} · protected`}
                         </Text>
                       </Stack>
-                      <Stack direction="row" gap={2} align="center">
-                        <Chip label={`+${block.credit}`} tone="steady" readOnly />
-                        {options.length ? (
-                          <Chip
-                            label={picking ? 'Close' : 'Change time'}
-                            tone={picking ? 'selected' : 'plain'}
-                            onPress={() => setPickingFor(picking ? null : block.id)}
-                          />
-                        ) : null}
-                      </Stack>
+                      <Chip label={`+${block.credit}`} tone="steady" readOnly />
+                      {options.length ? (
+                        <Chip
+                          label={picking ? 'Close' : 'Change time'}
+                          tone={picking ? 'selected' : 'plain'}
+                          onPress={() => setPickingFor(picking ? null : block.id)}
+                        />
+                      ) : null}
                     </Stack>
 
                     {/* Pick the hour yourself; the suggestion is only a default. */}
                     {picking ? (
-                      <Stack gap={2}>
-                        <Stack direction="row" gap={2} wrap>
-                          {options.map((hour) => (
-                            <Chip
-                              key={hour}
-                              label={formatHour(hour)}
-                              tone={
-                                hour === block.startHour
-                                  ? 'selected'
-                                  : hour === block.suggested
-                                    ? 'steady'
-                                    : 'plain'
-                              }
-                              onPress={() => {
-                                setChosenHour((prev) => ({ ...prev, [block.id]: hour }));
-                                setPickingFor(null);
-                              }}
-                            />
-                          ))}
-                        </Stack>
+                      <Stack direction="row" gap={2} wrap>
+                        {options.map((hour) => (
+                          <Chip
+                            key={hour}
+                            label={formatHour(hour)}
+                            tone={hour === block.startHour ? 'selected' : hour === block.suggested ? 'steady' : 'plain'}
+                            onPress={() => {
+                              setChosenHour((prev) => ({ ...prev, [block.id]: hour }));
+                              setPickingFor(null);
+                            }}
+                          />
+                        ))}
                         {chosenHour[block.id] !== undefined ? (
                           <Chip
                             label="Back to the suggestion"
@@ -610,56 +575,41 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                       </Stack>
                     ) : null}
                   </Stack>
+                );
+              })}
+
+              {!sleepChanged && placed.length === 0 ? (
+                <Stack direction="row" gap={4} align="center" className="rounded-lg bg-raised px-4 py-4">
+                  <Sticker name="cloud" size={36} />
+                  <Text variant="footnote" tone="subtle" className="flex-1">Nothing yet. Pick a night first.</Text>
                 </Stack>
-              );
-            })}
+              ) : null}
+            </Section>
 
-            {!sleepChanged && placed.length === 0 ? (
-              <Stack direction="row" gap={4} align="center" className="py-5">
-                <Sticker name="cloud" size={40} />
-                <Text variant="footnote" tone="subtle" className="flex-1">
-                  Move a slider and what it books appears here, with a time on it.
-                </Text>
-              </Stack>
+            {/* Where the booked blocks would actually sit - one tap away. */}
+            {toBook.length ? (
+              <Disclosure lead="🕒" title="See it on the day" summary={`${dayName} with ${toBook.length} new block${toBook.length === 1 ? '' : 's'}`}>
+                <DayTimeline
+                  items={[
+                    ...otherItems,
+                    ...toBook.map((block) => ({
+                      id: `preview-${block.id}`,
+                      title: block.label,
+                      bucket: block.bucket,
+                      hours: block.hours,
+                      dread: 1 as const,
+                      commitment: 'self' as const,
+                      date: day,
+                      startHour: block.startHour,
+                      isRecovery: true,
+                    })),
+                  ]}
+                  date={day}
+                  showGaps={false}
+                />
+              </Disclosure>
             ) : null}
-          </Card>
-        </Stack>
-
-        {/* Where the booked blocks would actually sit. */}
-        {toBook.length ? (
-          <Stack gap={3}>
-            <Text variant="micro" tone="subtle">WHERE THEY WOULD LAND</Text>
-            <Card gap={4}>
-              <DayTimeline
-                items={[
-                  ...otherItems,
-                  ...toBook.map((block) => ({
-                    id: `preview-${block.id}`,
-                    title: block.label,
-                    bucket: block.bucket,
-                    hours: block.hours,
-                    dread: 1 as const,
-                    commitment: 'self' as const,
-                    date: day,
-                    startHour: block.startHour,
-                    isRecovery: true,
-                  })),
-                ]}
-                date={day}
-                showGaps={false}
-              />
-            </Card>
           </Stack>
-        ) : null}
-
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">OR GO STRAIGHT TO</Text>
-          <Stack gap={3}>
-            <Button label="Rebalance next week" kind="secondary" onPress={() => router.push('/rebalance')} />
-            <Button label="Recovery ledger" kind="secondary" onPress={() => router.push('/recover')} />
-          </Stack>
-        </Stack>
-        </Stack>
         ) : null}
 
         <View className="h-4" />

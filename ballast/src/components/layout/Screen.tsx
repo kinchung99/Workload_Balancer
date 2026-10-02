@@ -10,7 +10,7 @@
  * it and where nobody looks for anything else.
  */
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -34,9 +34,14 @@ export interface ScreenProps {
   back?: Href;
   /** Optional word next to the chevron. Defaults to "Back". */
   backLabel?: string;
+  /**
+   * Floats over the top of the screen without blocking it - a notification
+   * that slides in. Only what it draws takes touches; the page under it stays live.
+   */
+  overlay?: ReactNode;
 }
 
-export function Screen({ children, footer, surface = 'page', scroll = true, back, backLabel }: ScreenProps) {
+export function Screen({ children, footer, surface = 'page', scroll = true, back, backLabel, overlay }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const onNight = surface === 'night';
@@ -95,6 +100,12 @@ export function Screen({ children, footer, surface = 'page', scroll = true, back
           <Stack gap={3} padX={5} padY={5} className={`w-full border-t border-line-hairline ${SURFACE[surface]}`}>
             {footer}
           </Stack>
+        ) : null}
+
+        {overlay ? (
+          <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { paddingTop: (insets.top || space[5]) + space[2] }]}>
+            {overlay}
+          </View>
         ) : null}
       </View>
     </View>

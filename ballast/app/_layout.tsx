@@ -4,20 +4,25 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { color } from '@design/tokens';
 import { useSync } from '@/hooks/useSync';
+import { useGate, useSession, useWaitingForSession } from '@/hooks/useGate';
+import { View } from 'react-native';
+import { Mascot } from '@/components';
 
 /**
  * Root layout.
  *
  * Everything below the tabs is a plain stack: the capture sheet, the rebalance
- * sheet, the drafter and the previews. There is still no auth *flow* — signing
- * in lives on one optional screen and gates nothing, because the app works
- * offline whether or not anyone ever does.
+ * sheet, the drafter and the previews.
  *
- * `useSync` is mounted here and nowhere else. It is the app's only background
- * loop, and it does nothing at all until somebody signs in.
+ * The app sits behind sign-in: `useSession` restores a saved session on launch
+ * and `useGate` sends anyone signed out to the sign-in screen. `useSync` is the
+ * app's only background loop, and it does nothing until somebody signs in.
  */
 export default function RootLayout() {
+  useSession();
+  useGate();
   useSync();
+  const waiting = useWaitingForSession();
 
   return (
     <SafeAreaProvider>
@@ -32,6 +37,12 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ animation: 'default' }} />
       </Stack>
+      {/* Coming back signed in: a moment with the battery while the session is confirmed. */}
+      {waiting ? (
+        <View className="absolute inset-0 items-center justify-center bg-page">
+          <Mascot charge={72} loadPercent={28} size={120} />
+        </View>
+      ) : null}
     </SafeAreaProvider>
   );
 }

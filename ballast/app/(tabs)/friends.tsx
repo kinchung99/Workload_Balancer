@@ -1,21 +1,26 @@
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Battery, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
+  Avatar, Battery, Button, Card, Chip, Door, PageHeader, Screen, Section, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
+import { FAMILY } from '@design/families';
 import { SCREEN } from '@design/screens';
 import { groupWash } from '@/features/social/groupArt';
-import { BAND_WORD, circleOrder, isStale, lastSeen, updatedToday, worthANudge } from '@/lib/circle';
+import { BAND_WORD, circleOrder, frequentFriends, isStale, lastSeen, updatedToday, worthANudge } from '@/lib/circle';
 import { chargeOf } from '@/lib/battery';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
-import { CHECK_IN_MESSAGE, VISIBILITY_WORD, onBallastCount, whatsapp } from '@/lib/sharing';
+import { CHECK_IN_MESSAGE, VISIBILITY, VISIBILITY_WORD, onBallastCount, whatsapp, type ShareMode } from '@/lib/sharing';
 import { useStore } from '@/state/store';
 import { useReading } from '@/state/selectors';
+import { bandFor } from '@/lib/load';
+import { moodEmoji } from '@/lib/logs';
+import { PersonRow } from '@/features/social/PersonRow';
 import type { BandName, CircleMember } from '@/lib/types';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
+const SHARE_EMOJI = (mode: ShareMode) => VISIBILITY.find((option) => option.value === mode)?.emoji ?? '';
 const RING: Record<BandName, string> = {
   steady: color.band.steady.fill,
   busy: color.band.busy.fill,
@@ -41,12 +46,14 @@ const RING: Record<BandName, string> = {
  */
 export default function Friends() {
   const router = useRouter();
-  const { circle, phoneContacts, sharing, markContacted, logMoment, groups } = useStore();
+  const { circle, phoneContacts, sharing, markContacted, logMoment, groups, pic, status, account, moods } = useStore();
+  const myMood = moodEmoji(moods);
   const reading = useReading();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
   const others = circleOrder(circle);
+  const frequent = frequentFriends(circle, 5);
   const you = circle.find((p) => p.isYou);
   const active = updatedToday(circle);
   const nudge = worthANudge(circle);
@@ -77,38 +84,46 @@ export default function Friends() {
           title="Your circle"
         />
 
-        {/* Your own row first, because the whole thing only works if you keep
-            your side of it current. This is the come-back loop. */}
+        <Pressable
+          accessibilityRole="search"
+          accessibilityLabel="Search friends"
+          onPress={() => { tapFeedback(); router.push('/everyone?search=1' as Href); }}
+          className="min-h-min flex-row items-center gap-2 rounded-pill border-2 border-line-hairline bg-sunken px-4 py-3 active:opacity-70"
+        >
+          <Text variant="callout">🔍</Text>
+          <Text variant="body" tone="subtle" className="flex-1">Search {others.length} friends</Text>
+        </Pressable>
+
+        {/* You first, in your own colour: the reading your circle sees, and one
+            tap to change what they see. The whole thing only works if you keep
+            your side of it current. */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`You, ${reading.charge} percent. Sharing: ${VISIBILITY_WORD(sharing)}. Tap to change what your circle sees.`}
           onPress={() => { tapFeedback(); router.push('/sharing'); }}
           className="active:opacity-70"
         >
-          <Card tone={active > 0 ? 'steady' : 'sunken'} gap={4}>
-            <Stack direction="row" gap={4} align="center">
-              <Battery
+          <View className="overflow-hidden rounded-xl border-2" style={{ borderColor: FAMILY.you.wash }}>
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: FAMILY.you.wash, opacity: 0.3 }]} />
+            <Stack gap={3} className="px-4 py-4">
+              <PersonRow
+                name="You"
+                initials={account?.initials ?? 'Y'}
+                band={bandFor(reading.overall)}
                 charge={reading.charge}
-                loadPercent={reading.overall}
-                width={64}
-                height={32}
-                label={`You, ${reading.charge} percent`}
+                pic={pic}
+                mood={myMood}
+                status={status}
+                line={you?.updatedMinsAgo !== undefined ? `Updated ${lastSeen(you)}` : 'Not shared yet'}
               />
-              <Stack gap={1} grow>
-                <Text variant="body" weight="semibold">You · {reading.charge}%</Text>
-                <Text variant="micro" tone="subtle">
-                  {you?.updatedMinsAgo !== undefined ? `Updated ${lastSeen(you)}` : 'Not shared yet'}
+              <Stack direction="row" gap={3} align="center" className="rounded-pill bg-raised px-4 py-2">
+                <Text variant="footnote" className="flex-1">
+                  {SHARE_EMOJI(sharing)} Sharing: {VISIBILITY_WORD(sharing).toLowerCase()}
                 </Text>
+                <Text variant="footnote" weight="semibold">Change ›</Text>
               </Stack>
-              <Sticker name="wave" size={38} wiggle={active > 0} />
             </Stack>
-            <Stack direction="row" gap={3} align="center">
-              <Text variant="footnote" tone="muted" className="flex-1">
-                Sharing: {VISIBILITY_WORD(sharing).toLowerCase()}
-              </Text>
-              <Text variant="footnote" tone="subtle">Change ›</Text>
-            </Stack>
-          </Card>
+          </View>
         </Pressable>
 
         {/* At most one person to check on, ever. A list of five people who might
@@ -146,12 +161,8 @@ export default function Friends() {
           </Card>
         ) : null}
 
-        {/* Groups, as a row of bubbles: the people you plan with most, one tap away. */}
-        <Stack gap={3}>
-          <Stack direction="row" align="center" justify="between">
-            <Text variant="micro" tone="subtle">GROUPS · {groups.length}</Text>
-            <Text variant="micro" tone="subtle">Tap one to find a time</Text>
-          </Stack>
+        {/* Groups, as story bubbles: the people you plan with most, one tap away. */}
+        <Section family="people" title="Groups" sticker="heart" meta={`${groups.length}`}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: 8 }}>
             <Pressable
               accessibilityRole="button"
@@ -160,10 +171,10 @@ export default function Friends() {
               className="items-center gap-2 active:opacity-60"
               style={{ width: 76 }}
             >
-              <View className="items-center justify-center rounded-pill border-2 border-dashed border-line-strong" style={{ width: 68, height: 68 }}>
+              <View className="items-center justify-center rounded-pill border-2 border-dashed border-line-strong bg-raised" style={{ width: 68, height: 68 }}>
                 <Text variant="title" tone="subtle">＋</Text>
               </View>
-              <Text variant="micro" tone="subtle">New group</Text>
+              <Text variant="micro" tone="muted">New group</Text>
             </Pressable>
             {groups.map((group) => {
               const members = circle.filter((person) => group.members.includes(person.id));
@@ -177,7 +188,7 @@ export default function Friends() {
                   style={{ width: 76 }}
                 >
                   {/* A ring like a story bubble, so a group reads as a place you can open. */}
-                  <View className="items-center justify-center rounded-pill" style={{ width: 68, height: 68, borderWidth: 3, borderColor: color.decor.blush, padding: 3 }}>
+                  <View className="items-center justify-center rounded-pill bg-raised" style={{ width: 68, height: 68, borderWidth: 3, borderColor: color.decor.blush, padding: 3 }}>
                     <View className="h-full w-full items-center justify-center rounded-pill" style={{ backgroundColor: groupWash(group.id) }}>
                       <Text variant="title">{group.emoji}</Text>
                     </View>
@@ -194,18 +205,11 @@ export default function Friends() {
               );
             })}
           </ScrollView>
-        </Stack>
+        </Section>
 
-        {/* The circle. View only — tap a row for what you can do about it. */}
-        <Stack gap={3}>
-          <Stack direction="row" gap={3} align="center" className="rounded-pill py-2 pl-2 pr-4" style={{ backgroundColor: color.decor.candy }}>
-            <View className="items-center justify-center rounded-pill" style={{ width: 30, height: 30, backgroundColor: color.surface.page }}>
-              <Sticker name="people" size={21} />
-            </View>
-            <Text variant="caption" weight="semibold" className="flex-1">Everyone</Text>
-          </Stack>
-
-          {others.map((person) => (
+        {/* The few you actually talk to. Everyone else is one page away, A to Z. */}
+        <Section family="people" title="Frequent" sticker="star" meta={`${frequent.length} of ${others.length}`}>
+          {frequent.map((person) => (
             <FriendRow
               key={person.id}
               person={person}
@@ -217,25 +221,20 @@ export default function Friends() {
               onCalendar={() => { tapFeedback(); router.push(`/friend/${person.id}`); }}
             />
           ))}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={toAdd ? `Find friends. ${toAdd} of your contacts are already on Ballast.` : 'Find friends from your contacts'}
-            onPress={() => { tapFeedback(); router.push('/find-friends'); }}
-            className="active:opacity-70"
-          >
-            <Stack direction="row" gap={4} align="center" className="min-h-row rounded-lg border-2 border-dashed border-line-strong px-4 py-4">
-              <Sticker name="chat" size={34} />
-              <Stack gap={1} grow>
-                <Text variant="body" weight="semibold">Find friends</Text>
-                <Text variant="micro" tone="subtle">
-                  {toAdd ? `${toAdd} of your contacts are here` : 'From your contacts'}
-                </Text>
-              </Stack>
-              <Text variant="heading" tone="subtle">›</Text>
-            </Stack>
-          </Pressable>
-        </Stack>
+          <Door
+            family="people"
+            title={`All friends · ${others.length}`}
+            sub={`${active} checked in today`}
+            onPress={() => router.push('/everyone' as Href)}
+          />
+          <Door
+            family="people"
+            sticker="chat"
+            title="Find friends"
+            sub={toAdd ? `${toAdd} of your contacts are here` : 'From your contacts'}
+            onPress={() => router.push('/find-friends')}
+          />
+        </Section>
 
         <View className="h-2" />
       </Stack>
@@ -265,28 +264,30 @@ function FriendRow({
   const charge = person.charge ?? 0;
 
   return (
-    <Stack gap={3} className={`rounded-lg border-2 px-4 py-4 ${open ? 'border-inverse bg-decor-cream' : 'border-line-hairline bg-raised'}`}>
+    <Stack gap={3} className={`rounded-xl border-2 bg-raised px-4 py-4 ${open ? 'border-inverse' : 'border-line-hairline'}`}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${person.name}, ${BAND_WORD[person.band]}, ${charge} percent, updated ${lastSeen(person)}`}
+        accessibilityLabel={`${person.name}, ${BAND_WORD[person.band]}, ${charge} percent, updated ${lastSeen(person)}${person.status ? `. “${person.status}”` : ''}`}
         onPress={onToggle}
         className="active:opacity-70"
       >
-        <Stack direction="row" gap={4} align="center">
-          {/* The same circle the profile draws, so one visual language covers both. */}
-          <Avatar initials={person.initials} band={person.band} stale={stale} size={44} />
-          <Stack gap={1} grow>
-            <Stack direction="row" gap={3} align="center">
-              <Text variant="body" weight="semibold">{person.name}</Text>
-              <Text variant="body" weight="semibold" tone={stale ? 'subtle' : TONE[person.band]}>{charge}%</Text>
-            </Stack>
-            <Text variant="micro" tone="subtle">
-              {stale ? `${lastSeen(person)} · may be out of date` : `${BAND_WORD[person.band]} · ${lastSeen(person)}`}
-            </Text>
-            {person.status ? <Text variant="micro" tone="muted">“{person.status}”</Text> : null}
-          </Stack>
-          <Text variant="heading" tone="subtle">{open ? '⌃' : '⌄'}</Text>
+        <Stack direction="row" gap={2} align="start">
+          <View className="flex-1">
+            <PersonRow
+              name={person.name}
+              initials={person.initials}
+              band={person.band}
+              charge={charge}
+              pic={person.pic}
+              mood={person.mood}
+              status={person.status}
+              stale={stale}
+              active={(person.updatedMinsAgo ?? Infinity) < 60}
+              line={stale ? `${lastSeen(person)} · may be out of date` : `${BAND_WORD[person.band]} · ${lastSeen(person)}`}
+            />
+          </View>
+          <Text variant="heading" tone="subtle" className="pt-4">{open ? '⌃' : '⌄'}</Text>
         </Stack>
       </Pressable>
 

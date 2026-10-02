@@ -51,7 +51,7 @@ export default function ShareHours() {
       }
     >
       <Stack gap={5} className="pt-2">
-        <PageHeader sticker="clock" wash={color.decor.lilac} eyebrow="Your privacy" title="Custom hours" sub="Drag each day. Solid blue is what friends see." />
+        <PageHeader sticker="clock" wash={color.decor.lilac} eyebrow="Your privacy" title="Custom hours" sub="Solid blue is what friends see." />
 
         {!custom ? (
           <Card tone="busy" gap={2}>

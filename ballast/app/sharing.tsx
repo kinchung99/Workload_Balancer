@@ -1,27 +1,25 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Battery, Card, PageHeader, Screen, Stack, Sticker, Text,
+  Avatar, Battery, Card, PageHeader, Screen, Section, Stack, Sticker, Text,
 } from '@/components';
 import { color, radius } from '@design/tokens';
 import { SCREEN } from '@design/screens';
+import { FAMILY } from '@design/families';
 import { DAY_LETTER } from '@/lib/dates';
-import { VISIBILITY, published } from '@/lib/sharing';
-import { weekDays } from '@/lib/schedule';
+import { VISIBILITY } from '@/lib/sharing';
 import { tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
-import { useItemsWithLogs, useReading } from '@/state/selectors';
-import { WeekPreview } from '@/features/sharing/WeekPreview';
+import { useReading } from '@/state/selectors';
 
 /**
- * What your circle sees — shown, not described.
+ * What your circle sees.
  *
  * Privacy settings normally fail in the same way: options explained in prose,
- * no way to check what you just agreed to, so people pick one at random and
- * never trust it again. This screen answers the only question that matters —
- * *what does Amin actually see when he taps my name?* — by showing his view of
- * your week, live, as you change the setting. Tap another face to see theirs.
+ * so people pick one at random and never trust it again. Here each answer
+ * carries its consequence in one line. The per-friend preview went when the
+ * circle grew to sixty - a row of every face was never going to fit.
  *
  * Three presets cover most people. "Custom hours" and "Who sees your times"
  * are one level down, for the student whose Sunday mornings are nobody's
@@ -32,21 +30,11 @@ import { WeekPreview } from '@/features/sharing/WeekPreview';
  */
 export default function Sharing() {
   const router = useRouter();
-  const { circle, sharing, setSharing, shareRules, today } = useStore();
-  const items = useItemsWithLogs();
+  const { circle, sharing, setSharing, shareRules } = useStore();
   const reading = useReading();
-  const days = weekDays(today);
   const friends = circle.filter((person) => !person.isYou);
   const hidden = shareRules.hiddenFrom;
 
-  /** Whose eyes the preview is through. Named, because "a friend" is abstract and "Amin" is not. */
-  const [viewer, setViewer] = useState<string | null>(friends[0]?.id ?? null);
-  const someone = friends.find((person) => person.id === viewer);
-  const blocked = !!someone && hidden.includes(someone.id);
-
-  /** Exactly what they would be shown, computed by the same function that publishes. */
-  const preview = days.map((date) => ({ date, free: blocked ? [] : published(items, date, sharing, 1, shareRules) }));
-  const windows = preview.reduce((sum, day) => sum + day.free.length, 0);
   const seeing = friends.filter((person) => !hidden.includes(person.id));
 
   return (
@@ -64,13 +52,13 @@ export default function Sharing() {
             <Battery charge={reading.charge} loadPercent={reading.overall} width={64} height={32} label={`${reading.charge} percent`} />
             <Stack gap={1} grow>
               <Text variant="body" weight="semibold">Your battery · {reading.charge}%</Text>
-              <Text variant="micro" tone="subtle">Always shared. It is how they know to check on you.</Text>
+              <Text variant="micro" tone="subtle">Always shared</Text>
             </Stack>
           </Stack>
         </Card>
 
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">YOUR CALENDAR</Text>
+        {/* What of your calendar they get: four answers, each with its consequence. */}
+        <Section family="people" title="Your calendar" sticker="calendar">
           {VISIBILITY.map((option) => {
             const picked = sharing === option.value;
             return (
@@ -80,8 +68,8 @@ export default function Sharing() {
                 accessibilityState={{ checked: picked }}
                 accessibilityLabel={`${option.word}. ${option.note}`}
                 onPress={() => { tapFeedback(); setSharing(option.value); }}
-                className={`min-h-row flex-row items-center gap-4 rounded-lg border-2 px-4 py-4 active:opacity-70 ${
-                  picked ? 'border-inverse bg-decor-cream' : 'border-line-hairline bg-raised'
+                className={`min-h-row flex-row items-center gap-4 rounded-lg border-2 bg-raised px-4 py-3 active:opacity-70 ${
+                  picked ? 'border-inverse' : 'border-line-hairline'
                 }`}
               >
                 <View
@@ -103,11 +91,10 @@ export default function Sharing() {
               </Pressable>
             );
           })}
-        </Stack>
+        </Section>
 
         {/* One level down: your own hours, and who sees anything at all. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">FINE-TUNE</Text>
+        <Section family="people" title="Fine-tune" sticker="sparkle">
           <Door
             emoji="🎛️"
             title="Custom hours"
@@ -125,54 +112,7 @@ export default function Sharing() {
               : `${seeing.length} of ${friends.length} · hidden from ${friends.filter((p) => hidden.includes(p.id)).map((p) => p.name).join(', ')}`}
             onPress={() => router.push('/sharing/people' as Href)}
           />
-        </Stack>
-
-        {/* Their view of you, live. The whole reason this screen is trustworthy. */}
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">
-            {someone ? `${someone.name.split(' ')[0].toUpperCase()}'S VIEW OF YOUR WEEK` : 'WHAT A FRIEND WOULD SEE'}
-          </Text>
-          {friends.length > 1 ? (
-            <Stack direction="row" gap={3}>
-              {friends.map((person) => (
-                <Pressable
-                  key={person.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: person.id === viewer }}
-                  accessibilityLabel={`See it as ${person.name}`}
-                  onPress={() => { tapFeedback(); setViewer(person.id); }}
-                  className="items-center gap-1 active:opacity-60"
-                  style={{ opacity: person.id === viewer ? 1 : 0.5 }}
-                >
-                  <Avatar initials={person.initials} band={person.band} size={38} stale={hidden.includes(person.id)} />
-                  <Text variant="micro" tone={person.id === viewer ? 'default' : 'subtle'}>
-                    {hidden.includes(person.id) ? '🚫 ' : ''}{person.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </Stack>
-          ) : null}
-          <Card tone={windows ? 'recovery' : 'sunken'} gap={3}>
-            {windows ? (
-              <WeekPreview week={preview} today={today} />
-            ) : (
-              <Stack direction="row" gap={4} align="center">
-                <Sticker name="cloud" size={34} />
-                <Text variant="callout" tone="muted" className="flex-1">
-                  {blocked ? `Nothing. Your times are hidden from ${someone!.name}.` : 'Nothing. Your calendar is private.'}
-                </Text>
-              </Stack>
-            )}
-          </Card>
-          <Text variant="footnote" tone="subtle">
-            Never a title, a deadline or who you are with. There is no field for it.
-          </Text>
-          {sharing === 'custom' ? (
-            <Text variant="micro" tone="subtle">
-              Custom: {shareRules.ahead === 7 ? 'one week' : 'two weeks'} ahead · free windows of {shareRules.minHours}h or more
-            </Text>
-          ) : null}
-        </Stack>
+        </Section>
 
         <View className="h-2" />
       </Stack>
@@ -192,7 +132,7 @@ function Door({
     >
       <Stack gap={3} className="rounded-lg border border-line-hairline bg-raised px-4 py-4">
         <Stack direction="row" gap={4} align="center">
-          <View className="items-center justify-center rounded-pill bg-sunken" style={{ width: 40, height: 40 }}>
+          <View className="items-center justify-center rounded-pill" style={{ width: 40, height: 40, backgroundColor: FAMILY.people.wash }}>
             <Text variant="heading">{emoji}</Text>
           </View>
           <Stack gap={1} grow>

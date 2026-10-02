@@ -1,22 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, DayTimeline, Divider, PageHeader, Screen, Stack, StepDots, StepNav,
-  Sticker, Text,
+  Battery, Button, Card, Chip, DayTimeline, Disclosure, PageHeader, Screen, Section, Stack, StepDots, StepNav, Text,
 } from '@/components';
+import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { BUCKETS, BUCKET_LABEL, bandFor } from '@/lib/load';
 import { formatHour, freeSlots, placeIn, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
-import { successFeedback } from '@/lib/haptics';
+import { successFeedback, tapFeedback } from '@/lib/haptics';
+import { api, hasServer } from '@/lib/api';
+import { CATALOGUE, DURATIONS, VIBES, fromIdea, fromSeed, hoursFor, rankRest, type RestEntry } from '@/lib/rest';
 import type { Item } from '@/lib/types';
+import type { RestContext, VibeId } from '@shared/contract';
 import { prescriptions } from '@/data/seed';
 import { restOwedFrom, useStore } from '@/state/store';
 import { readingFrom, useItemsWithLogs, useReading } from '@/state/selectors';
+import { IdeaDeck } from './IdeaDeck';
 
-const DURATIONS = [0.5, 0.75, 1, 1.5];
 const STEPS = ['What', 'When'];
+/** Ideas per round. Past the last one, "Another idea" asks for a fresh round. */
+const ROUND = 5;
 
 /** The two pages, as URL segments. `/prescription/when` opens on the slots. */
 export const STEP_SLUGS = ['what', 'when'] as const;
@@ -32,9 +37,10 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   const router = useRouter();
-  const { ceilings, today, booked, recovery, bookRecovery } = useStore();
+  const { ceilings, today, booked, recovery, bookRecovery, mode, account, sleepHours } = useStore();
   const items = useItemsWithLogs();
   const reading = useReading();
+  const online = hasServer() && !!account;
 
   const fullest = BUCKETS.reduce((a, b) => (reading.percents[a] >= reading.percents[b] ? a : b));
   const emptiest = BUCKETS.reduce((a, b) => (reading.percents[a] <= reading.percents[b] ? a : b));
@@ -43,26 +49,102 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
    * Ordered by where you still have room, not by what was written first.
    *
    * The rule this screen has always stated is the one underneath: "mental is
-   * full, physical has room", so it offers you something physical. Capture now
-   * asks which areas a thing drains, which means that answer moves - drain
-   * physical with the dials and physical stops being the area with room, and a
-   * different kind of rest leads. That loop is what makes the five dials mean
-   * something beyond a prettier form.
+   * full, physical has room", so it offers you something physical. Capture asks
+   * which areas a thing drains, which means that answer moves - drain physical
+   * and a different kind of rest leads.
+   *
+   * With an account, Claude suggests from those same numbers (and nothing
+   * else). Without one, the phone ranks its own catalogue. Either way "Another
+   * idea" never runs dry: past the last card it asks for a fresh round,
+   * excluding everything already shown.
    */
-  const available = prescriptions
-    .filter((entry) => !booked.includes(entry.id))
-    .slice()
-    .sort((a, b) => Number(b.refills === emptiest) - Number(a.refills === emptiest));
+  const pool = useMemo<RestEntry[]>(
+    () => [...(mode === 'demo' ? prescriptions.map(fromSeed) : []), ...CATALOGUE].filter((e) => !booked.includes(e.id)),
+    [mode, booked],
+  );
+  const [vibes, setVibes] = useState<VibeId[]>([]);
+  const rankFor = (moods: VibeId[]) => rankRest(pool, { vibes: moods, room: emptiest, full: fullest });
+  const [deck, setDeck] = useState<RestEntry[]>(() => (online ? [] : rankFor([]).slice(0, ROUND)));
+  const [source, setSource] = useState<'claude' | 'phone'>('phone');
+  const [loading, setLoading] = useState(online);
+  const [round, setRound] = useState(1);
+  /** Titles already shown this visit, so a fresh round is genuinely fresh. */
+  const shown = useRef<string[]>([]);
   const [index, setIndex] = useState(0);
   const [hours, setHours] = useState(1);
   const [day, setDay] = useState(today);
   const [start, setStart] = useState<number | null>(null);
   const dayOptions = Array.from({ length: 5 }, (_, offset) => addDays(today, offset));
-  const [justBooked, setJustBooked] = useState<string | null>(null);
+  const [justBooked, setJustBooked] = useState<RestEntry | null>(null);
   // Two questions, asked one at a time: what would help, then when it goes.
   const [step, setStep] = useState(initialStep);
 
-  const chosen = available[index % Math.max(1, available.length)];
+  /** A round of ideas: Claude's if it can, the phone's otherwise. */
+  const fetchRound = async (moods: VibeId[], fresh: boolean) => {
+    if (fresh) shown.current = [];
+    const exclude = [...shown.current];
+    if (online) {
+      setLoading(true);
+      const result = await api.restIdeas({
+        areas: Object.fromEntries(
+          BUCKETS.map((key) => [key, Math.max(0, Math.min(400, Math.round(reading.percents[key])))]),
+        ) as RestContext['areas'],
+        charge: reading.charge,
+        sleepHours: sleepHours ?? undefined,
+        free: freeSlots(items, today, 0.5).map(({ start: from, end }) => ({ start: from, end })),
+        vibes: moods,
+        exclude: exclude.slice(-60),
+      });
+      setLoading(false);
+      if (result.ok && result.data.ideas.length) {
+        setSource('claude');
+        return result.data.ideas.map(fromIdea).filter((e) => !booked.includes(e.id));
+      }
+    }
+    setSource('phone');
+    const ranked = rankFor(moods);
+    const unseen = ranked.filter((e) => !exclude.includes(e.title));
+    // Everything has been shown: start the list again rather than come up empty.
+    return (unseen.length ? unseen : ranked).slice(0, ROUND);
+  };
+
+  const load = async (moods: VibeId[], fresh: boolean) => {
+    const next = await fetchRound(moods, fresh);
+    setDeck(next);
+    setIndex(0);
+    setStart(null);
+  };
+
+  useEffect(() => {
+    if (online) void load([], true);
+    // Once, on arrival; moods and "Another idea" ask again on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const chosen = deck[index] ?? null;
+
+  // Every card shown counts as seen, and sets the length to what it is meant to take.
+  useEffect(() => {
+    if (!chosen) return;
+    if (!shown.current.includes(chosen.title)) shown.current.push(chosen.title);
+    setHours(hoursFor(chosen.minutes));
+    setStart(null);
+  }, [chosen?.id]);
+
+  const another = () => {
+    if (index + 1 < deck.length) { setIndex(index + 1); return; }
+    setRound(round + 1);
+    void load(vibes, false);
+  };
+
+  const toggleVibe = (vibe: VibeId) => {
+    tapFeedback();
+    const next = vibes.includes(vibe) ? vibes.filter((v) => v !== vibe) : [...vibes, vibe];
+    setVibes(next);
+    setRound(1);
+    void load(next, !online);
+  };
+
 
   // Real gaps in today, long enough for the length currently selected.
   const gaps = useMemo(() => freeSlots(items, day, hours), [items, day, hours]);
@@ -88,7 +170,7 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   }, [chosen, slot, hours, day, items, today, ceilings]);
 
   if (justBooked) {
-    const entry = prescriptions.find((p) => p.id === justBooked)!;
+    const entry = justBooked;
     return (
       <Screen
         back="/recover"
@@ -96,9 +178,11 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
         footer={
           <>
             <Button label="See the ledger" onPress={() => router.replace('/recover')} />
-            {available.length > 0 ? (
-              <Button label="Book something else" kind="secondary" onPress={() => { setJustBooked(null); setStart(null); setIndex(0); }} />
-            ) : null}
+            <Button
+              label="Book something else"
+              kind="secondary"
+              onPress={() => { setJustBooked(null); setStep(0); setStart(null); another(); }}
+            />
           </>
         }
       >
@@ -121,25 +205,11 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
               It is protected time. You are now {restOwedFrom(recovery)}h down instead.
             </Text>
           </Card>
-          <Card gap={4}>
-            <Text variant="micro" tone="subtle">TODAY, UPDATED</Text>
-            <DayTimeline items={items} date={day} showGaps={false} />
-          </Card>
-        </Stack>
-      </Screen>
-    );
-  }
-
-  if (!chosen) {
-    return (
-      <Screen back="/recover" backLabel="Recovery" footer={<Button label="Back to the ledger" onPress={() => router.replace('/recover')} />}>
-        <Stack gap={5} className="pt-4">
-          <PageHeader
-            sticker="star"
-            wash={SCREEN.prescription.wash}
-            title="Everything is booked."
-            sub="All four blocks are in your week. Go and do one."
-          />
+          <Section family="week" title={`${dayLabel(day, today)}, updated`} sticker="clock">
+            <Card gap={4}>
+              <DayTimeline items={items} date={day} showGaps={false} />
+            </Card>
+          </Section>
         </Stack>
       </Screen>
     );
@@ -155,10 +225,10 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
         <StepNav
           step={step}
           last={1}
-          canNext={step === 0 || slot !== null}
+          canNext={step === 0 ? !!chosen && !loading : slot !== null}
           nextLabel={
             step === 0
-              ? 'Yes, when?'
+              ? chosen ? 'Yes, when?' : 'Finding ideas…'
               : slot === null
                 ? `Nothing free on ${formatShort(day)}`
                 : `Book ${dayLabel(day, today)} at ${formatHour(slot)}`
@@ -166,11 +236,12 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
           backLabel="Something else"
           onBack={() => { setStep(0); setStart(null); }}
           onNext={() => {
+            if (!chosen) return;
             if (step === 0) { setStep(1); return; }
             if (slot === null) return;
             bookRecovery(chosen, slot, hours, day);
             successFeedback();
-            setJustBooked(chosen.id);
+            setJustBooked(chosen);
           }}
         />
       }
@@ -183,31 +254,48 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
           sub={
             step === 0
               ? `${BUCKET_LABEL[fullest]} is full, ${BUCKET_LABEL[emptiest].toLowerCase()} has room.`
-              : `${chosen.title}, ${hours < 1 ? `${hours * 60} minutes` : `${hours} hour${hours === 1 ? '' : 's'}`}`
+              : `${chosen?.title ?? ''}, ${hours < 1 ? `${hours * 60} minutes` : `${hours} hour${hours === 1 ? '' : 's'}`}`
           }
         />
 
         {step === 0 ? (
           <Stack gap={5}>
-            <Card tone="recovery" gap={4}>
-              <Stack direction="row" gap={4} align="center">
-                <Sticker name="leaf" size={44} />
-                <Stack gap={1} grow>
-                  <Text variant="micro" tone="recovery">BEST FIT</Text>
-                  <Text variant="title">{chosen.title}</Text>
-                </Stack>
+            {/* What kind of rest, in one tap each. Changing them asks again. */}
+            <Stack gap={2}>
+              <Text variant="micro" tone="subtle">IN THE MOOD FOR</Text>
+              <Stack direction="row" gap={2} wrap>
+                {VIBES.map((vibe) => (
+                  <Chip
+                    key={vibe.id}
+                    label={`${vibe.emoji} ${vibe.label}`}
+                    tone={vibes.includes(vibe.id) ? 'selected' : 'plain'}
+                    onPress={() => toggleVibe(vibe.id)}
+                  />
+                ))}
               </Stack>
-              <Text variant="callout" tone="muted">{chosen.detail}</Text>
-              {chosen.tags ? (
-                <Stack direction="row" gap={3} wrap>
-                  {chosen.tags.map((tag) => <Chip key={tag} label={tag} readOnly />)}
-                </Stack>
-              ) : null}
-            </Card>
+            </Stack>
 
-            <Stack gap={3}>
-              <Text variant="micro" tone="subtle">HOW LONG</Text>
-              <Stack direction="row" gap={3} wrap>
+            <Stack direction="row" align="center" justify="between">
+              <View className="rounded-pill px-3 py-1" style={{ backgroundColor: source === 'claude' || loading ? color.area.mental.wash : color.surface.sunken }}>
+                <Text variant="micro" tone={source === 'claude' || loading ? 'default' : 'subtle'}>
+                  {loading ? '✨ ASKING CLAUDE…' : source === 'claude' ? '✨ IDEAS FROM CLAUDE' : '📱 IDEAS ON YOUR PHONE'}
+                </Text>
+              </View>
+              {chosen ? <Text variant="micro" tone="subtle">ROUND {round} · {index + 1} OF {deck.length}</Text> : null}
+            </Stack>
+
+            <IdeaDeck
+              entry={chosen}
+              label={index === 0 && round === 1 ? 'BEST FIT' : `IDEA ${index + 1} OF ${deck.length}`}
+              loading={loading}
+              onNext={another}
+              onPick={() => setStep(1)}
+            />
+
+            {/* Two small choices, shown as they are. */}
+            <Stack gap={2}>
+              <Text variant="micro" tone="subtle">⏱ HOW LONG</Text>
+              <Stack direction="row" gap={2} wrap>
                 {DURATIONS.map((option) => (
                   <Chip
                     key={option}
@@ -219,15 +307,15 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
               </Stack>
             </Stack>
 
-            {available.length > 1 ? (
-              <Stack gap={3}>
-                <Text variant="micro" tone="subtle">OR ONE OF THESE</Text>
-                <Stack direction="row" gap={3} wrap>
-                  {available.filter((entry) => entry.id !== chosen.id).map((entry) => (
+            {deck.length > 1 ? (
+              <Stack gap={2}>
+                <Text variant="micro" tone="subtle">🗂️ OR ONE OF THESE</Text>
+                <Stack direction="row" gap={2} wrap>
+                  {deck.filter((entry) => entry.id !== chosen?.id).map((entry) => (
                     <Chip
                       key={entry.id}
-                      label={entry.title}
-                      onPress={() => { setIndex(available.indexOf(entry)); setStart(null); }}
+                      label={`${entry.emoji ?? ''} ${entry.title}`.trim()}
+                      onPress={() => { tapFeedback(); setIndex(deck.indexOf(entry)); }}
                     />
                   ))}
                 </Stack>
@@ -238,9 +326,9 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
 
         {step === 1 ? (
         <Stack gap={5}>
-        <Stack gap={3}>
+        <Section family="week" title="Pick a slot" sticker="clock">
           <Text variant="micro" tone="subtle">WHICH DAY</Text>
-          <Stack direction="row" gap={3} wrap>
+          <Stack direction="row" gap={2} wrap>
             {dayOptions.map((option) => (
               <Chip
                 key={option}
@@ -250,14 +338,11 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
               />
             ))}
           </Stack>
-        </Stack>
-
-        <Stack gap={3}>
           <Text variant="micro" tone="subtle">
             WHAT TIME · {gaps.length} GAP{gaps.length === 1 ? '' : 'S'} ON {dayLabel(day, today).toUpperCase()}
           </Text>
           {starts.length ? (
-            <Stack direction="row" gap={3} wrap>
+            <Stack direction="row" gap={2} wrap>
               {starts.map((option) => (
                 <Chip
                   key={option}
@@ -273,7 +358,7 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
               shorter block, or another day.
             </Text>
           )}
-        </Stack>
+        </Section>
 
         {/* The answer to "what does this cost me", before anything is written. */}
         {preview ? (
@@ -302,12 +387,13 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
           </Card>
         ) : null}
 
-        <Stack gap={3}>
-          <Text variant="micro" tone="subtle">WHERE IT LANDS</Text>
-          <Card gap={4}>
-            <DayTimeline items={preview ? [...items, preview.candidate] : items} date={day} />
-          </Card>
-        </Stack>
+        <Disclosure
+          lead="🕒"
+          title="Where it lands"
+          summary={slot !== null ? `${dayLabel(day, today)} ${formatHour(slot)}–${formatHour(slot + hours)}` : `${dayLabel(day, today)}, nothing free`}
+        >
+          <DayTimeline items={preview ? [...items, preview.candidate] : items} date={day} />
+        </Disclosure>
         </Stack>
         ) : null}
 

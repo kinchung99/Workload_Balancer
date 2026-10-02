@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import {
   Avatar, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
@@ -25,7 +25,7 @@ import { useStore } from '@/state/store';
  */
 export default function Account() {
   const router = useRouter();
-  const { account, setAccount, goLive, goDemo, mode: dataMode } = useStore();
+  const { account, setAccount, goLive, endSession, mode: dataMode } = useStore();
 
   /** Which form is showing. Distinct from the store's demo/live `mode`. */
   const [form, setForm] = useState<'in' | 'up'>('in');
@@ -109,8 +109,9 @@ export default function Account() {
   const signOut = async () => {
     tapFeedback();
     await api.signOut();
-    // Back to the seeded semester, which is what this app is without an account.
-    goDemo();
+    // Signed out is the sign-in screen: nothing here works without an account.
+    endSession();
+    router.replace('/welcome');
   };
 
   /* ------------------------------------------------------- no server built */
@@ -184,6 +185,9 @@ export default function Account() {
   }
 
   /* --------------------------------------------------------- signed out */
+
+  // Signing in and making an account live on the welcome screen now.
+  if (!account) return <Redirect href="/welcome" />;
 
   const ready = email.includes('@') && password.length >= 8 && (form === 'in' || name.trim().length > 0);
 

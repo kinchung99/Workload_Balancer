@@ -34,6 +34,8 @@ for (const [from, to] of [
   ['src/lib/sittings.ts', 'sittings.ts'],
   ['src/lib/compose.ts', 'compose.ts'],
   ['src/lib/together.ts', 'together.ts'],
+  ['src/lib/rest.ts', 'rest.ts'],
+  ['src/lib/drain.ts', 'drain.ts'],
   ['src/lib/moments.ts', 'moments.ts'],
   ['src/lib/timetable.ts', 'timetable.ts'],
   ['src/lib/priority.ts', 'priority.ts'],
@@ -46,6 +48,8 @@ for (const [from, to] of [
   ['src/state/snapshot.ts', 'snapshot.ts'],
   ['src/lib/battery.ts', 'battery.ts'],
   ['src/lib/simulate.ts', 'simulate.ts'],
+  ['src/lib/marking.ts', 'marking.ts'],
+  ['src/lib/access.ts', 'access.ts'],
   ['src/data/seed.ts', 'seed.ts'],
   ['src/state/store.ts', 'store.ts'],
 ]) {
@@ -116,18 +120,24 @@ const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, si
 const { dayFacts, whyThisDay, describeChange, durationLabel, nearestStart, nowHourFor } = await import(join(tmp, 'sittings.ts'));
 const { offlineIdeas, offlineDraft, offlineTweak, recipientOf, whatIsSent, TONES } = await import(join(tmp, 'compose.ts'));
 const { heatmap, everyoneFree, fitsWindow } = await import(join(tmp, 'together.ts'));
-const { flagInfo } = await import(join(tmp, 'timetable.ts'));
+const { flagInfo, flagsFor, modulesFrom } = await import(join(tmp, 'timetable.ts'));
+const { CATALOGUE, rankRest, fromSeed, fromIdea, hoursFor } = await import(join(tmp, 'rest.ts'));
 const { wireVisibility, DEFAULT_SHARE_RULES } = await import(join(tmp, 'sharing.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
-const { prioritise, rank, urgencyFactor } = await import(join(tmp, 'priority.ts'));
-const { circleOrder, isStale, lastSeen, updatedToday, worthANudge, STALE_AFTER_MINS } = await import(join(tmp, 'circle.ts'));
+const { prioritise, rank, urgencyFactor, whyFirst, rowWeight, nextFit, weekAhead, hoursNeeded } = await import(join(tmp, 'priority.ts'));
+const { DRAIN, LEVELS, drainCosts, costLabel, withDrain, toggleArea, batteryCost } = await import(join(tmp, 'drain.ts'));
+const { circleOrder, isStale, lastSeen, updatedToday, worthANudge, STALE_AFTER_MINS, frequentFriends, searchPeople, byLetter } = await import(join(tmp, 'circle.ts'));
 const { bestSwap, findSwap, firstRefusal, skippable, wantOf, whyNoSwap, DEFAULT_WANT, WANT_CHOICES } = await import(join(tmp, 'swap.ts'));
 const { CHECK_IN_MESSAGE, EVENING_FROM, PLAN_MESSAGE, VISIBILITY, busyFrom, freeOn, onBallastCount, published, sharedDays, suggestions, whatsapp } = await import(join(tmp, 'sharing.ts'));
 const { CADENCE_WORD, DEFAULT_WEIGHTS, REVIEW_FROM_HOUR, VERDICT, adherence, describeWeights, dueForReview, retune, reviewEvery, weightsFrom } = await import(join(tmp, 'review.ts'));
 const { applyPull, backoffFor, emptySync, enqueue, runSync, syncLabel, DEBOUNCE_MS, MAX_BACKOFF_MS } = await import(join(tmp, 'sync.ts'));
 const { diff, mergeInto, snapshotOf } = await import(join(tmp, 'snapshot.ts'));
 const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
+const { KIND, applyMark, autoMark, autoMarkedIn, canMark, clockHour, markKind, markStatus, outcomeWord, toMark } = await import(join(tmp, 'marking.ts'));
+const { moduleTerm, bestCase } = await import(join(tmp, 'timetable.ts'));
+const { moodEmoji } = await import(join(tmp, 'logs.ts'));
+const { guestAllowed } = await import(join(tmp, 'access.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
 const charge = (extra = []) => {
@@ -492,10 +502,104 @@ console.log('\nAttendance, when somebody is counting');
   check('which is below the 80% expected', attendanceStatus(s().modules.find((m) => m.id === 'alg')), 'below');
   check('networks is fine at 92%', attendanceStatus(s().modules.find((m) => m.id === 'net')), 'fine');
   check('and nothing is claimed where nobody counts', attendanceStatus(s().modules.find((m) => m.id === 'ds')), 'untracked');
-  s().markAttendance('alg', true);
-  check('turning up moves it', attendanceRate(s().modules.find((m) => m.id === 'alg')), 80);
-  s().markAttendance('alg', false);
-  check('and missing one moves it back', attendanceRate(s().modules.find((m) => m.id === 'alg')) < 80, true);
+  // Signed into one real class, once - not a button that adds one forever.
+  s().markItem('class-alg-1-9', 'done');
+  check('signing into a class moves it', attendanceRate(s().modules.find((m) => m.id === 'alg')), 80);
+  s().markItem('class-alg-1-9', 'done');
+  check('and signing in twice counts once', attendanceRate(s().modules.find((m) => m.id === 'alg')), 80);
+  s().markItem('class-alg-1-9', 'missed');
+  check('changing it to missed moves it back down', attendanceRate(s().modules.find((m) => m.id === 'alg')) < 78, true);
+  s().markItem('class-alg-1-9', undefined);
+  check('and taking the answer back restores it', attendanceRate(s().modules.find((m) => m.id === 'alg')), 78);
+}
+
+console.log('\nWhat happened, once its time came');
+{
+  s().reset();
+  const today = s().today;
+  check('the seeded Monday has its own afternoon', clockHour(today), 14.5);
+  check('a day already gone is over', clockHour('2020-01-06'), 24);
+  check('a day still ahead has not started', clockHour('2099-01-05'), 0);
+
+  const find = (id) => s().items.find((i) => i.id === id);
+  check('a class asks about signing in', markKind(find('class-os-0-9')), 'class');
+  check('an errand asks done or move', markKind(find('books')), 'errand');
+  check('a shift asks if you worked it', markKind(find('shift-mon')), 'shift');
+  check('a dinner asks if you went', markKind(find('flatmates')), 'social');
+  check('a walk asks if you did it', markKind(find('walk-shop')), 'rest');
+  check('coursework asks how much got done', KIND[markKind(find('os-2'))].answer, 'progress');
+
+  // At 2:30pm the morning is over, the afternoon is under way, the evening ahead.
+  check('the morning lecture and tutorial wait to be marked',
+    toMark(s().items, today, 14.5).map((i) => i.id), ['class-os-0-9', 'class-net-0-11']);
+  check('the afternoon block is under way', markStatus(find('os-2'), today, 14.5), 'now');
+  check('the evening shift is still ahead', markStatus(find('shift-mon'), today, 14.5), 'later');
+  check('a class cannot be signed into before it starts', canMark(find('class-os-1-17'), today, 14.5), false);
+  check('but an errand can be ticked early', canMark(find('pharmacy'), today, 14.5), true);
+  check('owing work is finished by its sittings, not marked', markStatus(find('algo-set'), today, 30), 'later');
+
+  // The morning after: yesterday, unanswered, is assumed done - and reviewable.
+  const auto = autoMarkedIn(s().items);
+  check('yesterday was marked for you', auto.map((i) => i.id).sort(), ['sun-call', 'sun-cook', 'sun-laundry', 'sun-reading']);
+  check('as done', auto.every((i) => i.outcome === 'done'), true);
+  check('and it says so', outcomeWord(find('sun-call')), 'Went');
+  s().markItem('sun-call', 'done');
+  check('keeping one takes it off the review list', autoMarkedIn(s().items).length, 3);
+  s().markItem('sun-cook', 'missed');
+  check('saying one did not happen takes it off too', find('sun-cook').outcome, 'missed');
+  check('and a thing that did not happen costs nothing', loadOf(find('sun-cook')), 0);
+
+  // The rule itself, on a week that has just rolled over.
+  const rolled = autoMark(s().items, s().modules, '2025-11-11');
+  const lecture = rolled.items.find((i) => i.id === 'class-os-0-9');
+  check('Monday unanswered becomes done on Tuesday', [lecture.outcome, lecture.autoMarked], ['done', true]);
+  check('and its register moves by that one class',
+    rolled.modules.find((m) => m.id === 'os').held - s().modules.find((m) => m.id === 'os').held, 1);
+  check('what was answered is left alone', rolled.items.find((i) => i.id === 'sun-cook').outcome, 'missed');
+
+  // Marking a thing done takes it off what to do first.
+  check('the afternoon block is first', prioritise(s().items, today).first[0].item.id, 'os-2');
+  s().markItem('os-2', 'done');
+  check('and done, it is not', prioritise(s().items, today).first.some((r) => r.item.id === 'os-2'), false);
+}
+
+console.log('\nA sitting moves its work by what it actually did');
+{
+  s().reset();
+  const today = s().today;
+  s().scheduleSessions('algo-set', [{ date: today, startHour: 19, hours: 2 }]);
+  const sitting = s().items.find((i) => i.parentId === 'algo-set');
+  const done = () => s().items.find((i) => i.id === 'algo-set').prepDone;
+  check('it asks how much got done', KIND[markKind(sitting)].question, 'How much did you get done?');
+  check('starting from one hour done', done(), 1);
+  s().markItem(sitting.id, 'partial', 0.5);
+  check('half of two hours moves it one hour', done(), 2);
+  check('and reads as half done', outcomeWord(s().items.find((i) => i.id === sitting.id)), '50% done');
+  s().markItem(sitting.id, 'done');
+  check('changing to all of it adds only the difference', done(), 3);
+  s().markItem(sitting.id, 'missed');
+  check('saying it did not happen takes it all back', done(), 1);
+  check('and it stops counting as booked', scheduledHours(s().items.find((i) => i.id === 'algo-set'), s().items), 0);
+}
+
+console.log('\nHow long a module runs');
+{
+  s().reset();
+  const os = () => s().modules.find((m) => m.id === 'os');
+  check('week ten of twelve', moduleTerm(os(), s().today), { week: 10, weeks: 12 });
+  s().setModuleWeeks('os', 14);
+  check('the student sets the length', moduleTerm(os(), s().today), { week: 10, weeks: 14 });
+  s().setModuleWeeks('os', 0);
+  check('and never below one week', os().weeks, 1);
+  s().reset();
+  const days = Array.from({ length: 7 }, (_, i) => s().today.slice(0, 8) + String(10 + i).padStart(2, '0'));
+  // 8 of 9 so far, 2 this week and 2 a week for two more weeks: at best 14 of 15.
+  check('the best still possible, if every class left is signed into', bestCase(os(), s().items, days, s().today), 93);
+  s().setModuleRequired('ds', 80);
+  check('a module nobody counted can start being counted', attendanceStatus(s().modules.find((m) => m.id === 'ds')), 'below');
+  s().setPic('🦊');
+  check('your picture is kept', s().pic, '🦊');
+  check('your latest check-in reads as an emoji', moodEmoji(s().moods), '😣');
 }
 
 console.log('\nImporting a pasted timetable');
@@ -888,8 +992,11 @@ console.log('\nFlags of your own');
 {
   s().reset();
   const lecture = s().items.find((i) => i.moduleId && !(i.flags ?? []).length);
-  const lock = s().addCustomFlag({ label: 'Lab sign-off', emoji: '🧪', protect: true });
-  const note = s().addCustomFlag({ label: 'Bring laptop', emoji: '💻', protect: false });
+  const elsewhere = s().items.find((i) => i.moduleId && i.moduleId !== lecture.moduleId);
+  const lock = s().addCustomFlag({ label: 'Lab sign-off', emoji: '🧪', protect: true, moduleId: lecture.moduleId });
+  const note = s().addCustomFlag({ label: 'Bring laptop', emoji: '💻', protect: false, moduleId: lecture.moduleId });
+  check('a flag is offered on its own module', flagsFor(lecture.moduleId, s().customFlags).map((f) => f.id), [lock, note]);
+  check('and nowhere else', flagsFor(elsewhere.moduleId, s().customFlags), []);
   check('a protecting flag says so in its id', lock.startsWith('lock-'), true);
   check('a note does not', note.startsWith('note-'), true);
   s().toggleClassFlag(lecture.id, note);
@@ -902,6 +1009,41 @@ console.log('\nFlags of your own');
   check('deleting a flag takes it off every class', s().items.some((i) => (i.flags ?? []).includes(lock)), false);
   check('and the class is movable again', isProtectedClass(s().items.find((i) => i.id === lecture.id)), false);
   check('a deleted flag reads as nothing', flagInfo(lock, s().customFlags), null);
+}
+
+console.log('\nPictures are picked at import');
+{
+  const parsed = parseTimetable('Mon 09:00-11:00 CS2040 Operating Systems Lecture Kilburn LT1\nTue 14:00-16:00 CS2011 Algorithms Lab in Lab A\nWed 10-11am CS2040 Operating Systems Tutorial Room 2');
+  const built = toItems(parsed.classes, '2025-11-10', 2);
+  const found = modulesFrom(built, { 'imported-cs2011': '🧪' });
+  check('one module per code, however many classes', found.map((m) => m.code), ['CS2040', 'CS2011']);
+  check('the picture picked is the one kept', found.find((m) => m.code === 'CS2011').emoji, '🧪');
+  check('a room given as "in Lab A" takes its "in" with it', parseLine('Tue 14:00-16:00 CS2011 Algorithms Lab in Lab A').name, 'Algorithms');
+  check('so the module reads as its name', found.find((m) => m.code === 'CS2011').name, 'Algorithms');
+  check('one not picked gets a guess from its name', found.find((m) => m.code === 'CS2040').emoji, '💻');
+}
+
+console.log('\nWhat might help, without a server');
+{
+  s().reset();
+  const pool = [...prescriptions.map(fromSeed), ...CATALOGUE];
+  const plain = rankRest(pool, { vibes: [], room: 'physical', full: 'mental' });
+  check('the demo week\'s own ideas lead', plain.slice(0, 2).map((e) => e.id), ['river', 'pool']);
+  check('and the first round still offers the nap', plain.slice(0, 5).some((e) => e.id === 'nap'), true);
+  const social = rankRest(pool, { vibes: ['people'], room: 'physical', full: 'mental' });
+  check('a mood tapped puts ideas that fit it first', social.slice(0, 3).every((e) => e.vibes.includes('people')), true);
+  check('the catalogue is big enough to keep refreshing', CATALOGUE.length >= 20, true);
+  check('and has no idea twice', new Set(CATALOGUE.map((e) => e.title)).size, CATALOGUE.length);
+  check('every idea says which area it gives back to', CATALOGUE.every((e) => ['mental', 'physical', 'social'].includes(e.refills)), true);
+  check('every idea belongs in sensible hours', CATALOGUE.every((e) => e.preferred[0] >= 7 && e.preferred[1] <= 23 && e.preferred[0] < e.preferred[1]), true);
+  check('lengths snap to what the screen offers', [10, 25, 40, 50, 90, 200].map(hoursFor), [0.25, 0.5, 0.75, 0.75, 1.5, 2]);
+
+  // Claude's idea, booked through the same flow as any other.
+  const idea = fromIdea({ id: 'idea-sunset-walk', title: 'Sunset walk', detail: 'x', emoji: '🌅', area: 'physical', minutes: 40, from: 17, to: 20, tags: ['Outside'] });
+  check('an idea from Claude books like any other', idea.preferred, [17, 20]);
+  s().bookRecovery(idea, 18, hoursFor(idea.minutes));
+  check('it lands in the week as protected time', s().items.some((i) => i.id === 'recovery-idea-sunset-walk' && i.isRecovery), true);
+  check('and is not suggested again', s().booked.includes('idea-sunset-walk'), true);
 }
 
 console.log('\nGroups, and finding a time');
@@ -931,8 +1073,81 @@ console.log('\nGroups, and finding a time');
 
   s().sendInvite({ title: 'Dinner · Badminton', date: windows[0].date, startHour: 18, hours: 2, people: ['amin', 'ravi'], groupId: id });
   check('an invite remembers its group', s().invites[0].groupId, id);
+  check('asking some of a group leaves the group as it is', group().members, ['amin', 'ravi']);
+
+  const act = s().addActivity({ label: '  Badminton  ', emoji: '🏸', hours: 2.2 }, id);
+  check('a usual activity is saved to the group', group().activities.map((a) => [a.label, a.hours]), [['Badminton', 2]]);
+  check('not to anyone else\'s list', s().planActivities, []);
+  s().addActivity({ label: 'Karaoke', emoji: '🎤', hours: 3 });
+  check('with no group it is saved to your own', s().planActivities.map((a) => a.label), ['Karaoke']);
+  s().removeActivity(act, id);
+  check('and can be taken off again', group().activities, []);
+  check('a seeded group already has its usual one', s().groups.find((g) => g.id === 'study-crew').activities[0].label, 'Library session');
   s().deleteGroup(id);
   check('a group can be deleted', s().groups.some((g) => g.id === id), false);
+}
+
+console.log('\nHow draining is it - one question, priced');
+{
+  s().reset();
+  check('five levels, each with a word', LEVELS.map((l) => DRAIN[l].word), ['Easy', 'Fine', 'Tiring', 'Draining', 'Exhausting']);
+  check('and an everyday example', LEVELS.every((l) => DRAIN[l].like.startsWith('like ')), true);
+
+  const algo = s().items.find((i) => i.id === 'algo-set');
+  const costs = drainCosts(s().items.filter((i) => i.id !== 'algo-set'), (level) => [{ ...algo, dread: level }], algo.date, s().ceilings);
+  check('every answer has a price', LEVELS.every((l) => typeof costs[l] === 'number'), true);
+  check('and a more draining answer never costs less', LEVELS.slice(1).every((l) => costs[l] >= costs[l - 1]), true);
+  check('exhausting costs well over easy', costs[5] >= costs[1] * 3, true);
+  check('small costs read as under a point', costLabel(0), '<1%');
+  check('others read as battery taken', costLabel(6), '\u22126%');
+
+  // A week already over its line still prices an answer: the clamp is not applied to costs.
+  const flat = { mental: 9999, time: 9999, physical: 9999, social: 9999, errands: 9999 };
+  const big = drainCosts([], (level) => [{ ...algo, dread: level }], algo.date, { mental: 1, time: 1, physical: 1, social: 1, errands: 1 });
+  check('even past the line, more drain costs more', big[5] > big[1], true);
+  check('and nothing costs nothing in an empty week with room', drainCosts([], (level) => [{ ...algo, dread: level }], algo.date, flat)[5] >= 0, true);
+
+  check('the cost of a task is what it adds to its own week', batteryCost(s().items, algo, s().ceilings) > 0, true);
+
+  const shape = { mental: 4, time: 3, physical: 0, social: 0, errands: 0 };
+  check('one overall drain sets the strongest area', LEVELS.map((l) => dreadFromMix(withDrain(shape, l, 'mental'))), [1, 2, 3, 4, 5]);
+  check('and keeps the split', withDrain(shape, 5, 'mental'), { mental: 5, time: 4, physical: 0, social: 0, errands: 0 });
+  check('with nothing set, the guessed area takes it', withDrain({ mental: 0, time: 0, physical: 0, social: 0, errands: 0 }, 3, 'social').social, 3);
+  check('tapping an area in gives it the current drain', toggleArea(shape, 'social', 4).social, 4);
+  check('tapping it out takes it away', toggleArea(shape, 'time', 4).time, 0);
+  check('but the last area cannot be tapped out', toggleArea({ mental: 3, time: 0, physical: 0, social: 0, errands: 0 }, 'mental', 3).mental, 3);
+}
+
+console.log('\nWhat to do first, answered in full');
+{
+  s().reset();
+  const { first } = prioritise(s().items, s().today, 7);
+  const top = first[0];
+  check('the top is the hard deadline due today', top.item.id, 'os-2');
+  const why = whyFirst(top, s().items, s().today, Math.max(...first.map(rowWeight)));
+  check('why it is first, strongest first', why.map((p) => p.label), ['Due today', 'Hard deadline', 'A 4h block']);
+  check('each with a strength out of three', why.every((p) => p.strength >= 1 && p.strength <= 3), true);
+  check('something already at a time is booked, not fitted', nextFit(top, s().items, s().today), { date: s().today, start: 13, hours: 4, booked: true });
+
+  const algo = first.find((r) => r.item.id === 'algo-set');
+  const fit = nextFit(algo, s().items, s().today);
+  check('owing work fits in working hours before it is due', fit.start >= 9 && fit.start + fit.hours <= 21 && fit.date < algo.item.deadline, true);
+  check('and a sitting is at most two hours', fit.hours, 2);
+  check('it needs what is neither done nor booked', hoursNeeded(algo, s().items), 3);
+  check('something at a time needs no more', hoursNeeded(top, s().items), 0);
+  // Late on its day, a loose thing still only fits in hours that are left.
+  const loose = first.find((r) => r.kind === 'loose');
+  check('a loose thing fits on its own day', nextFit(loose, s().items, s().today).date, loose.item.date);
+
+  const ahead = weekAhead(first, s().items, s().today);
+  check('the strip is seven days from today', ahead.days.map((d) => d.date), Array.from({ length: 7 }, (_, i) => addDaysISO(s().today, i)));
+  check('number one sits on the day it is due', ahead.days[0].due.includes(1), true);
+  check('every ranked thing due this week is placed once', ahead.days.flatMap((d) => d.due).length, first.filter((r) => (r.item.deadline ?? r.item.date) <= addDaysISO(s().today, 6)).length);
+  check('the week fits with room to spare', ahead.verdict, 'fits');
+  check('because what is needed is less than what is free', ahead.needed < ahead.free, true);
+  // Fill every free hour and the verdict changes.
+  const swamped = [...s().items, ...Array.from({ length: 7 }, (_, i) => ({ id: `wall-${i}`, title: 'wall', bucket: 'time', hours: 16, dread: 1, commitment: 'hard', date: addDaysISO(s().today, i), startHour: 7 }))];
+  check('with no free time left it says it is short', weekAhead(prioritise(swamped, s().today, 7).first, swamped, s().today).verdict, 'short');
 }
 
 console.log('\nTonight, as three kinds of night');
@@ -1281,13 +1496,16 @@ console.log('\nYour circle, and how old each reading is');
   check('an hour-old one is not', isStale({ updatedMinsAgo: 60 }), false);
   check('and no reading at all is stale', isStale({}), true);
 
-  check('three of the four checked in today', updatedToday(circle), 3);
+  // The four people the study was written around: three checked in today.
+  const four = circle.filter((p) => ['you', 'amin', 'jo', 'aisyah', 'ravi'].includes(p.id));
+  check('three of the four checked in today', updatedToday(four), 3);
+  check('and a real-sized circle counts everyone who did', updatedToday(circle) > 3, true);
   check('you are never counted as one of your own friends', updatedToday(circle.filter((p) => p.isYou)), 0);
 
   // Emptiest first - but a stale battery sinks rather than rises.
-  const order = circleOrder(circle);
-  check('you are not in your own circle list', order.every((p) => !p.isYou), true);
-  check('the emptiest fresh reading is first', order[0].id, 'aisyah');
+  const order = circleOrder(four);
+  check('you are not in your own circle list', circleOrder(circle).every((p) => !p.isYou), true);
+  check('the emptiest fresh reading is first', circleOrder(circle)[0].id, 'aisyah');
   check('and the stale one is last however low it reads', order.at(-1).id, 'jo');
 
   // At most one person to check on, ever.
@@ -1298,6 +1516,50 @@ console.log('\nYour circle, and how old each reading is');
   check('nobody is suggested when everyone is fine', worthANudge([
     { id: 'a', name: 'A', initials: 'A', band: 'steady', charge: 80, updatedMinsAgo: 10 },
   ]), null);
+}
+
+console.log('\nSigned in, or a guest in a preview');
+{
+  s().reset();
+  // A real build: a server, and no guest flag - everyone signs in.
+  process.env.EXPO_PUBLIC_API_URL = 'https://api.example.test';
+  delete process.env.EXPO_PUBLIC_GUEST;
+  check('a real build has no guests', guestAllowed(), false);
+  process.env.EXPO_PUBLIC_GUEST = '1';
+  check('a preview build lets you look around as one', guestAllowed(), true);
+  delete process.env.EXPO_PUBLIC_GUEST;
+  delete process.env.EXPO_PUBLIC_API_URL;
+  check('and a build with no server at all can only be a guest', guestAllowed(), true);
+
+  s().startGuest();
+  check('a guest gets the sample week', [s().guest, s().mode, s().items.length > 10], [true, 'demo', true]);
+  check('and walks the setup like anyone new', s().onboarded, false);
+  s().goLive({ id: 'u9', email: 'new@uni.edu', name: 'New', initials: 'N', phone: null, visibility: 'evenings' }, '2026-03-02');
+  check('signing in is never a guest', s().guest, false);
+  s().endSession();
+  check('signing out leaves no guest behind', [s().guest, s().account], [false, null]);
+  s().reset();
+}
+
+console.log('\nA circle of sixty, not four');
+{
+  s().reset();
+  const circle = s().circle;
+  check('the few you talk to most come first',
+    frequentFriends(circle, 4).map((p) => p.id), ['amin', 'ravi', 'friend-hana-yusof', 'jo']);
+  check('you are never one of your own frequent friends', frequentFriends(circle, 60).some((p) => p.isYou), false);
+  const letters = byLetter(circle);
+  check('everyone else sits A to Z under a letter', letters[0].letter, 'A');
+  check('with every friend under exactly one letter', letters.reduce((n, l) => n + l.people.length, 0), 60);
+  check('a search finds a name by any word in it', searchPeople(circle, 'lim').map((p) => p.name).includes('Daniel Lim'), true);
+  check('a name starting with the search comes first', searchPeople(circle, 'ai')[0].name.toLowerCase().split(' ').some((w) => w.startsWith('ai')), true);
+  check('ignoring case', searchPeople(circle, 'AMIN').some((p) => p.id === 'amin'), true);
+  check('and nothing typed finds nothing', searchPeople(circle, '  ').length, 0);
+  const before = s().circle.find((p) => p.id === 'friend-zara-ahmed').frequency ?? 0;
+  s().markContacted('friend-zara-ahmed');
+  check('messaging someone makes them more frequent', s().circle.find((p) => p.id === 'friend-zara-ahmed').frequency, before + 1);
+  s().sendInvite({ title: 'Dinner', date: s().today, startHour: 19, hours: 2, people: ['friend-zara-ahmed'] });
+  check('and so does planning with them', s().circle.find((p) => p.id === 'friend-zara-ahmed').frequency, before + 2);
 }
 
 console.log('\nSwapping, not dropping');
@@ -1703,7 +1965,7 @@ console.log('\nA real account, not the seeded semester');
   s().reset();
   const seededItems = s().items.length;
   check('the demo starts with a whole semester in it', seededItems > 10, true);
-  check('and four friends', s().circle.filter((p) => !p.isYou).length, 4);
+  check('and a real-sized circle', s().circle.filter((p) => !p.isYou).length, 60);
   check('demo is the default mode', s().mode, 'demo');
 
   const me = { id: 'u1', email: 'you@university.edu', name: 'Kin Chung', initials: 'KC', phone: null, visibility: 'evenings' };
@@ -1730,7 +1992,7 @@ console.log('\nA real account, not the seeded semester');
 
   s().goDemo();
   check('signing out restores the study', s().items.length, seededItems);
-  check('and the friends it is built on', s().circle.filter((p) => !p.isYou).length, 4);
+  check('and the friends it is built on', s().circle.filter((p) => !p.isYou).length, 60);
   check('and the account is gone', s().account, null);
 }
 

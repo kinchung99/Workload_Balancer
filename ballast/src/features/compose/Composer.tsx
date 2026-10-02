@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, TextInput, View } from 'react-native';
-import { Button, Chip, Reveal, Stack, Text } from '@/components';
+import { Button, Chip, Reveal, Section, Stack, Text } from '@/components';
 import { color, radius } from '@design/tokens';
 import { api, hasServer } from '@/lib/api';
 import { LENGTHS, TONES, TWEAKS, offlineDraft, offlineIdeas, offlineTweak, whatIsSent } from '@/lib/compose';
@@ -116,7 +116,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
   const toneNote = TONES.find((option) => option.id === tone)!.note;
 
   return (
-    <Stack gap={6}>
+    <Stack gap={5}>
       {/* Who it is going to. Editable, because the app can only guess. */}
       <Stack direction="row" gap={3} align="center" className="rounded-pill border border-line-hairline bg-sunken py-2 pl-2 pr-4">
         <View className="items-center justify-center rounded-pill" style={{ width: 36, height: 36, backgroundColor: color.decor.candy }}>
@@ -135,13 +135,12 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
       </Stack>
 
       {/* 1 · What it is for */}
-      <Stack gap={3}>
-        <Stack direction="row" align="center" justify="between" gap={2}>
-          <Text variant="heading">What do you want to say?</Text>
-          {online ? (
-            <Chip label="↻ New ideas" onPress={() => { tapFeedback(); void fetchIdeas(); }} />
-          ) : null}
-        </Stack>
+      <Section
+        family="people"
+        title="What do you want to say?"
+        sticker="chat"
+        action={online ? { label: '↻ New ideas', onPress: () => void fetchIdeas() } : undefined}
+      >
         <SourcePill source={ideaSource} loading={loadingIdeas} what="ideas" />
 
         {loadingIdeas ? (
@@ -184,11 +183,10 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
             className="min-h-row rounded-md border-2 border-inverse bg-page px-4 py-3 text-body text-ink-default"
           />
         ) : null}
-      </Stack>
+      </Section>
 
       {/* 2 · How it sounds */}
-      <Stack gap={3}>
-        <Text variant="heading">Pick a tone</Text>
+      <Section family="people" title="Pick a tone" sticker="sparkle">
         <Stack direction="row" justify="between">
           {TONES.map((option) => (
             <ToneBubble
@@ -207,7 +205,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
           value={length}
           onChange={(next) => { tapFeedback(); setLength(next); }}
         />
-      </Stack>
+      </Section>
 
       <Button
         label={

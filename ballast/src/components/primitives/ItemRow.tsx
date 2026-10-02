@@ -1,15 +1,16 @@
 /**
  * Data / Item row — one thing you are carrying.
  *
- * Dread is visible on every row, which is how the app knows a twenty-minute
- * errand is not the thing crushing you even though both are "a task". The row
+ * How draining it is shows on every row, as the same face it was set with -
+ * which is how the app knows a twenty-minute errand is not the thing crushing
+ * you even though both are "a task". The row
  * announces itself to a screen reader as a sentence rather than as four
  * unconnected labels.
  */
 import { Pressable, View } from 'react-native';
 import { COMMITMENT_LABEL, loadOf } from '@/lib/load';
 import type { Item } from '@/lib/types';
-import { DreadDots } from './DreadDots';
+import { DrainBadge } from './DrainPicker';
 import { Stack } from './Stack';
 import { Text } from './Text';
 
@@ -27,11 +28,11 @@ export function ItemRow({ item, onPress }: { item: Item; onPress?: () => void })
         <Text variant="body" weight="semibold">{item.title}</Text>
         <Text variant="footnote" tone="subtle">{meta(item)}</Text>
       </Stack>
-      <DreadDots value={item.dread} />
+      <DrainBadge value={item.dread} />
     </Stack>
   );
 
-  const label = `${item.title}. ${meta(item)}. Dread ${item.dread} of 5. Load ${loadOf(item)}.`;
+  const label = `${item.title}. ${meta(item)}. Drain ${item.dread} of 5. Load ${loadOf(item)}.`;
 
   if (!onPress) return <View accessible accessibilityLabel={label}>{body}</View>;
   return (

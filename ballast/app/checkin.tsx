@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Burst, Button, Card, Chip, MoodGrid, PageHeader, Screen, Stack, Text, quadrantLabel, quadrantTone,
+  Burst, Button, Chip, MoodGrid, PageHeader, Screen, Section, Stack, Text, quadrantLabel, quadrantTone,
 } from '@/components';
 import { color } from '@design/tokens';
 import { SLEEP_TARGET } from '@/lib/logs';
@@ -43,8 +43,8 @@ export default function CheckIn() {
 
         {burst ? <Burst show label="Logged" /> : null}
 
-        <Card gap={4}>
-          <Text variant="micro" tone="subtle">TODAY FEELS</Text>
+        {/* How you are: the mood, then the two basics under it. */}
+        <Section family="you" title="Today feels" sticker="cloud">
           <MoodGrid
             value={mood}
             onChange={(next) => {
@@ -57,39 +57,39 @@ export default function CheckIn() {
           {mood ? (
             <Text variant="footnote" weight="semibold" tone={quadrantTone(mood)}>{quadrantLabel(mood)}</Text>
           ) : null}
-        </Card>
+        </Section>
 
-        <Card gap={4}>
-          <Text variant="micro" tone="subtle">SLEPT</Text>
-          <Stack direction="row" gap={2} wrap>
-            {SLEEP.map((hours) => (
-              <Chip
-                key={hours}
-                label={`${hours}h`}
-                tone={sleepHours === hours ? 'selected' : 'plain'}
-                onPress={() => { logSleep(hours); successFeedback(); }}
-              />
-            ))}
+        <Section family="you" title="Sleep and food" sticker="moon">
+          <Stack gap={3} className="rounded-lg bg-raised px-4 py-3">
+            <Text variant="caption" weight="semibold">😴 Slept</Text>
+            <Stack direction="row" gap={2} wrap>
+              {SLEEP.map((hours) => (
+                <Chip
+                  key={hours}
+                  label={`${hours}h`}
+                  tone={sleepHours === hours ? 'selected' : 'plain'}
+                  onPress={() => { logSleep(hours); successFeedback(); }}
+                />
+              ))}
+            </Stack>
           </Stack>
-        </Card>
-
-        <Card gap={4}>
-          <Text variant="micro" tone="subtle">ATE TODAY</Text>
-          <Stack direction="row" gap={2} wrap>
-            {ATE.map(([status, label]) => (
-              <Chip
-                key={status}
-                label={label}
-                tone={dinner?.status === status ? 'selected' : 'plain'}
-                onPress={() => { setMealStatus('dinner', status); successFeedback(); }}
-              />
-            ))}
+          <Stack gap={3} className="rounded-lg bg-raised px-4 py-3">
+            <Text variant="caption" weight="semibold">🍽️ Ate today</Text>
+            <Stack direction="row" gap={2} wrap>
+              {ATE.map(([status, label]) => (
+                <Chip
+                  key={status}
+                  label={label}
+                  tone={dinner?.status === status ? 'selected' : 'plain'}
+                  onPress={() => { setMealStatus('dinner', status); successFeedback(); }}
+                />
+              ))}
+            </Stack>
           </Stack>
-        </Card>
+        </Section>
 
-        {/* The only input that puts charge back. */}
-        <Card tone="steady" gap={4}>
-          <Text variant="micro" tone="steady">SOMETHING GOOD HAPPENED?</Text>
+        {/* The only input that puts charge back - so it wears the rest colour. */}
+        <Section family="rest" title="Something good happened?" sticker="sparkle">
           <Stack direction="row" gap={2} wrap>
             {MOMENT_KINDS.map((kind) => (
               <Chip
@@ -104,7 +104,7 @@ export default function CheckIn() {
               />
             ))}
           </Stack>
-        </Card>
+        </Section>
 
         <View className="h-2" />
       </Stack>

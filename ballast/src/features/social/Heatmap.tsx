@@ -79,9 +79,7 @@ export function Heatmap({
           </Text>
           <Text variant="micro" tone="muted">{focus.who.length ? focus.who.join(', ') : 'Nobody has this hour free.'}</Text>
         </View>
-      ) : (
-        <Text variant="micro" tone="subtle">Tap a square to see who is free. Green works for everyone.</Text>
-      )}
+      ) : null}
     </Stack>
   );
 }

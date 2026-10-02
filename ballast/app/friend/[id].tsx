@@ -100,7 +100,7 @@ export default function FriendDay() {
           rather than a list of readouts.
         */}
         <Card tone={stale ? 'sunken' : band} gap={5} align="center">
-          <Avatar initials={person.initials} band={stale ? undefined : band} stale={stale} size={96} charge={charge} />
+          <Avatar initials={person.initials} band={stale ? undefined : band} stale={stale} size={96} charge={charge} pic={person.pic} mood={person.mood} />
 
           <Stack gap={2} align="center">
             <Text variant="title" accessibilityRole="header">{person.name}</Text>

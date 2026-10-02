@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Card, Chip, Stack, Sticker, Text } from '@/components';
+import { Button, Card, Chip, Door, Stack, Sticker, Text } from '@/components';
 import { color, radius } from '@design/tokens';
 import { addDays, formatShort, parseISO } from '@/lib/dates';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/lib/sittings';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
+import { MarkSheet } from '@/features/marking/MarkSheet';
 import type { Item } from '@/lib/types';
 import { Cheer } from './Cheer';
 import { SittingEditor } from './SittingEditor';
@@ -42,9 +43,10 @@ const CHART_MAX = 64;
  * Booked sittings stay movable here too, so a Tuesday that falls through is a
  * drag rather than a give-back-and-start-again.
  */
-export function Sittings({ item, items }: { item: Item; items: Item[] }) {
+export function Sittings({ item, items, autoSuggest = false }: { item: Item; items: Item[]; autoSuggest?: boolean }) {
   const router = useRouter();
-  const { today, scheduleSessions, completeSitting, unscheduleSession, updateSession, pushSittings } = useStore();
+  const { today, scheduleSessions, unscheduleSession, updateSession, pushSittings } = useStore();
+  const [marking, setMarking] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Proposal[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [moving, setMoving] = useState<Draft | null>(null);
@@ -128,6 +130,13 @@ export function Sittings({ item, items }: { item: Item; items: Item[] }) {
     });
   };
 
+  // Arriving from "Suggest N sittings" on the task page opens straight onto them.
+  useEffect(() => {
+    if (autoSuggest && plan.length && !drafts) suggest();
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startMove = (session: Item) => {
     tapFeedback();
     if (open === session.id) { setOpen(null); setMoving(null); return; }
@@ -147,6 +156,7 @@ export function Sittings({ item, items }: { item: Item; items: Item[] }) {
   return (
     <Stack gap={4}>
       {cheer ? <Cheer key={cheer.id} title={cheer.title} sub={cheer.sub} /> : null}
+      <MarkSheet itemId={marking} onClose={() => setMarking(null)} />
 
       {/* ------------------------------------------------ what is already booked */}
       {sittings.length ? (
@@ -180,11 +190,7 @@ export function Sittings({ item, items }: { item: Item; items: Item[] }) {
                 </Stack>
                 {session.sessionDone ? null : (
                   <Stack direction="row" gap={2} wrap>
-                    <Chip label={`Done · +${durationLabel(session.hours)}`} tone="steady" onPress={() => {
-                      completeSitting(session.id);
-                      successFeedback();
-                      setCheer({ id: Date.now(), title: `+${durationLabel(session.hours)} done`, sub: `${durationLabel(Math.max(0, remaining(item) - session.hours))} to go` });
-                    }} />
+                    <Chip label="How much? ✓" tone="steady" onPress={() => { tapFeedback(); setMarking(session.id); }} />
                     <Chip
                       label={session.startHour === undefined ? 'Pick a time' : open === session.id ? 'Close' : 'Move'}
                       tone={session.startHour === undefined ? 'heavy' : open === session.id ? 'selected' : 'plain'}
@@ -450,5 +456,67 @@ function DayChart({ facts }: { facts: DayFact[] }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>{columns}</ScrollView>
       ) : columns}
     </View>
+  );
+}
+
+/**
+ * The task page's view of its sittings: the next few, each one tap from done,
+ * and the way into the full planner. Planning, moving and adding live on their
+ * own page - here they would bury the progress they are meant to serve.
+ */
+export function SittingsPreview({
+  item, items, onOpen, onSuggest,
+}: { item: Item; items: Item[]; onOpen: () => void; onSuggest: () => void }) {
+  const { today } = useStore();
+  const [marking, setMarking] = useState<string | null>(null);
+  const sittings = sittingsOf(item, items);
+  const upcoming = sittings.filter((s) => !s.sessionDone && s.outcome !== 'missed').slice(0, 3);
+  const ticked = sittings.filter((s) => s.sessionDone).length;
+  const loose = unplanned(item, items);
+  const plan = planSessions(item, items, today, nowHourFor(today));
+  const due = item.deadline ?? item.date;
+
+  return (
+    <Stack gap={3}>
+      {upcoming.map((session) => (
+        <Stack key={session.id} direction="row" gap={3} align="center" className="rounded-md bg-raised px-3 py-2">
+          <DateBlock date={session.date} today={today} tone="recovery" />
+          <Stack gap={1} grow>
+            <Text variant="body" weight="semibold" tone={session.startHour === undefined ? 'heavy' : 'default'}>{spanLabel(session)}</Text>
+            <Text variant="micro" tone="subtle">{durationLabel(session.hours)}</Text>
+          </Stack>
+          <Chip
+            label="How much? ✓"
+            tone="steady"
+            onPress={() => { tapFeedback(); setMarking(session.id); }}
+          />
+        </Stack>
+      ))}
+      <MarkSheet itemId={marking} onClose={() => setMarking(null)} />
+      {!sittings.length ? <Text variant="footnote" tone="muted">Nothing booked yet.</Text> : null}
+
+      {loose > 0 ? (
+        <Stack gap={3} className="rounded-md bg-raised px-4 py-4">
+          <Stack gap={1}>
+            <Text variant="heading">{durationLabel(loose)} still loose</Text>
+            <Text variant="footnote" tone="muted">
+              {plan.length
+                ? `${plan.length} sitting${plan.length === 1 ? '' : 's'} fit before ${formatShort(due)}`
+                : `No gap of ${durationLabel(MIN_SESSION)} left before ${formatShort(due)}`}
+            </Text>
+          </Stack>
+          {plan.length ? (
+            <Button label={`✨ Suggest ${plan.length} sitting${plan.length === 1 ? '' : 's'}`} onPress={onSuggest} />
+          ) : null}
+        </Stack>
+      ) : null}
+
+      <Door
+        family="week"
+        title="Plan, move or add sittings"
+        sub={sittings.length ? `${ticked} of ${sittings.length} done` : 'Pick days and times yourself'}
+        onPress={onOpen}
+      />
+    </Stack>
   );
 }

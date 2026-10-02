@@ -1,259 +1,209 @@
-import { useMemo, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import {
-  Battery, BatteryMini, Button, Card, Chip, DreadPicker, Screen, Stack, Text, PageHeader, StepDots,
-} from '@/components';
-import { color } from '@design/tokens';
-import { BUCKETS, BUCKET_LABEL, bandFor, loadOf } from '@/lib/load';
-import { chargeOf } from '@/lib/battery';
-import { tapFeedback, successFeedback } from '@/lib/haptics';
-import type { Dread } from '@/lib/types';
-import { useStore, weekReading } from '@/state/store';
-import { useReading } from '@/state/selectors';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, TextInput, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { Button, Mascot, Screen, Stack, Sticker, Text, type StickerName } from '@/components';
+import { color, radius } from '@design/tokens';
+import { api, hasServer } from '@/lib/api';
+import { guestAllowed } from '@/lib/access';
+import { localISO } from '@/lib/marking';
+import { successFeedback, tapFeedback } from '@/lib/haptics';
+import { useStore } from '@/state/store';
 
-const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
-const HOURS = [1, 2, 4, 8];
+/** Three reasons, as pictures with a few words each. */
+const WHY: Array<{ sticker: StickerName; wash: string; title: string; sub: string }> = [
+  { sticker: 'battery', wash: color.decor.mint, title: 'Your week as a battery', sub: 'Hours × how draining' },
+  { sticker: 'star', wash: color.decor.lemon, title: 'What to do first', sub: 'Ranked, with the reason' },
+  { sticker: 'people', wash: color.decor.candy, title: 'Time with friends', sub: 'See who’s free, never their tasks' },
+];
+
+/** Plain words for the handful of things that actually go wrong. */
+const MESSAGE: Record<string, string> = {
+  INVALID_EMAIL_OR_PASSWORD: 'That email and password do not match.',
+  USER_ALREADY_EXISTS: 'There is already an account with that email. Sign in instead.',
+  offline: 'No connection. Try again when you are online.',
+  timeout: 'The server took too long. Try again in a moment.',
+  default: 'That did not work. Try again.',
+};
 
 /**
- * The intro.
+ * Welcome - sign in or make an account.
  *
- * The one idea this app is built on is that an hour of laundry and an hour of a
- * group presentation are not the same hour. That idea is invisible on a home
- * screen full of percentages, so this teaches it in the only way that sticks:
- * two tasks, a dial each, and the load swapping in front of you.
- *
- * Three steps, skippable, and it ends with the student's own task in their own
- * week rather than with a "Get started" button.
+ * Everything in Ballast belongs to somebody: a week, a circle, a battery. So the
+ * app opens here, with what it does in three pictures and one form. A new
+ * account goes on to set up - timetable, tasks, friends - and a returning one
+ * goes straight to its week. Preview builds also offer the sample week as a
+ * guest; a real build does not.
  */
-const STEPS = ['The idea', 'Your areas', 'Your turn'];
-
 export default function Welcome() {
   const router = useRouter();
-  const { items, ceilings, today, addItem, finishOnboarding } = useStore();
-  const [step, setStep] = useState(0);
+  const { goLive, startGuest, account } = useStore();
+  // Set while this screen signs someone in, so the effect below leaves that to it.
+  const own = useRef(false);
 
-  // Step 1 - the demonstration. Both dials start where the study puts them.
-  const [presentationDread, setPresentationDread] = useState<Dread>(4);
-  const [readingDread, setReadingDread] = useState<Dread>(1);
+  // Already signed in - a session restored after this screen opened: go to the week.
+  useEffect(() => {
+    if (account && !own.current) router.replace('/');
+  }, [account, router]);
+  const [form, setForm] = useState<'up' | 'in'>('up');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const server = hasServer();
 
-  // Step 3 - their own first task.
-  const [title, setTitle] = useState('');
-  const [hours, setHours] = useState(4);
-  const [dread, setDread] = useState<Dread>(4);
+  const ready = email.includes('@') && password.length >= 8 && (form === 'in' || name.trim().length > 0);
 
-  const presentation = loadOf({ hours: 3, dread: presentationDread });
-  const reading = loadOf({ hours: 6, dread: readingDread });
-  const mine = loadOf({ hours, dread });
-
-  const { percents, overall } = useReading();
-
-  const verdict = useMemo(() => {
-    if (presentation > reading) return 'Half the hours. Twice the load.';
-    if (presentation < reading) return 'Now the long, easy one costs more.';
-    return 'Level. Six easy hours equal three hard ones.';
-  }, [presentation, reading]);
-
-  const done = () => {
-    if (title.trim()) {
-      addItem({
-        title: title.trim(),
-        bucket: 'mental',
-        hours,
-        dread,
-        commitment: 'soft',
-        date: today,
-      });
+  const submit = async () => {
+    if (!ready || busy) return;
+    own.current = true;
+    setBusy(true);
+    setProblem(null);
+    const res = form === 'up'
+      ? await api.signUp(name.trim(), email.trim().toLowerCase(), password)
+      : await api.signIn(email.trim().toLowerCase(), password);
+    if (!res.ok) {
+      own.current = false;
+      setBusy(false);
+      setProblem(MESSAGE[res.error] ?? MESSAGE.default);
+      return;
     }
+    const me = await api.me();
+    setBusy(false);
+    if (!me.ok) { own.current = false; setProblem(MESSAGE.default); return; }
+    goLive(me.data, localISO());
+    setPassword('');
     successFeedback();
-    finishOnboarding();
-    router.replace('/');
+    // A new account sets up; a returning one goes straight to its week.
+    router.replace((form === 'up' ? '/setup/timetable' : '/') as Href);
   };
 
-  const skip = () => {
-    finishOnboarding();
-    router.replace('/');
+  const asGuest = () => {
+    tapFeedback();
+    startGuest();
+    router.replace('/setup/timetable' as Href);
   };
 
   return (
     <Screen
       footer={
-        <>
-          {step < 2 ? (
-            <Button
-              label="Next"
-              onPress={() => {
-                tapFeedback();
-                setStep((current) => current + 1);
-              }}
-            />
-          ) : (
-            <Button label={title.trim() ? 'Add it and see my week' : 'See my week'} onPress={done} />
-          )}
-          <Pressable
-            accessibilityRole="button"
-            onPress={step === 0 ? skip : () => setStep((current) => current - 1)}
-            className="min-h-min items-center justify-center"
-          >
-            <Text variant="footnote" tone="subtle">{step === 0 ? 'Skip the intro' : 'Back'}</Text>
-          </Pressable>
-        </>
+        server ? (
+          <Button
+            label={busy ? 'One moment…' : form === 'up' ? 'Create account' : 'Sign in'}
+            kind={ready && !busy ? 'primary' : 'secondary'}
+            accessibilityState={{ disabled: !ready || busy }}
+            onPress={() => void submit()}
+          />
+        ) : (
+          <Button label="Look around as a guest" onPress={asGuest} />
+        )
       }
     >
-      <Stack gap={6} className="pt-6">
-        <StepDots labels={STEPS} current={step} onJump={setStep} />
+      <Stack gap={5} className="pt-2">
+        {/* The battery, the name, the one line. */}
+        <View className="items-center gap-2 overflow-hidden px-4 pb-5 pt-6" style={{ borderRadius: radius.xl, backgroundColor: color.decor.lemon }}>
+          <Mascot charge={72} loadPercent={28} size={112} />
+          <Text variant="display" accessibilityRole="header">Ballast</Text>
+          <Text variant="callout" weight="semibold">Plan your week around your energy.</Text>
+        </View>
 
-        {step === 0 ? (
-          <Stack gap={6}>
-            <PageHeader
-              sticker="wave"
-              wash={color.decor.lemon}
-              eyebrow="The whole idea"
-              title="Not every hour costs the same."
-              sub="Two tasks, same afternoon. Drag the dots."
-            />
-
-            <Card gap={5}>
-              <Stack gap={2}>
-                <Text variant="heading">Group presentation</Text>
-                <Text variant="footnote" tone="subtle">3 hours</Text>
+        <Stack gap={2}>
+          {WHY.map((row) => (
+            <Stack key={row.title} direction="row" gap={3} align="center" className="rounded-lg border border-line-hairline bg-raised px-3 py-2">
+              <View className="items-center justify-center rounded-pill" style={{ width: 40, height: 40, backgroundColor: row.wash }}>
+                <Sticker name={row.sticker} size={26} />
+              </View>
+              <Stack gap={0} grow>
+                <Text variant="body" weight="semibold">{row.title}</Text>
+                <Text variant="micro" tone="muted">{row.sub}</Text>
               </Stack>
-              <DreadPicker value={presentationDread} onChange={setPresentationDread} />
-              <LoadBar value={presentation} max={30} />
-            </Card>
+            </Stack>
+          ))}
+        </Stack>
 
-            <Card gap={5}>
-              <Stack gap={2}>
-                <Text variant="heading">Reading you enjoy</Text>
-                <Text variant="footnote" tone="subtle">6 hours</Text>
-              </Stack>
-              <DreadPicker value={readingDread} onChange={setReadingDread} />
-              <LoadBar value={reading} max={30} />
-            </Card>
-
-            <Card tone={presentation > reading ? 'heavy' : 'steady'} gap={2}>
-              <Text variant="heading" accessibilityLiveRegion="polite">{verdict}</Text>
-              <Text variant="footnote" tone="muted">
-                Every planner measures hours. That is exactly why none of them can tell you that you are
-                about to break.
-              </Text>
-            </Card>
-          </Stack>
-        ) : null}
-
-        {step === 1 ? (
-          <Stack gap={6}>
-            <PageHeader
-              sticker="battery"
-              wash={color.decor.mint}
-              eyebrow="Why one number is not enough"
-              title="You run out in one place."
-              sub="Five areas, five ceilings, one blended reading."
-            />
-
-            <Card tone={bandFor(overall)} gap={5}>
-              <Stack direction="row" gap={5} align="center">
-                <Battery
-                  charge={chargeOf(overall)}
-                  loadPercent={overall}
-                  width={130}
-                  height={64}
-                  label={`${chargeOf(overall)} percent left overall`}
-                />
-                <Stack gap={1} grow>
-                  <Text variant="display" tone={TONE[bandFor(overall)]}>{chargeOf(overall)}%</Text>
-                  <Text variant="footnote" tone="muted">left this week</Text>
-                </Stack>
-              </Stack>
-            </Card>
-
-            <Stack gap={3}>
-              {BUCKETS.map((bucket) => (
-                <Stack key={bucket} direction="row" gap={4} align="center">
-                  <BatteryMini charge={chargeOf(percents[bucket])} loadPercent={percents[bucket]} />
-                  <Text variant="body" className="flex-1">{BUCKET_LABEL[bucket]}</Text>
-                  <Text variant="body" weight="semibold" tone={TONE[bandFor(percents[bucket])]}>
-                    {chargeOf(percents[bucket])}%
+        {server ? (
+          <Stack gap={4}>
+            {/* Two mutually exclusive forms are one segmented control. */}
+            <Stack direction="row" gap={0} className="rounded-pill border-2 border-line-strong bg-sunken p-1">
+              {(['up', 'in'] as const).map((option) => (
+                <Pressable
+                  key={option}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: form === option }}
+                  accessibilityLabel={option === 'up' ? 'Create account' : 'Sign in'}
+                  onPress={() => { tapFeedback(); setForm(option); setProblem(null); }}
+                  className={`min-h-min flex-1 items-center justify-center rounded-pill py-3 active:opacity-70 ${form === option ? 'bg-inverse' : ''}`}
+                >
+                  <Text variant="caption" weight="bold" tone={form === option ? 'inverse' : 'muted'}>
+                    {option === 'up' ? 'Create account' : 'Sign in'}
                   </Text>
-                </Stack>
+                </Pressable>
               ))}
             </Stack>
 
-            <Card gap={2}>
-              <Text variant="callout">
-                Amira's head is empty and her body still has {chargeOf(percents.physical)}% left. That pairing has
-                a specific fix — get out of the building, do not think.
-              </Text>
-              <Text variant="footnote" tone="muted">
-                A timetable cannot see it, because a timetable counts hours.
-              </Text>
-            </Card>
-          </Stack>
-        ) : null}
-
-        {step === 2 ? (
-          <Stack gap={6}>
-            <PageHeader
-              sticker="star"
-              wash={color.decor.candy}
-              eyebrow="Your turn"
-              title="What are you dreading?"
-              sub="One thing. It goes straight into your week."
-            />
-
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Statistics coursework"
-              placeholderTextColor={color.ink.subtle}
-              accessibilityLabel="What are you dreading"
-              className="min-h-row rounded-md border border-line-strong bg-page px-5 py-4 text-body text-ink-default"
-            />
-
             <Stack gap={3}>
-              <Text variant="micro" tone="subtle">HOW LONG</Text>
-              <Stack direction="row" gap={3} wrap>
-                {HOURS.map((option) => (
-                  <Chip
-                    key={option}
-                    label={`${option}h`}
-                    tone={hours === option ? 'selected' : 'plain'}
-                    onPress={() => { tapFeedback(); setHours(option); }}
-                  />
-                ))}
-              </Stack>
+              {form === 'up' ? (
+                <Field label="Your name" value={name} onChange={setName} autoComplete="name" />
+              ) : null}
+              <Field label="Email" value={email} onChange={setEmail} autoComplete="email" keyboardType="email-address" />
+              <Field
+                label="Password · 8+ characters"
+                value={password}
+                onChange={setPassword}
+                autoComplete={form === 'up' ? 'new-password' : 'current-password'}
+                secure
+                onSubmit={() => void submit()}
+              />
+              {problem ? <Text variant="footnote" tone="heavy" accessibilityLiveRegion="polite">{problem}</Text> : null}
             </Stack>
-
-            <Card gap={5}>
-              <Text variant="micro" tone="subtle">HOW MUCH ARE YOU DREADING IT</Text>
-              <DreadPicker value={dread} onChange={setDread} />
-            </Card>
-
-            <Card tone={mine >= 20 ? 'heavy' : mine >= 10 ? 'busy' : 'steady'} gap={2}>
-              <Text variant="display" accessibilityLiveRegion="polite">{mine}</Text>
-              <Text variant="footnote" tone="muted">
-                load — {hours} hours multiplied by dread {dread}. That is the number the whole app runs on.
-              </Text>
-            </Card>
           </Stack>
         ) : null}
 
-        <View className="h-4" />
+        {/* Preview builds only: the sample week, no account. */}
+        {server && guestAllowed() ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Look around as a guest"
+            onPress={asGuest}
+            className="min-h-min items-center justify-center gap-1 py-2 active:opacity-60"
+          >
+            <Text variant="callout" weight="semibold" className="underline">Look around as a guest</Text>
+            <Text variant="micro" tone="subtle">Sample week · preview only</Text>
+          </Pressable>
+        ) : null}
+
+        <View className="h-2" />
       </Stack>
     </Screen>
   );
 }
 
-/** A bare load bar, sized against a shared maximum so the two cards compare honestly. */
-function LoadBar({ value, max }: { value: number; max: number }) {
-  const band = value >= 20 ? 'heavy' : value >= 10 ? 'busy' : 'steady';
-  const tone = { steady: 'bg-steady-fill', busy: 'bg-busy-fill', heavy: 'bg-heavy-fill' }[band];
+function Field({
+  label, value, onChange, autoComplete, keyboardType, secure, onSubmit,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  autoComplete?: 'name' | 'email' | 'new-password' | 'current-password';
+  keyboardType?: 'email-address';
+  secure?: boolean;
+  onSubmit?: () => void;
+}) {
   return (
-    <Stack direction="row" gap={4} align="center">
-      <View className="h-3 flex-1 overflow-hidden rounded-pill bg-track">
-        <View className={`h-3 rounded-pill ${tone}`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
-      </View>
-      <Text variant="heading" tone={band} accessibilityLabel={`Load ${value}`}>{value}</Text>
-    </Stack>
+    <TextInput
+      value={value}
+      onChangeText={onChange}
+      placeholder={label}
+      placeholderTextColor={color.ink.subtle}
+      autoCapitalize={autoComplete === 'name' ? 'words' : 'none'}
+      autoCorrect={false}
+      autoComplete={autoComplete}
+      keyboardType={keyboardType}
+      secureTextEntry={secure}
+      onSubmitEditing={onSubmit}
+      accessibilityLabel={label}
+      className="min-h-row rounded-pill border-2 border-line-hairline bg-sunken px-5 py-3 text-body text-ink-default"
+      style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : undefined}
+    />
   );
 }

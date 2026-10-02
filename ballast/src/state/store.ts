@@ -11,7 +11,7 @@ import { SCHEMA_VERSION, STORAGE_KEY, migrateSaved, storage } from './storage';
 import type {
   BucketKey, CircleMember, Contact, ContributionTag, DayReport, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
   MoodQuadrant, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
-  RecoveryEntry, SimAction, Trade, Mix, CustomFlag, FlagId, Group, ShareRules, ShareWindow,
+  RecoveryEntry, SimAction, Trade, Mix, CustomFlag, FlagId, Group, PlanActivity, ShareRules, ShareWindow, Outcome,
 } from '@/lib/types';
 import { DEFAULT_SHARE_RULES, type PhoneContact, type ShareMode } from '@/lib/sharing';
 import type { Collection, MeDTO, PendingRequestDTO } from '@shared/contract';
@@ -21,6 +21,7 @@ import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from 
 import { applySelection } from '@/lib/rebalance';
 import { completionCredit } from '@/lib/errands';
 import { customFlagId } from '@/lib/timetable';
+import { applyMark, applyRegister, autoMark } from '@/lib/marking';
 import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
@@ -28,6 +29,12 @@ import {
   customActions as seedCustomActions, errands as seedErrands, meals as seedMeals, modules as seedModules,
   moodHistory, phoneContacts as seedPhoneContacts, recoveryLedger, seedItems, groups as seedGroups,
 } from '@/data/seed';
+
+/**
+ * The seeded semester, the morning after Sunday: whatever nobody marked
+ * yesterday is already marked done, and waiting on Home to be reviewed.
+ */
+const SEEDED = autoMark(seedItems, seedModules, TODAY);
 
 interface State {
   today: string;
@@ -86,6 +93,8 @@ interface State {
   customFlags: CustomFlag[];
   /** Friends you plan with often. */
   groups: Group[];
+  /** Your own usual activities, for plans made outside a group. */
+  planActivities: PlanActivity[];
   /**
    * The signed-in account, or null.
    *
@@ -120,6 +129,26 @@ interface State {
    * door without every screen that shows it making its own request.
    */
   requests: PendingRequestDTO[];
+  /**
+   * Your picture: a photo (an image URI) or an emoji you chose instead.
+   * Null shows your initials on your ring. A fact about you, so it survives a reload.
+   */
+  pic: string | null;
+  /** "Later" on the marking notification: quiet until the app is opened again. */
+  marksSnoozed: boolean;
+  /**
+   * Looking around with the sample week and no account. Only offered by
+   * preview builds - a real build signs everyone in (see `lib/access`).
+   */
+  guest: boolean;
+  /** The saved session has been asked about. Until then nobody is sent to sign in. */
+  sessionChecked: boolean;
+  /**
+   * Who was signed in on this device last time, kept across reloads. Only a
+   * hint: it is why a reload waits for the server instead of flashing the
+   * sign-in screen, and the server's answer is what counts.
+   */
+  lastAccountId: string | null;
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
@@ -132,11 +161,13 @@ interface State {
   toggleHiddenFrom: (friendId: string) => void;
   addCustomFlag: (flag: Omit<CustomFlag, 'id'>) => string;
   removeCustomFlag: (id: string) => void;
-  setModuleEmoji: (moduleId: string, emoji: string) => void;
   createGroup: (group: Omit<Group, 'id'>) => string;
   updateGroup: (id: string, patch: Partial<Omit<Group, 'id'>>) => void;
   toggleGroupMember: (groupId: string, friendId: string) => void;
   deleteGroup: (id: string) => void;
+  /** A usual activity, saved to a group or - with no group - to your own list. Returns its id. */
+  addActivity: (activity: Omit<PlanActivity, 'id'>, groupId?: string) => string;
+  removeActivity: (id: string, groupId?: string) => void;
   setAccount: (account: MeDTO | null) => void;
   setStatus: (status: string | null) => void;
   goLive: (account: MeDTO, today: string) => void;
@@ -180,7 +211,22 @@ interface State {
   setModuleDread: (moduleId: string, dread: DreadLevel) => void;
   setModuleImportance: (moduleId: string, importance: 1 | 2 | 3) => void;
   toggleClassFlag: (itemId: string, flag: FlagId) => void;
-  markAttendance: (moduleId: string, attended: boolean) => void;
+  /**
+   * Say what happened: done, partly done (with how much) or missed - or, with
+   * no outcome, take the answer back.
+   */
+  markItem: (id: string, outcome: Outcome | undefined, fraction?: number) => void;
+  setModuleWeeks: (moduleId: string, weeks: number) => void;
+  setModuleRequired: (moduleId: string, required: number | null) => void;
+  /** The rarely-changed details set at import: its picture, and which week it started. */
+  updateModule: (moduleId: string, patch: Partial<Pick<Module, 'emoji' | 'startDate'>>) => void;
+  setPic: (pic: string | null) => void;
+  snoozeMarks: () => void;
+  /** The sample week, as a guest. */
+  startGuest: () => void;
+  /** Signed out, or a guest leaving: back to the sign-in screen. */
+  endSession: () => void;
+  setSessionChecked: () => void;
   importTimetable: (items: Item[], modules: Module[]) => void;
   reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number, verdict?: DayReport['verdict']) => void;
   logMood: (quadrant: MoodQuadrant, tags: ContributionTag[]) => void;
@@ -206,7 +252,7 @@ export const useStore = create<State>()(
     (set) => ({
   today: TODAY,
   onboarded: false,
-  items: seedItems,
+  items: SEEDED.items,
   ceilings: CEILINGS,
   overallCeiling: OVERALL_CEILING,
   showEverythingAnyway: false,
@@ -223,7 +269,7 @@ export const useStore = create<State>()(
   moments: [],
   offHour: 17,
   customActions: seedCustomActions,
-  modules: seedModules,
+  modules: SEEDED.modules,
   circle: seedCircle,
   phoneContacts: seedPhoneContacts,
   // Free evenings by default, which is what makes the planning side work at all.
@@ -232,10 +278,16 @@ export const useStore = create<State>()(
   shareRules: DEFAULT_SHARE_RULES,
   customFlags: [],
   groups: seedGroups,
+  planActivities: [],
   account: null,
   mode: 'demo',
   requests: [],
   status: null,
+  pic: null,
+  marksSnoozed: false,
+  guest: false,
+  sessionChecked: false,
+  lastAccountId: null,
 
   addItem: (item) =>
     set((state) => {
@@ -346,14 +398,14 @@ export const useStore = create<State>()(
    */
   goLive: (account, today) =>
     set({
-      mode: 'live', account, today,
+      mode: 'live', account, today, guest: false, lastAccountId: account.id,
       items: [], errands: [], modules: [], moods: [], meals: [], moments: [],
       recovery: [], contacts: [], dayReports: [], booked: [], invites: [],
       circle: [], phoneContacts: [], customActions: [], requests: [], status: null,
       sleepHours: null, showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: DEFAULT_CEILINGS, overallCeiling: DEFAULT_OVERALL_CEILING,
       sharing: 'evenings', offHour: 17,
-      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: [],
+      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: [], planActivities: [],
     }),
 
   /** Back to the interface study. What the public link shows, and what the checks assert. */
@@ -365,13 +417,13 @@ export const useStore = create<State>()(
   goDemo: () =>
     set({
       mode: 'demo', account: null, today: TODAY,
-      items: seedItems, moods: moodHistory, meals: seedMeals, errands: seedErrands,
-      contacts: seedContacts, recovery: recoveryLedger, modules: seedModules,
+      items: SEEDED.items, moods: moodHistory, meals: seedMeals, errands: seedErrands,
+      contacts: seedContacts, recovery: recoveryLedger, modules: SEEDED.modules,
       circle: seedCircle, phoneContacts: seedPhoneContacts, customActions: seedCustomActions,
       requests: [], booked: [], dayReports: [], invites: [], moments: [], sleepHours: null, status: null,
       showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: CEILINGS, overallCeiling: OVERALL_CEILING, sharing: 'evenings', offHour: 17,
-      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups,
+      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups, planActivities: [],
     }),
 
   /**
@@ -416,9 +468,20 @@ export const useStore = create<State>()(
         if (typeof settings.onboarded === 'boolean') patch.onboarded = settings.onboarded;
         if (Array.isArray(settings.customFlags)) patch.customFlags = settings.customFlags as CustomFlag[];
         if (Array.isArray(settings.groups)) patch.groups = settings.groups as Group[];
+        if (Array.isArray(settings.planActivities)) patch.planActivities = settings.planActivities as PlanActivity[];
         if (settings.shareRules && typeof settings.shareRules === 'object') {
           patch.shareRules = { ...DEFAULT_SHARE_RULES, ...(settings.shareRules as Partial<ShareRules>) };
         }
+      }
+
+      // Whatever arrived from an earlier day still unanswered is assumed done,
+      // the same morning-after rule the seeded week follows.
+      const items = patch.items ?? state.items;
+      const modules = patch.modules ?? state.modules;
+      const marked = autoMark(items, modules, state.today);
+      if (marked.items !== items) {
+        patch.items = marked.items;
+        patch.modules = marked.modules;
       }
 
       return patch;
@@ -468,6 +531,8 @@ export const useStore = create<State>()(
             label: prescription.title,
             detail: `Booked for ${formatHour(startHour)}${date && date !== state.today ? ` on ${date.slice(8)}` : ''}`,
             hours: credit,
+            emoji: prescription.emoji ?? '🌿',
+            tag: `Booked · ${formatHour(startHour)}`,
           },
           ...state.recovery,
         ],
@@ -558,10 +623,7 @@ export const useStore = create<State>()(
       }),
     })),
 
-  setModuleEmoji: (moduleId, emoji) =>
-    set((state) => ({ modules: state.modules.map((m) => (m.id === moduleId ? { ...m, emoji } : m)) })),
-
-  /** A flag of your own. Returns its id so the class it was made on can wear it at once. */
+  /** A flag of your own, for one module. Returns its id so the class it was made on can wear it at once. */
   addCustomFlag: (flag) => {
     const id = customFlagId(flag.protect);
     const label = flag.label.trim().slice(0, 24);
@@ -619,12 +681,58 @@ export const useStore = create<State>()(
 
   deleteGroup: (id) => set((state) => ({ groups: state.groups.filter((g) => g.id !== id) })),
 
-  markAttendance: (moduleId, attended) =>
+  addActivity: (activity, groupId) => {
+    const id = `act-${Date.now()}`;
+    const made: PlanActivity = {
+      id,
+      label: activity.label.trim().slice(0, 24) || 'Hang out',
+      emoji: activity.emoji,
+      hours: Math.max(0.5, Math.min(12, Math.round(activity.hours * 2) / 2)),
+    };
+    set((state) => (groupId
+      ? { groups: state.groups.map((g) => (g.id === groupId ? { ...g, activities: [...(g.activities ?? []), made] } : g)) }
+      : { planActivities: [...state.planActivities, made] }));
+    return id;
+  },
+
+  removeActivity: (id, groupId) =>
+    set((state) => (groupId
+      ? { groups: state.groups.map((g) => (g.id === groupId ? { ...g, activities: (g.activities ?? []).filter((a) => a.id !== id) } : g)) }
+      : { planActivities: state.planActivities.filter((a) => a.id !== id) })),
+
+  markItem: (id, outcome, fraction) =>
+    set((state) => {
+      const result = applyMark(state.items, id, outcome, fraction);
+      return {
+        items: result.items,
+        modules: result.register ? applyRegister(state.modules, [result.register]) : state.modules,
+      };
+    }),
+
+  setModuleWeeks: (moduleId, weeks) =>
     set((state) => ({
-      modules: state.modules.map((m) =>
-        m.id === moduleId ? { ...m, held: m.held + 1, attended: m.attended + (attended ? 1 : 0) } : m,
-      ),
+      modules: state.modules.map((m) => (m.id === moduleId ? { ...m, weeks: Math.max(1, Math.min(30, Math.round(weeks))) } : m)),
     })),
+
+  setModuleRequired: (moduleId, required) =>
+    set((state) => ({
+      modules: state.modules.map((m) => (m.id === moduleId ? { ...m, requiredAttendance: required } : m)),
+    })),
+
+  updateModule: (moduleId, patch) =>
+    set((state) => ({ modules: state.modules.map((m) => (m.id === moduleId ? { ...m, ...patch } : m)) })),
+
+  setPic: (pic) => set({ pic }),
+  snoozeMarks: () => set({ marksSnoozed: true }),
+  startGuest: () => {
+    useStore.getState().goDemo();
+    set({ guest: true, onboarded: false });
+  },
+  endSession: () => {
+    useStore.getState().goDemo();
+    set({ guest: false, lastAccountId: null });
+  },
+  setSessionChecked: () => set({ sessionChecked: true }),
 
   /** Replace the timetable wholesale. A paste is an import, not an append. */
   importTimetable: (items, modules) =>
@@ -669,6 +777,8 @@ export const useStore = create<State>()(
   markContacted: (id) =>
     set((state) => ({
       contacts: state.contacts.map((c) => (c.id === id ? { ...c, lastSpokeDays: 0, state: 'talked' } : c)),
+      // Messaging someone is what makes them one of your frequent people.
+      circle: state.circle.map((p) => (p.id === id ? { ...p, frequency: (p.frequency ?? 0) + 1 } : p)),
     })),
 
   /** The one input that gives charge back rather than taking it. */
@@ -770,14 +880,7 @@ export const useStore = create<State>()(
     set((state) => {
       const session = state.items.find((item) => item.id === sessionId);
       if (!session || session.sessionDone || !session.parentId) return {};
-      return {
-        items: state.items.map((item) => {
-          if (item.id === sessionId) return { ...item, sessionDone: true };
-          if (item.id !== session.parentId) return item;
-          const done = Math.min(item.prepHours ?? 0, (item.prepDone ?? 0) + session.hours);
-          return { ...item, prepDone: Math.round(done * 10) / 10 };
-        }),
-      };
+      return { items: applyMark(state.items, sessionId, 'done').items };
     }),
 
   /** Work done without booking a sitting first, which happens. */
@@ -811,6 +914,8 @@ export const useStore = create<State>()(
       const id = `invite-${invite.date}-${invite.startHour}-${invite.people.join('-')}`;
       return {
         invites: [...state.invites, { ...invite, id }],
+        // Planning with people is the other thing that makes them frequent.
+        circle: state.circle.map((p) => (invite.people.includes(p.id) ? { ...p, frequency: (p.frequency ?? 0) + 1 } : p)),
         items: [
           ...state.items,
           {
@@ -917,12 +1022,12 @@ export const useStore = create<State>()(
   /** Back to the seeded semester. The intro stays done - resetting is not a punishment. */
   reset: () =>
     set({
-      items: seedItems, showEverythingAnyway: false, minimumViableWeek: false,
+      items: SEEDED.items, showEverythingAnyway: false, minimumViableWeek: false,
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
-      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: seedCustomActions, modules: seedModules,
+      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: seedCustomActions, modules: SEEDED.modules,
       circle: seedCircle, phoneContacts: seedPhoneContacts, sharing: 'evenings',
-      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups,
+      shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups, planActivities: [],
       // Ceilings too. They move when you report a hard day below your line, and
       // reset clears the day reports that moved them - leaving the lowered line
       // in place with the evidence for it gone made every later reading read
@@ -934,16 +1039,17 @@ export const useStore = create<State>()(
       name: STORAGE_KEY,
       storage,
       /**
-       * Only whether the intro has run survives a reload.
+       * Only whether the intro has run, and your picture, survive a reload.
        *
        * Every launch starts from the seeded semester on purpose. A week you can
        * accidentally wreck and cannot get back is worse than one that forgets:
        * the demo is repeatable, nothing half-finished carries over, and a bug
        * fixed in code cannot be kept alive by data written before it. The intro
        * flag is the exception because replaying a three-step tour on every
-       * refresh would be its own kind of punishment.
+       * refresh would be its own kind of punishment; the picture because it is
+       * a fact about you, not about your week.
        */
-      partialize: ({ onboarded }) => ({ onboarded }) as unknown as State,
+      partialize: ({ onboarded, pic, guest, lastAccountId }) => ({ onboarded, pic, guest, lastAccountId }) as unknown as State,
       /**
        * Bump this whenever a fix changes what a *saved* week can contain.
        *

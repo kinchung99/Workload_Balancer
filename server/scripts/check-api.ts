@@ -331,6 +331,10 @@ section('Writing a message');
   const fake: Writer = {
     ideas: async (ctx) => { seen.push(ctx); return [{ id: 'ai-0', title: 'Say no, kindly', emoji: '💛', detail: 'Keeps the friendship' }]; },
     draft: async (req) => `${req.intent.title} · ${req.tone} · ${req.length}`,
+    rest: async (ctx) => {
+      seen.push(ctx);
+      return [{ id: 'idea-walk', title: 'Walk somewhere green', detail: 'Physical has room', emoji: '🌳', area: 'physical', minutes: 30, from: 12, to: 19, tags: ['Costs nothing'] }];
+    },
   };
   const withWriter = createApp(db, auth, fake);
   const ask = (path: string, body: unknown, cookie?: string) =>
@@ -357,6 +361,22 @@ section('Writing a message');
 
   check('an unknown tone is refused', (await ask('/api/compose/draft', { context, intent: { title: 'x' }, tone: 'sarcastic' }, amira.cookie)).status, 400);
   check('so is a context with no subject', (await ask('/api/compose/ideas', { context: { ...context, subject: '' } }, amira.cookie)).status, 400);
+
+  // What might help: numbers and taps only.
+  const restContext = {
+    areas: { mental: 118, time: 64, physical: 22, social: 40, errands: 51 },
+    charge: 47, sleepHours: 6, free: [{ start: 17, end: 23 }], vibes: ['outside', 'alone'], exclude: ['Nap, 25 minutes'],
+  };
+  check('recovery ideas need an account too', (await ask('/api/suggest/recovery', { context: restContext })).status, 401);
+  const rest = await ask('/api/suggest/recovery', { context: restContext }, amira.cookie);
+  check('recovery ideas come back for a signed-in student', rest.status, 200);
+  check('as cards with an area and a length',
+    ((await rest.json()) as { ideas: Array<{ area: string; minutes: number }> }).ideas.map((i) => [i.area, i.minutes]), [['physical', 30]]);
+  const restSeen = seen[seen.length - 1] as Record<string, unknown>;
+  check('the model sees numbers and taps, never a task', Object.keys(restSeen).sort(), ['areas', 'charge', 'exclude', 'free', 'sleepHours', 'vibes']);
+  check('and what was already shown, so a refresh is new', restSeen.exclude, ['Nap, 25 minutes']);
+  check('an unknown mood is refused', (await ask('/api/suggest/recovery', { context: { ...restContext, vibes: ['rave'] } }, amira.cookie)).status, 400);
+  check('so is an area missing its number', (await ask('/api/suggest/recovery', { context: { ...restContext, areas: { mental: 10 } } }, amira.cookie)).status, 400);
 
   // Thirty per ten minutes, per person. Jo has made none yet.
   let last = 0;
@@ -432,7 +452,7 @@ section('The deployment routes every path to the function');
     '/', '/health',
     '/api/auth/sign-up/email', '/api/auth/sign-in/anonymous', '/api/auth/sign-out',
     '/api/me', '/api/sync', '/api/circle', '/api/circle/request',
-    '/api/sharing/presence', '/api/invites', '/api/compose/ideas', '/api/compose/draft',
+    '/api/sharing/presence', '/api/invites', '/api/compose/ideas', '/api/compose/draft', '/api/suggest/recovery',
   ]) {
     check(`${path} reaches the function`, reaches(path), true);
   }

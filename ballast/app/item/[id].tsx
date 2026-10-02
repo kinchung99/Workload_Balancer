@@ -1,11 +1,11 @@
 import { View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
-  AreaIcon, Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
+  AreaIcon, Button, Chip, Disclosure, Door, PageHeader, Screen, Section, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
 import { BUCKET_LABEL, COMMITMENT_LABEL, describeMix, loadOf } from '@/lib/load';
-import { needsPrep, remaining, sittingsOf } from '@/lib/prep';
+import { daysLeft, needsPrep, remaining, sittingsOf } from '@/lib/prep';
 import { formatHour, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
@@ -13,8 +13,8 @@ import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
 import { flagInfo, isProtectedClass } from '@/lib/timetable';
 import { LogTime, OwingSummary } from '@/features/item/Owing';
-import { Sittings } from '@/features/item/Sittings';
-import { DreadCard } from '@/features/item/Dread';
+import { SittingsPreview } from '@/features/item/Sittings';
+import { DrainDisclosure } from '@/features/item/Dread';
 
 /**
  * Two real items, so `/item/...` renders in the static export rather than the
@@ -25,16 +25,15 @@ export async function generateStaticParams() {
 }
 
 /**
- * One thing, and everything you can do to it.
+ * One thing, and everything you can do to it - in panels, not a pile.
  *
- * The lists used to carry their own controls: every owing card had Plan it,
- * Progress, Book sittings and Push, every timeline row had Move, Unschedule and
- * a slot picker. Three pieces of work on one day meant a dozen buttons on a
- * screen whose job was to tell you what your day looked like.
- *
- * So the lists are read-only now, and this is where the verbs live. Tap a row,
- * get a page. Nothing is hidden — it is one tap further away, and the screen you
- * came from is legible again.
+ * The page had grown a ring, a sittings planner, a time logger, a drain picker
+ * and a decline button, all open at once. Now: the facts at the top; a Progress
+ * panel (the ring, with "did some without booking it" folded inside); a
+ * Sittings panel (the next few, one tap from done, and the way into the full
+ * planner on its own page); how draining it is, folded to one row; and a door to
+ * the message writer. Each panel is one family's colour, so the page reads as
+ * four different things rather than eleven similar ones.
  */
 export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,6 +58,7 @@ export default function ItemDetail() {
   const ticked = sittingsOf(item, items).filter((s) => s.sessionDone).length;
   const slots = startOptions(items, item.date, item.hours);
   const locked = isProtectedClass(item) || item.commitment === 'hard';
+  const left = daysLeft(item, today);
 
   return (
     <Screen
@@ -76,8 +76,8 @@ export default function ItemDetail() {
           wiggle={false}
         />
 
-        {/* What it is, before what you can do to it. */}
-        <Card gap={4}>
+        {/* The facts, in one row. */}
+        <Stack gap={2}>
           <Stack direction="row" gap={2} wrap>
             <View className="flex-row items-center gap-2 rounded-pill px-3 py-2" style={{ backgroundColor: color.area[item.bucket].wash }}>
               <AreaIcon area={item.bucket} size={15} />
@@ -91,52 +91,52 @@ export default function ItemDetail() {
             ) : finished ? null : (
               <Chip label="No time yet" tone="busy" readOnly />
             )}
+            {item.flags?.map((flag) => {
+              const info = flagInfo(flag, customFlags);
+              return info ? <Chip key={flag} label={`${info.emoji} ${info.short}`} tone={info.protect ? 'heavy' : 'plain'} readOnly /> : null;
+            })}
           </Stack>
-          {item.flags?.length ? (
-            <Stack direction="row" gap={2} wrap>
-              {item.flags.map((flag) => {
-                const info = flagInfo(flag, customFlags);
-                return info ? <Chip key={flag} label={`${info.emoji} ${info.label}`} tone={info.protect ? 'heavy' : 'plain'} readOnly /> : null;
-              })}
-            </Stack>
-          ) : null}
           {locked ? (
-            <Stack direction="row" gap={3} align="center" className="rounded-md bg-heavy-wash px-3 py-3">
-              <Sticker name="wall" size={26} />
-              <Text variant="micro" tone="heavy" className="flex-1">
-                Locked. Nothing in this app will propose moving it.
-              </Text>
+            <Stack direction="row" gap={3} align="center" className="rounded-md bg-heavy-wash px-3 py-2">
+              <Sticker name="wall" size={22} />
+              <Text variant="micro" tone="heavy" className="flex-1">Locked · never suggested for moving</Text>
             </Stack>
           ) : null}
-        </Card>
+        </Stack>
 
-        {/* Owing work: where it stands, when it happens, and what you did off-plan. */}
+        {/* Owing work: how far along, then when the rest happens. */}
         {owing ? (
           <>
-            <OwingSummary item={item} items={items} today={today} />
-            <Sittings item={item} items={items} />
-            <LogTime item={item} />
+            <Section family="focus" title="Progress" meta={left === 0 ? 'Due today' : `${left} day${left === 1 ? '' : 's'} left`}>
+              <OwingSummary item={item} items={items} today={today} />
+              <Disclosure lead="⏱" title="Did some without booking it?" summary="Log time you already put in">
+                <LogTime item={item} />
+              </Disclosure>
+            </Section>
+
+            <Section family="week" title="Sittings" sticker="clock">
+              <SittingsPreview
+                item={item}
+                items={items}
+                onOpen={() => router.push(`/item/${item.id}/sittings` as Href)}
+                onSuggest={() => router.push(`/item/${item.id}/sittings?suggest=1` as Href)}
+              />
+            </Section>
           </>
         ) : null}
 
         {finished ? (
-          <Card tone="steady" gap={3}>
-            <Stack direction="row" gap={4} align="center">
-              <Sticker name="star" size={48} wiggle />
-              <Stack gap={1} grow>
-                <Text variant="heading" tone="steady">All {item.prepHours}h done</Text>
-                <Text variant="footnote" tone="muted">
-                  {ticked ? `${ticked} sitting${ticked === 1 ? '' : 's'} ticked off · ` : ''}Off every list.
-                </Text>
-              </Stack>
+          <Section family="focus" title={`All ${item.prepHours}h done`} meta={ticked ? `${ticked} sittings` : undefined}>
+            <Stack direction="row" gap={4} align="center" className="rounded-md bg-raised px-4 py-3">
+              <Sticker name="star" size={40} wiggle />
+              <Text variant="footnote" tone="muted" className="flex-1">Off every list.</Text>
             </Stack>
-          </Card>
+          </Section>
         ) : null}
 
         {/* Anything with a slot, or wanting one. */}
         {!owing && !finished && !locked && !item.repeats ? (
-          <Card gap={4}>
-            <Text variant="heading">{item.startHour === undefined ? 'Give it a time' : 'Move it'}</Text>
+          <Section family="week" title={item.startHour === undefined ? 'Give it a time' : 'Move it'} sticker="clock">
             {slots.length ? (
               <Stack direction="row" gap={2} wrap>
                 {slots.map((hour) => (
@@ -149,9 +149,7 @@ export default function ItemDetail() {
                 ))}
               </Stack>
             ) : (
-              <Text variant="footnote" tone="muted">
-                No gap on {formatShort(item.date)} is {item.hours}h long. Try another day.
-              </Text>
+              <Text variant="footnote" tone="muted">No {item.hours}h gap on {formatShort(item.date)}.</Text>
             )}
             <Stack direction="row" gap={2} wrap>
               {item.startHour !== undefined ? (
@@ -161,14 +159,20 @@ export default function ItemDetail() {
                 <Chip key={date} label={`Move to ${formatShort(date)}`} onPress={() => { moveItem(item.id, date); successFeedback(); }} />
               ))}
             </Stack>
-          </Card>
+          </Section>
         ) : null}
 
-        {/* How much you mind it — the one number only you can set. */}
-        {!item.isRecovery && !item.isLog ? <DreadCard item={item} items={items} /> : null}
+        {/* How much you mind it — folded to one row until you want to change it. */}
+        {!item.isRecovery && !item.isLog ? <DrainDisclosure item={item} items={items} /> : null}
 
         {!locked && item.commitment !== 'hard' && !item.repeats && !item.moduleId ? (
-          <Button label="Write a message to get out of it" kind="secondary" onPress={() => router.push(`/decline/${item.id}`)} />
+          <Door
+            family="people"
+            sticker="chat"
+            title="Get out of it"
+            sub="Write a message to get out of it"
+            onPress={() => router.push(`/decline/${item.id}`)}
+          />
         ) : null}
 
         <View className="h-2" />

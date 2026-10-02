@@ -7,14 +7,29 @@ import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 
 /**
- * Make a flag of your own.
+ * Make a flag of your own, for one module.
  *
  * A picture, a few words, and one real decision: does this flag protect the
  * class? Most flags are notes to self ("bring the laptop") and should not stop
  * the app suggesting a move; a few are reasons the hour cannot be skipped
  * ("lab sign-off"). The switch is off by default and fixed once made.
+ *
+ * The flag belongs to the module it was made in, and is offered on that
+ * module's classes only - a reason that matters in one subject is noise in
+ * every other.
  */
-export function FlagMaker({ onMade, onCancel }: { onMade: (id: string) => void; onCancel: () => void }) {
+export function FlagMaker({
+  moduleId,
+  moduleCode,
+  onMade,
+  onCancel,
+}: {
+  moduleId: string;
+  /** Shown in the heading, so it is plain where the flag will live. */
+  moduleCode?: string;
+  onMade: (id: string) => void;
+  onCancel: () => void;
+}) {
   const { addCustomFlag } = useStore();
   const [emoji, setEmoji] = useState(FLAG_EMOJIS[0]);
   const [label, setLabel] = useState('');
@@ -23,7 +38,7 @@ export function FlagMaker({ onMade, onCancel }: { onMade: (id: string) => void; 
 
   return (
     <Stack gap={4} className="rounded-lg border-2 border-dashed border-line-strong bg-sunken p-4">
-      <Text variant="micro" tone="subtle">NEW FLAG</Text>
+      <Text variant="micro" tone="subtle">NEW FLAG{moduleCode ? ` · ${moduleCode} ONLY` : ''}</Text>
 
       <Stack direction="row" gap={2} wrap>
         {FLAG_EMOJIS.map((option) => (
@@ -82,7 +97,7 @@ export function FlagMaker({ onMade, onCancel }: { onMade: (id: string) => void; 
           disabled={!ready}
           onPress={() => {
             if (!ready) return;
-            const id = addCustomFlag({ label, emoji, protect });
+            const id = addCustomFlag({ label, emoji, protect, moduleId });
             successFeedback();
             onMade(id);
           }}

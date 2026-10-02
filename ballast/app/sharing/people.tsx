@@ -4,6 +4,8 @@ import { Avatar, Button, Card, Chip, PageHeader, Screen, Stack, Text, Toggle } f
 import { color } from '@design/tokens';
 import { tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
+import { frequentFriends } from '@/lib/circle';
+import { PeopleList } from '@/features/social/PeopleList';
 
 /**
  * `/sharing/people` — who sees your times at all.
@@ -62,26 +64,19 @@ export default function SharePeople() {
           </Stack>
         </Stack>
 
-        <Card gap={2}>
-          {friends.map((person, index) => {
-            const sees = !hidden.includes(person.id);
-            return (
-              <View key={person.id}>
-                <Stack direction="row" gap={4} align="center" className="py-2" style={{ opacity: sees ? 1 : 0.6 }}>
-                  <Avatar initials={person.initials} band={person.band} size={40} stale={!sees} />
-                  <Stack gap={1} grow>
-                    <Text variant="body" weight="semibold">{person.name}</Text>
-                    <Text variant="micro" tone={sees ? 'recovery' : 'subtle'}>
-                      {sees ? 'Sees your free times' : '🚫 No times · still sees your battery'}
-                    </Text>
-                  </Stack>
-                  <Toggle state={sees ? 'on' : 'off'} label={`${person.name} sees your times`} onPress={() => toggleHiddenFrom(person.id)} />
-                </Stack>
-                {index < friends.length - 1 ? <View className="h-px w-full bg-line-hairline" /> : null}
-              </View>
-            );
-          })}
-        </Card>
+        <PeopleList
+          people={friends}
+          frequent={frequentFriends(circle, 6)}
+          selected={seeing.map((person) => person.id)}
+          onToggle={(id) => toggleHiddenFrom(id)}
+          right={(person) => (
+            <Toggle
+              state={hidden.includes(person.id) ? 'off' : 'on'}
+              label={`${person.name} sees your times`}
+              onPress={() => toggleHiddenFrom(person.id)}
+            />
+          )}
+        />
       </Stack>
     </Screen>
   );

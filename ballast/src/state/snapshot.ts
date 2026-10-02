@@ -43,6 +43,7 @@ export interface Syncable {
   customFlags: unknown[];
   groups: unknown[];
   shareRules: unknown;
+  planActivities: unknown[];
 }
 
 const byId = (rows: Array<{ id: string }>): Record<string, unknown> =>
@@ -79,6 +80,7 @@ export function snapshotOf(state: Syncable): Snapshot {
         customFlags: state.customFlags,
         groups: state.groups,
         shareRules: state.shareRules,
+        planActivities: state.planActivities,
       },
     },
   };

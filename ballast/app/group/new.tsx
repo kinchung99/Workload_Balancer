@@ -6,6 +6,8 @@ import { color, radius } from '@design/tokens';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useStore } from '@/state/store';
+import { frequentFriends } from '@/lib/circle';
+import { PeopleList } from '@/features/social/PeopleList';
 import { GROUP_EMOJIS } from '@/features/social/groupArt';
 
 /**
@@ -92,28 +94,12 @@ export default function NewGroup() {
 
         <Stack gap={3}>
           <Text variant="micro" tone="subtle">WHO’S IN · {members.length} PICKED</Text>
-          <Stack direction="row" gap={3} wrap>
-            {friends.map((person) => {
-              const on = members.includes(person.id);
-              return (
-                <Pressable
-                  key={person.id}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  accessibilityLabel={person.name}
-                  onPress={() => { tapFeedback(); setMembers(on ? members.filter((m) => m !== person.id) : [...members, person.id]); }}
-                  className={`items-center gap-2 rounded-lg border-2 px-3 py-3 active:opacity-70 ${on ? 'border-inverse bg-decor-cream' : 'border-line-hairline'}`}
-                  style={{ width: 96 }}
-                >
-                  <Avatar initials={person.initials} band={person.band} size={44} />
-                  <Text variant="caption" weight="semibold">{person.name}</Text>
-                  <View className={`rounded-pill px-2 py-1 ${on ? 'bg-inverse' : 'bg-sunken'}`}>
-                    <Text variant="micro" tone={on ? 'inverse' : 'subtle'}>{on ? '✓ In' : 'Add'}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </Stack>
+          <PeopleList
+            people={friends}
+            frequent={frequentFriends(circle, 6)}
+            selected={members}
+            onToggle={(id) => setMembers(members.includes(id) ? members.filter((m) => m !== id) : [...members, id])}
+          />
         </Stack>
       </Stack>
     </Screen>

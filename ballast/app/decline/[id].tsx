@@ -193,7 +193,7 @@ export default function Decline() {
           <WeekMeter percent={weekPercent} />
           {replans ? (
             <Text variant="micro" tone="subtle">
-              If you go, the chapter 9 reading moves to Sunday. Going is not the wrong answer.
+              If you go: Chapter 9 reading → Sunday.
             </Text>
           ) : null}
         </Card>

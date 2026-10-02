@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Linking, Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   Button, Card, Chip, PageHeader, Screen, Stack, Sticker, Text,
 } from '@/components';
@@ -30,6 +30,7 @@ const INVITE = 'I am using Ballast to keep my week from piling up. Want to be in
 export default function FindFriends() {
   const router = useRouter();
   const { circle, phoneContacts, addFriend, mode, requests, setRequests, account } = useStore();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,8 +86,8 @@ export default function FindFriends() {
 
   return (
     <Screen
-      back="/friends"
-      backLabel="Friends"
+      back={from === 'setup' ? ('/setup/friends' as Href) : '/friends'}
+      backLabel={from === 'setup' ? 'Setup' : 'Friends'}
       footer={<Button label="Done" onPress={() => router.replace('/friends')} />}
     >
       <Stack gap={5} className="pt-2">
@@ -237,17 +238,7 @@ export default function FindFriends() {
           The one thing a screen that touches an address book has to say, said
           where it is read rather than in a settings page nobody opens.
         */}
-        <Card tone="sunken" gap={2}>
-          <Stack direction="row" gap={3} align="center">
-            <Sticker name="heart" size={30} />
-            <Text variant="footnote" weight="semibold" className="flex-1">
-              Matching happens on your phone.
-            </Text>
-          </Stack>
-          <Text variant="micro" tone="muted">
-            Your contacts are never uploaded. Nothing is posted, ever.
-          </Text>
-        </Card>
+        <Text variant="micro" tone="subtle" className="text-center">🔒 Your contacts never leave your phone.</Text>
 
         <View className="h-2" />
       </Stack>
