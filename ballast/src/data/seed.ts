@@ -10,9 +10,10 @@
  * `new Date()` so the demo reads the same on every phone in every timezone.
  */
 import type {
-  CircleMember, Contact, Errand, Group, Item, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry, SimAction,
+  CircleMember, Contact, Errand, Group, GroupInvite, Invite, Item, ReceivedInvite, Meal, Module, MoodCheckIn, Prescription, RecoveryEntry, SimAction,
 } from '@/lib/types';
 import type { PhoneContact } from '@/lib/sharing';
+import type { PendingRequestDTO } from '@shared/contract';
 import { addDays } from '@/lib/dates';
 
 export const TODAY = '2025-11-10';
@@ -332,7 +333,7 @@ const MORE_FRIENDS: CircleMember[] = MORE_NAMES.map((name, i) => {
  * a link, and the student presses send.
  */
 export const circle: CircleMember[] = [
-  { id: 'you', name: 'You', initials: 'A', band: 'busy', isYou: true, charge: 47, updatedMinsAgo: 5 },
+  { id: 'you', name: 'You', initials: 'A', band: 'busy', isYou: true, charge: 48, updatedMinsAgo: 5 },
   {
     id: 'amin', name: 'Amin', initials: 'Am', band: 'steady', charge: 62,
     updatedMinsAgo: 22, status: 'Finally handed it in', phone: '60123456701', mood: '🥳', pic: '🧑🏽‍💻', frequency: 14,
@@ -382,11 +383,11 @@ export const circle: CircleMember[] = [
 /** Two groups, so the groups row and `/group/...` have something real to show. */
 export const groups: Group[] = [
   {
-    id: 'study-crew', name: 'Study crew', emoji: '📚', members: ['amin', 'ravi'],
+    id: 'study-crew', name: 'Study crew', emoji: '📚', members: ['amin', 'ravi'], owner: true,
     activities: [{ id: 'act-library', label: 'Library session', emoji: '📖', hours: 3 }],
   },
   {
-    id: 'flat-4b', name: 'Flat 4B', emoji: '🏠', members: ['jo', 'aisyah', 'ravi'],
+    id: 'flat-4b', name: 'Flat 4B', emoji: '🏠', members: ['jo', 'aisyah', 'ravi'], owner: true,
     activities: [{ id: 'act-movie', label: 'Movie night', emoji: '🎬', hours: 3 }],
   },
 ];
@@ -457,4 +458,30 @@ export const errands: Errand[] = [
   { id: 'e6', title: 'Print the lab report',  category: 'Academic',  done: false },
   { id: 'e7', title: 'Return library books',  category: 'Academic',  done: true },
   { id: 'e8', title: 'Email Prof. Chen',      category: 'Academic',  done: false },
+];
+
+/** Somebody in your contacts asked to be in your circle. Yours to answer. */
+export const friendRequests: PendingRequestDTO[] = [
+  { userId: 'c-nadia', name: 'Nadia Rahman', initials: 'NR', direction: 'incoming', at: '2025-11-10T08:12:00.000Z' },
+];
+
+/** And Jo asked you into a group of theirs. */
+export const groupInvites: GroupInvite[] = [
+  { id: 'badminton', name: 'Badminton club', emoji: '🏸', from: 'Jo', at: '2025-11-09T19:40:00.000Z', members: ['jo', 'amin'] },
+];
+
+/** Ravi asked you to noodles on Wednesday; Amin has already said yes. */
+export const receivedInvites: ReceivedInvite[] = [
+  {
+    id: 'rcv-noodles', title: 'Noodles after the lab', date: addDays(TODAY, 2), startHour: 19, hours: 2,
+    from: 'Ravi', others: [{ id: 'amin', name: 'Amin', answer: 'yes' }, { id: 'jo', name: 'Jo' }], at: '2025-11-10T07:30:00.000Z',
+  },
+];
+
+/** And you asked three people to a film on Friday: two in, one out, Jo still to answer. */
+export const sentInvites: Invite[] = [
+  {
+    id: 'sent-film', title: 'Film night with Amin, Ravi and Aisyah', date: addDays(TODAY, 4), startHour: 20, hours: 3,
+    people: ['amin', 'ravi', 'aisyah', 'jo'], answers: { amin: 'yes', ravi: 'yes', aisyah: 'no' },
+  },
 ];

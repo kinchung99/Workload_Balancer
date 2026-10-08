@@ -15,8 +15,10 @@ import { CHECK_IN_MESSAGE, VISIBILITY, VISIBILITY_WORD, onBallastCount, whatsapp
 import { useStore } from '@/state/store';
 import { useReading } from '@/state/selectors';
 import { bandFor } from '@/lib/load';
-import { moodEmoji } from '@/lib/logs';
+import { shownMood } from '@/lib/checkin';
 import { PersonRow } from '@/features/social/PersonRow';
+import { api } from '@/lib/api';
+import { useAiAnswer } from '@/lib/ai';
 import type { BandName, CircleMember } from '@/lib/types';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
@@ -46,8 +48,11 @@ const RING: Record<BandName, string> = {
  */
 export default function Friends() {
   const router = useRouter();
-  const { circle, phoneContacts, sharing, markContacted, logMoment, groups, pic, status, account, moods } = useStore();
-  const myMood = moodEmoji(moods);
+  const { circle, phoneContacts, sharing, markContacted, logMoment, groups, pic, status, account, moods, vibe, invites, received } = useStore();
+  const newPlans = received.filter((invite) => !invite.answer).length;
+  const waitingOn = invites.filter((invite) => invite.people.some((id) => !invite.answers?.[id])).length;
+  const goingTo = received.filter((invite) => invite.answer === 'yes').length + invites.filter((invite) => invite.scheduled).length;
+  const myMood = shownMood(vibe, moods);
   const reading = useReading();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -67,8 +72,35 @@ export default function Friends() {
    * sent message, which is exactly where good intentions die. The app writes it
    * and WhatsApp opens with the chat ready. Sending is still their tap.
    */
-  const send = (person: CircleMember) => {
-    Linking.openURL(whatsapp(CHECK_IN_MESSAGE(person.name), person.phone));
+  /*
+   * The check-in itself, written by the AI for this person and why they came
+   * up - "heavy for 11 days" reads differently from "quiet for a week". The
+   * plain line stays until the AI's arrives, and if it never does.
+   */
+  const firstName = nudge?.person.name.split(' ')[0] ?? '';
+  const aiNote = useAiAnswer(
+    nudge ? `checkin-note:${nudge.person.id}:${nudge.reason}` : null,
+    async () => {
+      if (!nudge) return null;
+      const res = await api.composeDraft({
+        context: {
+          kind: 'checkin',
+          subject: `Checking in on ${firstName}`,
+          to: firstName,
+          pressure: `They have been ${nudge.reason}`,
+          ...(nudge.person.charge !== undefined ? { theirCharge: nudge.person.charge } : {}),
+        },
+        intent: { title: 'A gentle check-in', detail: 'No pressure to reply' },
+        tone: 'warm',
+        length: 'short',
+      });
+      return res.ok ? res.data.message : null;
+    },
+  );
+  const note = nudge ? aiNote ?? CHECK_IN_MESSAGE(nudge.person.name) : '';
+
+  const send = (person: CircleMember, text = CHECK_IN_MESSAGE(person.name)) => {
+    Linking.openURL(whatsapp(text, person.phone));
     markContacted(person.id);
     logMoment('good-chat', 'social', 3);
     successFeedback();
@@ -138,6 +170,12 @@ export default function Friends() {
                 <Text variant="footnote" tone="muted">{nudge.reason}</Text>
               </Stack>
             </Stack>
+            {/* What will be sent, as it will read. */}
+            {sentTo !== nudge.person.id ? (
+              <View className="rounded-lg bg-raised px-4 py-3">
+                <Text variant="callout">{aiNote ? '✨ ' : ''}“{note}”</Text>
+              </View>
+            ) : null}
             {sentTo === nudge.person.id ? (
               <Text variant="callout" weight="semibold" tone="recovery" accessibilityLiveRegion="polite">
                 Opened in WhatsApp.
@@ -145,13 +183,13 @@ export default function Friends() {
             ) : (
               <Stack direction="row" gap={2}>
                 <Button
-                  label={`Send "thinking of you"`}
+                  label="Send it"
                   kind="secondary"
                   className="flex-1"
-                  onPress={() => send(nudge.person)}
+                  onPress={() => send(nudge.person, note)}
                 />
                 <Button
-                  label="✨"
+                  label="✏️"
                   kind="secondary"
                   accessibilityLabel={`Write ${nudge.person.name} a message`}
                   onPress={() => { tapFeedback(); router.push(`/message?kind=checkin&to=${nudge.person.id}` as Href); }}
@@ -160,6 +198,31 @@ export default function Friends() {
             )}
           </Card>
         ) : null}
+
+        {/* Plans: what you were asked to, and what you asked. */}
+        <Section family="people" title="Plans" sticker="calendar" meta={goingTo ? `${goingTo} on` : undefined} action={{ label: 'All ›', onPress: () => router.push('/plans' as Href) }}>
+          <Stack direction="row" gap={3}>
+            {([
+              { tab: 'received', emoji: '📥', title: 'Received', sub: newPlans ? `${newPlans} new` : `${received.length} total`, hot: newPlans },
+              { tab: 'sent', emoji: '📤', title: 'Sent', sub: waitingOn ? `${waitingOn} waiting` : `${invites.length} total`, hot: 0 },
+            ] as const).map((tile) => (
+              <Pressable
+                key={tile.tab}
+                accessibilityRole="button"
+                accessibilityLabel={`${tile.title}, ${tile.sub}`}
+                onPress={() => { tapFeedback(); router.push(`/plans?tab=${tile.tab}` as Href); }}
+                className="flex-1 flex-row items-center gap-3 rounded-lg bg-raised px-4 py-3 active:opacity-70"
+                style={{ borderWidth: 2, borderColor: tile.hot ? color.band.heavy.fill : color.line.hairline }}
+              >
+                <Text variant="title">{tile.emoji}</Text>
+                <Stack gap={0} grow>
+                  <Text variant="body" weight="semibold">{tile.title}</Text>
+                  <Text variant="micro" tone={tile.hot ? 'heavy' : 'subtle'}>{tile.sub}</Text>
+                </Stack>
+              </Pressable>
+            ))}
+          </Stack>
+        </Section>
 
         {/* Groups, as story bubbles: the people you plan with most, one tap away. */}
         <Section family="people" title="Groups" sticker="heart" meta={`${groups.length}`}>
@@ -304,7 +367,7 @@ function FriendRow({
           ) : (
             <Chip label="Say hi" onPress={onSend} />
           )}
-          <Chip label="✨ Write a message" onPress={onWrite} />
+          <Chip label="✏️ Write a message" onPress={onWrite} />
         </Stack>
       ) : null}
     </Stack>

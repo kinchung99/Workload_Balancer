@@ -24,7 +24,7 @@ export type StickerName =
   | 'assignment' | 'class' | 'shift' | 'move' | 'people' | 'chore'
   | 'sparkle' | 'heart' | 'clock' | 'calendar' | 'wave' | 'star'
   | 'sun' | 'moon' | 'scales' | 'leaf' | 'chat' | 'palette' | 'cloud' | 'battery' | 'basket'
-  | 'wall';
+  | 'wall' | 'bell';
 
 const d = color.decor;
 const INK = color.ink.default;
@@ -282,6 +282,16 @@ export function Sticker({ name, size = 44, wiggle = false }: { name: StickerName
           <Circle cx={20} cy={35.5} r={1.5} fill={INK} />
           <Circle cx={28} cy={35.5} r={1.5} fill={INK} />
           <Path d="M21 38.6h6" stroke={INK} strokeWidth={1.5} strokeLinecap="round" />
+        </G>
+      ) : null}
+
+      {/* Bell: something worth knowing. */}
+      {name === 'bell' ? (
+        <G>
+          <Path d="M24 6a3 3 0 0 1 3 3v1.4c6 1.4 10 6.6 10 13V31l4 5H7l4-5v-7.6c0-6.4 4-11.6 10-13V9a3 3 0 0 1 3-3z" fill={d.lemon} {...outline} />
+          <Path d="M19 39a5 5 0 0 0 10 0" fill={d.candy} {...outline} />
+          <Face cx={24} cy={23} w={0.85} />
+          <Path d="M5 15q1-5 5-8M43 15q-1-5-5-8" stroke={INK} strokeWidth={2} strokeLinecap="round" fill="none" />
         </G>
       ) : null}
 

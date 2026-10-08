@@ -1,40 +1,52 @@
-import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Battery, Button, Card, Chip, Disclosure, PageHeader, Screen, Section, Stack, Text, Toggle, WeekStrip,
+  Battery, Button, Card, Disclosure, Mascot, PageHeader, Screen, Section, Stack, Text,
 } from '@/components';
+import { color, radius } from '@design/tokens';
 import { SCREEN } from '@design/screens';
-import { bandFor, overallPercent, percentByBucket } from '@/lib/load';
-import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
-import { applySelection, buildTrades, totalSaved } from '@/lib/rebalance';
+import { bandFor, capacityOf, loadOf, overallOf } from '@/lib/load';
+import { chargeOf } from '@/lib/battery';
+import { applySelection, buildTrades } from '@/lib/rebalance';
 import { CLUSTER_MIN_ITEMS, clusterCount, findCollision } from '@/lib/forecast';
-import { endHour, formatHour, weekDays } from '@/lib/schedule';
-import { formatShort } from '@/lib/dates';
-import { successFeedback } from '@/lib/haptics';
+import { DAY_LETTER, dayIndex, formatShort } from '@/lib/dates';
+import { formatHour, weekDays } from '@/lib/schedule';
+import { SPEND, spendKey } from '@/lib/breakdown';
 import { itemsInWeek, nextWeek, useStore, weekReading } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
 import { bestSwap, firstRefusal } from '@/lib/swap';
+import { countedOnce } from '@/lib/prep';
 import { SwapCard } from '@/features/rebalance/SwapCard';
+import { api } from '@/lib/api';
+import { rebalanceContext } from '@/lib/coach';
+import { successFeedback, tapFeedback } from '@/lib/haptics';
+import { useAiAnswer } from '@/lib/ai';
+import type { Item, Trade } from '@/lib/types';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
+/** "Ask Jo to take it, saves 14" → "Ask Jo to take it": the action, not the arithmetic. */
+const actionOf = (trade: Trade): string => trade.detail.replace(/,?\s*saves\s+[\d.]+$/, '');
+
 /**
- * Trading, not deleting.
+ * Lighten next week - trading, not deleting.
  *
- * Two things were wrong here. Applying did nothing at all — the selection lived
- * in the screen and the store read a field nobody wrote to — and the screen told
- * you almost nothing about what a trade would actually change. Each row now says
- * which day and hour it touches, the week strip shows the days that get lighter,
- * and the confirmation says whether the wall it was called to fix is still there.
+ * One picture first: next week's battery now, and after what you pick, with
+ * the seven days underneath showing which ones get lighter. Then the things
+ * you could put down, each a card you tap, each wearing the battery it gives
+ * back. Hard deadlines cannot move, so they are folded away at the bottom
+ * rather than taking up the list.
  */
 export default function Rebalance() {
   const router = useRouter();
   const { items, ceilings, today, modules, applyTrades, dropSwap } = useStore();
   const withLogs = useItemsWithLogs();
+  const capacity = capacityOf(ceilings);
+  const pct = (load: number) => (load / capacity) * 100;
 
   const anchor = nextWeek(today);
-  const week = useMemo(() => itemsInWeek(items, anchor), [items, anchor]);
+  const week = useMemo(() => itemsInWeek(countedOnce(items), anchor), [items, anchor]);
   const trades = useMemo(() => buildTrades(week), [week]);
   const byId = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
 
@@ -42,7 +54,7 @@ export default function Rebalance() {
     Object.fromEntries(trades.map((t) => [t.id, t.selected])),
   );
   const [applied, setApplied] = useState<{
-    count: number; saved: number; charge: number; wallGone: boolean; freed: string[]; nextWall: string | null;
+    count: number; charge: number; gain: number; wallGone: boolean; freed: Array<{ date: string; percent: number }>; nextWall: string | null;
   } | null>(null);
 
   /** The collision this screen was opened to fix, so we can check that one. */
@@ -50,9 +62,11 @@ export default function Rebalance() {
 
   const before = weekReading(items, anchor, ceilings).overall;
   const afterItems = useMemo(() => applySelection(week, trades, selected), [week, trades, selected]);
-  const after = overallPercent(percentByBucket(afterItems, ceilings));
-  const saved = totalSaved(trades, selected);
+  const after = overallOf(afterItems, ceilings);
+  const gain = chargeOf(after) - chargeOf(before);
   const chosen = trades.filter((t) => selected[t.id] && !t.locked).length;
+  const open = trades.filter((t) => !t.locked);
+  const locked = trades.filter((t) => t.locked);
 
   const days = weekDays(anchor);
 
@@ -68,22 +82,47 @@ export default function Rebalance() {
     () => (swap ? null : firstRefusal(withLogs, days, modules)),
     [swap, withLogs, days, modules],
   );
-  const previewWeek = useMemo(
-    () => [...items.filter((i) => !week.some((w) => w.id === i.id)), ...afterItems],
-    [items, week, afterItems],
-  );
 
-  /** Which days actually get lighter, and by how much. Ordered by the biggest win. */
-  const freed = useMemo(() => {
-    const dayOf = (list: typeof items) =>
-      Object.fromEntries(days.map((d) => [d, list.filter((i) => i.date === d).reduce((t, i) => t + i.hours, 0)]));
-    const now = dayOf(week);
-    const next = dayOf(afterItems);
-    return days
-      .map((d) => ({ date: d, hours: Math.round((now[d] - next[d]) * 10) / 10 }))
-      .filter((d) => d.hours > 0.1)
-      .sort((a, b) => b.hours - a.hours);
-  }, [days, week, afterItems]);
+  /*
+   * The trades are the app's, priced from your week. The AI says, for each, what
+   * putting it down buys or why it should stay, picks which to take, and gives
+   * the swap its reason - and its picks become the starting selection until you
+   * tap a card yourself.
+   */
+  const touched = useRef(false);
+  const advice = useAiAnswer(
+    trades.length ? `rebalance:${anchor}:${trades.map((t) => t.id).join(',')}:${swap ? swap.drop.id : ''}` : null,
+    async () => {
+      const res = await api.suggestRebalance(rebalanceContext(trades, byId, chargeOf(before), swap
+        ? { keep: swap.keep.title, drop: swap.drop.title, day: formatShort(swap.date) }
+        : undefined));
+      return res.ok && res.data.picks.length ? res.data : null;
+    },
+  );
+  useEffect(() => {
+    if (!advice || touched.current) return;
+    setSelected(Object.fromEntries(trades.map((t) => [
+      t.id, !t.locked && !!advice.picks.find((pick) => pick.id === t.id)?.take,
+    ])));
+  }, [advice, trades]);
+  const aiWhy = (id: string): string | undefined => advice?.picks.find((pick) => pick.id === id)?.why;
+
+  /** Each day's cost to the battery, now and after the picks. */
+  const dayCost = useMemo(() => {
+    const of = (list: Item[]) =>
+      Object.fromEntries(days.map((d) => [d, pct(list.filter((i) => i.date === d).reduce((t, i) => t + loadOf(i), 0))]));
+    return { now: of(week), next: of(afterItems) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, week, afterItems, capacity]);
+  const freed = days
+    .map((date) => ({ date, percent: Math.round(dayCost.now[date] - dayCost.next[date]) }))
+    .filter((day) => day.percent >= 1);
+
+  const toggle = (trade: Trade) => {
+    tapFeedback();
+    touched.current = true;
+    setSelected((prev) => ({ ...prev, [trade.id]: !prev[trade.id] }));
+  };
 
   if (applied) {
     return (
@@ -97,63 +136,36 @@ export default function Rebalance() {
           </>
         }
       >
-        <Stack gap={6} className="pt-6">
-          <Text variant="micro" tone="steady">DONE</Text>
-          <Text variant="title" accessibilityRole="header" accessibilityLiveRegion="polite">
-            {applied.count} change{applied.count === 1 ? '' : 's'} applied.
-          </Text>
-
-          <Card tone="steady" gap={5}>
-            <Stack direction="row" gap={5} align="center">
-              <Battery
-                charge={applied.charge}
-                loadPercent={100 - applied.charge}
-                width={130}
-                height={64}
-                label={`Next week now reads ${applied.charge} percent`}
-              />
-              <Stack gap={1} grow>
-                <Text variant="display" tone="steady">{applied.charge}%</Text>
-                <Text variant="micro" tone="subtle">of next week left</Text>
-              </Stack>
-            </Stack>
-            <Text variant="callout" tone="muted">You got {applied.saved} load back.</Text>
+        <Stack gap={5} className="pt-6">
+          {/* The win, as a face and a number. */}
+          <Card tone="steady" gap={3} align="center">
+            <Mascot charge={applied.charge} loadPercent={100 - applied.charge} size={120} />
+            <Text variant="hero" tone="steady" accessibilityLiveRegion="polite">{applied.charge}%</Text>
+            <View className="rounded-pill px-4 py-1" style={{ backgroundColor: color.band.steady.fill }}>
+              <Text variant="callout" weight="bold" tone="inverse">⚡ +{applied.gain}% next week</Text>
+            </View>
           </Card>
 
-          {/* The question the whole screen exists to answer. */}
-          <Card tone={applied.wallGone ? 'steady' : 'busy'} gap={3}>
-            <Text variant="micro" tone={applied.wallGone ? 'steady' : 'busy'}>THE WALL</Text>
-            <Text variant="heading">
-              {applied.wallGone ? 'Gone. Nothing is clustered now.' : 'Still there, but lighter.'}
-            </Text>
-            <Text variant="footnote" tone="muted">
-              {applied.wallGone
-                ? 'That three-day window no longer holds four things.'
-                : 'Hard deadlines cannot move. Rebalance again or protect the days around it.'}
-            </Text>
-            {/* Clearing one pile-up can reveal a smaller one. Say so. */}
-            {applied.nextWall ? (
-              <Stack gap={2} className="rounded-sm bg-busy-wash px-4 py-3">
-                <Text variant="footnote" weight="semibold" tone="busy">Next one down: {applied.nextWall}</Text>
-                <Text variant="micro" tone="muted">Smaller, and it was always there — it just was not the worst.</Text>
-              </Stack>
-            ) : null}
+          {/* Did the pile-up it was opened for go? */}
+          <Card tone={applied.wallGone ? 'steady' : 'busy'} gap={2}>
+            <Stack direction="row" gap={3} align="center">
+              <Text variant="title">{applied.wallGone ? '✅' : '⚠️'}</Text>
+              <Text variant="heading" className="flex-1">
+                {applied.wallGone ? 'Pile-up cleared' : 'Lighter, still busy'}
+              </Text>
+            </Stack>
+            {applied.nextWall ? <Text variant="footnote" tone="busy">Next one: {applied.nextWall}</Text> : null}
           </Card>
 
           {applied.freed.length ? (
-            <Section family="week" title="Days that got lighter" meta={`${applied.freed.length}`}>
-              {applied.freed.map((line) => (
-                <View key={line} className="rounded-md bg-raised px-4 py-3">
-                  <Text variant="body">{line}</Text>
+            <Stack direction="row" gap={2} wrap>
+              {applied.freed.map((day) => (
+                <View key={day.date} className="rounded-pill px-3 py-2" style={{ backgroundColor: color.band.steady.wash }}>
+                  <Text variant="caption" weight="bold" tone="steady">{formatShort(day.date)} · +{day.percent}%</Text>
                 </View>
               ))}
-            </Section>
+            </Stack>
           ) : null}
-
-          <Card tone="sunken" gap={2}>
-            <Text variant="footnote" weight="semibold">Two messages are drafted and waiting.</Text>
-            <Text variant="footnote" tone="muted">Nothing has been sent. You read them first.</Text>
-          </Card>
         </Stack>
       </Screen>
     );
@@ -166,8 +178,11 @@ export default function Rebalance() {
       footer={
         <>
           <Button
-            label={`Apply ${chosen} change${chosen === 1 ? '' : 's'}`}
+            label={chosen ? `Apply ${chosen} · ⚡ +${gain}%` : 'Pick something to put down'}
+            kind={chosen ? 'primary' : 'secondary'}
+            accessibilityState={{ disabled: !chosen }}
             onPress={() => {
+              if (!chosen) return;
               const picked = trades.map((t) => ({ ...t, selected: !!selected[t.id] }));
               const nextItems = [...items.filter((i) => !week.some((w) => w.id === i.id)), ...afterItems];
               // Did *this* wall clear, and did another surface elsewhere?
@@ -176,56 +191,49 @@ export default function Rebalance() {
               const elsewhere = findCollision(nextItems, today);
               setApplied({
                 count: chosen,
-                saved,
                 charge: chargeOf(after),
+                gain,
                 wallGone: !stillClustered,
                 nextWall:
                   !stillClustered && elsewhere && elsewhere.from !== target?.from ? elsewhere.headline : null,
-                freed: freed.map((d) => `${formatShort(d.date)} — ${d.hours}h back`),
+                freed,
               });
               applyTrades(picked);
               successFeedback();
             }}
           />
-          <Button label="Not this week" kind="secondary" onPress={() => router.back()} />
+          <Button label="Not this week" kind="quiet" onPress={() => (router.canGoBack() ? router.back() : router.replace('/plan'))} />
         </>
       }
     >
-      <Stack gap={5} className="pt-4">
+      <Stack gap={5} className="pt-2">
         <PageHeader
           {...SCREEN.rebalance}
           eyebrow="Next week"
-          title="Something has to come off"
-          sub="Toggle a trade and watch the battery move."
+          title="Lighten next week"
+          sub={advice ? `✨ ${advice.headline}` : undefined}
         />
 
-        {/* The answer first: what next week reads now, and after your picks. */}
+        {/* Now → after, and the seven days it buys back. */}
         <Card gap={4}>
-          <Stack direction="row" gap={4} align="center">
-            <Text variant="display" tone="subtle" className="line-through">{chargeOf(before)}%</Text>
-            <Text variant="display" tone={TONE[bandFor(after)]}>{chargeOf(after)}%</Text>
-            <Chip label={CHARGE_LABEL[bandFor(after)]} tone={TONE[bandFor(after)]} readOnly />
+          <Stack direction="row" align="center" justify="between">
+            <Gauge label="NOW" charge={chargeOf(before)} overall={before} faded />
+            <Stack gap={1} align="center">
+              <View className="rounded-pill px-3 py-1" style={{ backgroundColor: gain > 0 ? color.band.steady.fill : color.surface.sunken }}>
+                <Text variant="callout" weight="bold" tone={gain > 0 ? 'inverse' : 'subtle'}>+{gain}%</Text>
+              </View>
+              <Text variant="title" tone="subtle">→</Text>
+            </Stack>
+            <Gauge label="AFTER" charge={chargeOf(after)} overall={after} />
           </Stack>
-          <Battery
-            charge={chargeOf(after)}
-            loadPercent={after}
-            width={200}
-            height={78}
-            label={`${chargeOf(after)} percent charge after these changes`}
-          />
-          <Text
-            variant="footnote"
-            tone="muted"
-            accessibilityLiveRegion="polite"
-            accessibilityLabel={`${chosen} changes selected, saving ${saved} load. Charge would go from ${chargeOf(before)} to ${chargeOf(after)} percent.`}
-          >
-            {chosen} change{chosen === 1 ? '' : 's'} selected, saving {saved} load.
-          </Text>
+          <WeekBars days={days} now={dayCost.now} next={dayCost.next} />
         </Card>
 
         <SwapCard
           swap={swap}
           refusal={refusal}
+          why={advice?.swap}
+          capacity={capacity}
           onSwap={() => {
             if (!swap) return;
             dropSwap(swap.drop.id);
@@ -233,68 +241,124 @@ export default function Rebalance() {
           }}
         />
 
-        {/* The trades: one card each, a switch on every one. */}
-        <Section family="focus" title="What you could put down" sticker="scales" meta={`${chosen} on`}>
-          {trades.map((trade) => {
-            const item = byId[trade.itemId.split(',')[0]];
-            return (
-              <Stack
+        {/* What could come off: one card each, tap to put it down. */}
+        {open.length ? (
+          <Section family="focus" title="Put down" sticker="scales" meta={`${chosen} of ${open.length}`}>
+            {open.map((trade) => (
+              <TradeCard
                 key={trade.id}
-                direction="row"
-                gap={4}
-                align="center"
-                justify="between"
-                className={`min-h-row rounded-lg border px-4 py-3 ${trade.locked ? 'border-line-hairline bg-sunken' : 'border-line-hairline bg-raised'}`}
-              >
-                <Stack gap={1} grow>
-                  <Text variant="body" weight="semibold">{trade.title}</Text>
-                  {/* When it is, so a trade is a decision about a real day. */}
-                  {item ? (
-                    <Text variant="micro" tone="subtle">
-                      {formatShort(item.date)}
-                      {item.startHour !== undefined
-                        ? ` · ${formatHour(item.startHour)}–${formatHour(endHour(item))}`
-                        : ' · no slot yet'}
-                    </Text>
-                  ) : null}
-                  <Text variant="footnote" tone={trade.locked ? 'subtle' : 'muted'}>{trade.detail}</Text>
-                </Stack>
-                <Toggle
-                  label={trade.title}
-                  state={
-                    trade.locked ? 'locked'
-                    : trade.protected && !selected[trade.id] ? 'protected'
-                    : selected[trade.id] ? 'on' : 'off'
-                  }
-                  onPress={() => setSelected((prev) => ({ ...prev, [trade.id]: !prev[trade.id] }))}
-                />
-              </Stack>
-            );
-          })}
-        </Section>
+                trade={trade}
+                item={byId[trade.itemId.split(',')[0]]}
+                on={!!selected[trade.id]}
+                percent={pct(trade.saves)}
+                why={aiWhy(trade.id)}
+                onPress={() => toggle(trade)}
+              />
+            ))}
+          </Section>
+        ) : null}
 
-        {/* Which days this buys back - the answer in the row, the picture inside. */}
-        <Disclosure
-          lead="📅"
-          title="Which days get lighter"
-          summary={freed.length
-            ? freed.slice(0, 2).map((day) => `${formatShort(day.date)} −${day.hours}h`).join(' · ') + (freed.length > 2 ? ` +${freed.length - 2}` : '')
-            : 'Nothing selected yet'}
-        >
-          <Stack gap={4}>
-            <WeekStrip items={previewWeek} days={days} today={today} />
-            {freed.length ? (
-              <Stack direction="row" gap={2} wrap>
-                {freed.map((day) => (
-                  <Chip key={day.date} label={`${formatShort(day.date)} −${day.hours}h`} tone="steady" readOnly />
-                ))}
-              </Stack>
-            ) : null}
-          </Stack>
-        </Disclosure>
+        {/* Hard deadlines: named, never offered. */}
+        {locked.length ? (
+          <Disclosure lead="🔒" title={`${locked.length} can’t move`} summary="Hard deadlines">
+            <Stack gap={2}>
+              {locked.map((trade) => (
+                <Stack key={trade.id} direction="row" gap={3} align="center">
+                  <Text variant="callout">{SPEND[spendKey(byId[trade.itemId.split(',')[0]] ?? ({} as Item))]?.emoji ?? '📌'}</Text>
+                  <Text variant="body" className="flex-1" numberOfLines={1}>{trade.title}</Text>
+                </Stack>
+              ))}
+            </Stack>
+          </Disclosure>
+        ) : null}
 
         <View className="h-2" />
       </Stack>
     </Screen>
+  );
+}
+
+/** One battery, a word over it and its number under it. */
+function Gauge({ label, charge, overall, faded = false }: { label: string; charge: number; overall: number; faded?: boolean }) {
+  return (
+    <Stack gap={1} align="center" style={{ opacity: faded ? 0.55 : 1 }}>
+      <Text variant="micro" tone="subtle">{label}</Text>
+      <Battery charge={charge} loadPercent={overall} width={92} height={46} label={`${label.toLowerCase()} ${charge} percent`} />
+      <Text variant="title" tone={TONE[bandFor(overall)]}>{charge}%</Text>
+    </Stack>
+  );
+}
+
+/** Seven columns: each day's cost, with what the picks take off it in green. */
+function WeekBars({ days, now, next }: { days: string[]; now: Record<string, number>; next: Record<string, number> }) {
+  const tallest = Math.max(1, ...days.map((d) => now[d]));
+  const HEIGHT = 64;
+  return (
+    <Stack direction="row" gap={2} align="end">
+      {days.map((date) => {
+        const freed = Math.round(now[date] - next[date]);
+        const keep = (next[date] / tallest) * HEIGHT;
+        const off = Math.max(0, ((now[date] - next[date]) / tallest) * HEIGHT);
+        return (
+          <Stack key={date} gap={1} align="center" className="flex-1" accessible accessibilityLabel={`${formatShort(date)}: ${freed >= 1 ? `${freed} percent lighter` : 'unchanged'}`}>
+            <Text variant="micro" tone="steady" style={{ opacity: freed >= 1 ? 1 : 0 }}>+{Math.max(0, freed)}</Text>
+            <View className="w-full justify-end overflow-hidden" style={{ height: HEIGHT, borderRadius: radius.sm, backgroundColor: color.surface.sunken }}>
+              {off > 0 ? <View style={{ height: off, backgroundColor: color.band.steady.wash, borderWidth: 1.5, borderStyle: 'dashed', borderColor: color.band.steady.fill }} /> : null}
+              <View style={{ height: keep, backgroundColor: color.band.busy.fill }} />
+            </View>
+            <Text variant="micro" tone="muted">{DAY_LETTER[dayIndex(date)]}</Text>
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+}
+
+/** One thing that could come off, as a card: tap to put it down. */
+function TradeCard({
+  trade, item, on, percent, why, onPress,
+}: { trade: Trade; item?: Item; on: boolean; percent: number; why?: string; onPress: () => void }) {
+  const info = item ? SPEND[spendKey(item)] : SPEND.errand;
+  // Putting down rest costs battery rather than giving it back: say so in red.
+  const value = Math.round(percent);
+  const costs = value < 0;
+  const accent = costs ? color.band.heavy : color.band.steady;
+  const when = item ? `${formatShort(item.date)}${item.startHour !== undefined ? ` · ${formatHour(item.startHour)}` : ''}` : '';
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      accessibilityLabel={`${trade.title}. ${actionOf(trade)}. ${costs ? `Costs ${-value}` : `Gives back ${Math.max(1, value)}`} percent.`}
+      onPress={onPress}
+      className="rounded-xl border-2 px-4 py-3 active:opacity-80"
+      style={{
+        borderColor: on ? accent.fill : color.line.hairline,
+        backgroundColor: on ? accent.wash : color.surface.raised,
+      }}
+    >
+      <Stack direction="row" gap={3} align="center">
+        <View className="items-center justify-center rounded-pill bg-raised" style={{ width: 44, height: 44 }}>
+          <Text variant="title">{trade.protected ? '🌿' : info.emoji}</Text>
+        </View>
+        <Stack gap={1} grow>
+          <Text variant="body" weight="semibold" numberOfLines={1}>{trade.title}</Text>
+          <Text variant="micro" tone="subtle" numberOfLines={1}>{[when, actionOf(trade)].filter(Boolean).join(' · ')}</Text>
+          {why ? <Text variant="footnote" tone="muted" numberOfLines={2}>✨ {why}</Text> : null}
+        </Stack>
+        <Stack gap={2} align="center">
+          <Text variant="heading" tone={costs ? 'heavy' : 'steady'}>{costs ? `−${-value}` : `+${Math.max(1, value)}`}%</Text>
+          <View
+            className="items-center justify-center rounded-pill"
+            style={{
+              width: 26, height: 26,
+              backgroundColor: on ? accent.fill : color.surface.raised,
+              borderWidth: 2, borderColor: on ? accent.fill : color.line.strong,
+            }}
+          >
+            {on ? <Text variant="micro" tone="inverse">✓</Text> : null}
+          </View>
+        </Stack>
+      </Stack>
+    </Pressable>
   );
 }

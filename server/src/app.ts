@@ -22,6 +22,7 @@ import { profiles, user } from './db/schema.js';
 import type { Database } from './db/client.js';
 import type { Env } from './types.js';
 import { circle } from './routes/circle.js';
+import { groups } from './routes/groups.js';
 import { invites } from './routes/invites.js';
 import { sharing } from './routes/sharing.js';
 import { sync } from './routes/sync.js';
@@ -91,6 +92,8 @@ export function createApp(
   app.use('/api/me', requireUser);
   app.use('/api/sync/*', requireUser);
   app.use('/api/circle/*', requireUser);
+  app.use('/api/groups', requireUser);
+  app.use('/api/groups/*', requireUser);
   app.use('/api/sharing/*', requireUser);
   app.use('/api/invites/*', requireUser);
   app.use('/api/compose/*', requireUser);
@@ -170,6 +173,7 @@ export function createApp(
 
   app.route('/api/sync', sync);
   app.route('/api/circle', circle);
+  app.route('/api/groups', groups);
   app.route('/api/sharing', sharing);
   app.route('/api/invites', invites);
   app.route('/api/compose', composeRoutes(writer));

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View } from 'react-native';
 import {
@@ -8,12 +8,12 @@ import {
 import { threshold } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { buildForecast, findCollision, leadLabel, speakForecast } from '@/lib/forecast';
-import { bandFor } from '@/lib/load';
+import { bandFor, capacityOf, loadOf } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
 import { dayHours, endHour, formatHour, freeSlots, slotHours } from '@/lib/schedule';
 import { addDays, formatLong, formatShort, daysBetween } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
-import { openPrep, remaining } from '@/lib/prep';
+import { countedOnce, openPrep, remaining } from '@/lib/prep';
 import { nextWeek, useStore, weekReading } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { WEEK_NUMBER } from '@/data/seed';
@@ -39,6 +39,8 @@ export default function Plan() {
   // Arriving from Home's week strip opens straight onto that day.
   const params = useLocalSearchParams<{ day?: string }>();
   const [selected, setSelected] = useState(params.day ?? today);
+  // The tab stays mounted, so a later link to another day has to move it too.
+  useEffect(() => { if (params.day) setSelected(params.day); }, [params.day]);
 
   const days = buildForecast(items, today, ceilings);
   const collision = findCollision(items, today);
@@ -51,6 +53,11 @@ export default function Plan() {
   const marked = days.map((day) => ({ ...day, inCluster: cluster.has(day.date) }));
 
   const hours = dayHours(items, selected);
+  // What the day costs the week's battery: everything on it, sittings counted once.
+  const capacity = capacityOf(ceilings);
+  const dayCost = countedOnce(items)
+    .filter((item) => item.date === selected && !item.isLog)
+    .reduce((sum, item) => sum + loadOf(item), 0) / capacity * 100;
   const free = freeSlots(items, selected, 1);
   const freeHours = Math.round(free.reduce((total, slot) => total + slotHours(slot), 0) * 10) / 10;
   const owing = openPrep(items, selected);
@@ -110,7 +117,7 @@ export default function Plan() {
           meta={away === 0 || away === 1 ? formatShort(selected) : `in ${away} days`}
         >
           <Stack direction="row" gap={2} wrap>
-            <Chip label={`${hours.committed}h booked`} readOnly />
+            <Chip label={`🔋 −${Math.round(dayCost)}%`} tone={dayCost >= 10 ? 'busy' : 'plain'} readOnly />
             <Chip label={`${freeHours}h free`} tone={freeHours > 3 ? 'steady' : 'busy'} readOnly />
             {due.length ? <Chip label={`⏳ ${due.length} to mark`} tone="busy" readOnly /> : null}
           </Stack>
@@ -121,6 +128,7 @@ export default function Plan() {
             onSelect={(item) => setMarking(item.id)}
             onAddAt={(date, startHour) => router.push(`/add?date=${date}&start=${startHour}`)}
             clock={{ today, hour }}
+            capacity={capacity}
             todoMeta={owingMeta}
             todo={
               <TodoList

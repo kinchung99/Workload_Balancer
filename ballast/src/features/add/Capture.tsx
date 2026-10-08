@@ -2,23 +2,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  AreaDial, AreaIcon, Battery, Burst, Button, Card, Chip, DatePicker, DrainPicker, Reveal,
+  Battery, Burst, Button, Card, Chip, DatePicker, DrainPicker,
   Screen, Stack, StepDots, Sticker, Text, type StickerName,
 } from '@/components';
 import { color } from '@design/tokens';
 import { parse, titleFrom } from '@/lib/parser';
 import {
   BAND_LABEL, BUCKET_LABEL, COMMITMENT_LABEL,
-  bandFor, describeMix, dominantArea, dreadFromMix, loadOf, mixShares,
+  bandFor, capacityOf, dominantArea, dreadFromMix, loadOf,
 } from '@/lib/load';
 import { addDays, formatShort } from '@/lib/dates';
 import { formatHour, startOptions } from '@/lib/schedule';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import type { BucketKey, CommitmentKind, Item, Mix } from '@/lib/types';
 import { useStore } from '@/state/store';
-import { categorise } from '@/lib/errands';
 import { WANT_CHOICES } from '@/lib/swap';
-import { AREA_HINT, drainCosts, toggleArea, withDrain } from '@/lib/drain';
+import { drainCosts, withDrain } from '@/lib/drain';
 import { readingFrom, useItemsWithLogs, useReading } from '@/state/selectors';
 
 const HOUR_OPTIONS = [0.5, 1, 2, 3, 4, 6, 8];
@@ -58,13 +57,6 @@ const ART: Record<number, { sticker: StickerName; title: string; sub: string; wa
 };
 
 /**
- * The dials, in the order a person thinks about themselves - head, hours, body,
- * people, admin. BUCKETS keeps its own order because the readings elsewhere are
- * built on it; this is presentation.
- */
-const DIAL_ORDER: BucketKey[] = ['mental', 'time', 'physical', 'social', 'errands'];
-
-/**
  * Screen 2 — capture, as four short pages instead of one long form.
  *
  * Two changes carry this screen. The first is shape: everything used to be on
@@ -88,7 +80,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   // Prefilled when you arrive from a gap in a day: "add something here" should
   // mean here, not "somewhere on Tuesday".
   const params = useLocalSearchParams<{ date?: string; start?: string }>();
-  const { today, ceilings, addItem, addErrand } = useStore();
+  const { today, ceilings, addItem } = useStore();
   const scheduleItems = useItemsWithLogs();
   const reading = useReading();
 
@@ -102,6 +94,8 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const [mix, setMix] = useState<Record<BucketKey, number>>(EMPTY_MIX);
   const [mixTouched, setMixTouched] = useState(false);
   const [needsPrep, setNeedsPrep] = useState(false);
+  // Set by hand once, the parser stops guessing it.
+  const [prepTouched, setPrepTouched] = useState(false);
   const [hours, setHours] = useState<number | null>(null);
   const [prepHours, setPrepHours] = useState(4);
   const [importance, setImportance] = useState<1 | 2 | 3>(2);
@@ -130,10 +124,15 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
     if (!mixTouched) setMix({ ...EMPTY_MIX, [parsed.bucket]: parsed.dread });
   }, [parsed.bucket, parsed.dread, mixTouched]);
   const liveMix = mix;
+  // "Essay draft, Friday" is work before Friday, not an hour on Friday.
+  useEffect(() => {
+    if (prepTouched) return;
+    setNeedsPrep(parsed.prep);
+    if (parsed.prep && !parsed.unknown.includes('hours')) setPrepHours(parsed.hours);
+  }, [parsed.prep, parsed.hours, parsed.unknown, prepTouched]);
 
   const dread = dreadFromMix(liveMix);
   const bucket = dominantArea(liveMix, parsed.bucket);
-  const shares = mixShares(liveMix);
   const spentHours = needsPrep ? prepHours : hours ?? parsed.hours;
   const load = loadOf({ hours: spentHours, dread });
   const due = deadline ?? parsed.date ?? addDays(today, 3);
@@ -141,7 +140,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const commit = commitment ?? parsed.commitment;
   const timeOptions = startOptions(scheduleItems, day, spentHours);
   const ready = text.trim().length > 0;
-  const areasChosen = DIAL_ORDER.filter((key) => liveMix[key] > 0);
 
   /** What the week's battery becomes with this in it. Nothing is written yet. */
   const after = useMemo(() => {
@@ -174,16 +172,10 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   /** The reading on show: with the new thing folded in once there is one. */
   const shown = after ?? reading;
 
-  const setArea = (area: BucketKey, value: number) => {
-    setMixTouched(true);
-    // Functional: several drag events can land before React re-renders, and
-    // each one must build on the last rather than on a stale copy.
-    setMix((prev) => ({ ...prev, [area]: value }));
-  };
 
   const go = (next: number) => { tapFeedback(); setStep(next); };
 
-  const canAdvance = step === 0 ? ready : step === 2 ? areasChosen.length > 0 : true;
+  const canAdvance = step === 0 ? ready : true;
 
   const commitIt = () => {
     if (!ready) return;
@@ -196,22 +188,20 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
         mix: liveMix, want,
       });
     } else {
-      // Something you only turn up to is the same kind of object as an errand,
-      // so it goes in the one list rather than a parallel one.
-      addErrand(
-        titleFrom(text),
-        categorise(text),
-        spentHours,
-        (Math.min(3, Math.max(1, Math.round(dread * 0.6))) as 1 | 2 | 3),
-        { date: day, ...(time === null ? {} : { startHour: time }) },
-        bucket,
-        liveMix,
-        want,
-      );
+      // A real task, carrying both answers - how draining it is and whether it
+      // can move - so it can be ranked, marked, moved and traded like any other.
+      addItem({
+        title: titleFrom(text),
+        bucket, dread, commitment: commit, date: day,
+        hours: spentHours,
+        ...(time === null ? {} : { startHour: time }),
+        mix: liveMix, want,
+      });
     }
     successFeedback();
     setCelebrate(true);
-    setTimeout(() => router.back(), 650);
+    // Back to where you came from - or Home, if this was opened on its own.
+    setTimeout(() => (router.canGoBack() ? router.back() : router.replace('/')), 650);
   };
 
   const art = ART[step];
@@ -230,9 +220,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               step < 3
                 ? step === 0 && !ready
                   ? 'Type something first'
-                  : step === 2 && areasChosen.length === 0
-                    ? 'Pick at least one'
-                    : 'Next'
+                  : 'Next'
                 : needsPrep
                   ? `Add it · due ${formatShort(due)}`
                   : `Add it · ${label(day, today)}${time === null ? '' : ` ${formatHour(time)}`}`
@@ -252,7 +240,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
       <Stack gap={5} className="pt-2">
         <Stack direction="row" justify="between" align="center">
           <StepDots labels={STEPS} current={step} onJump={go} />
-          <Pressable accessibilityRole="button" onPress={() => router.back()} className="min-h-min justify-center pl-4">
+          <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} className="min-h-min justify-center pl-4">
             <Text variant="caption" tone="subtle">Cancel</Text>
           </Pressable>
         </Stack>
@@ -305,6 +293,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                         setHours(pick.hours);
                         setPrepHours(pick.hours);
                         setNeedsPrep(pick.prep);
+                        setPrepTouched(true);
                       }}
                       className={`min-h-row grow items-center gap-2 rounded-md border-2 p-4 active:opacity-70 ${
                         picked ? 'border-inverse bg-decor-cream' : 'border-line-hairline bg-raised'
@@ -344,7 +333,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                   accessibilityRole="button"
                   accessibilityState={{ selected: needsPrep === option.prep }}
                   accessibilityLabel={`${option.title}. ${option.sub}`}
-                  onPress={() => { tapFeedback(); setNeedsPrep(option.prep); }}
+                  onPress={() => { tapFeedback(); setNeedsPrep(option.prep); setPrepTouched(true); }}
                   className={`flex-1 items-center gap-3 rounded-lg border-2 p-5 active:opacity-70 ${
                     needsPrep === option.prep ? 'border-inverse bg-decor-cream' : 'border-line-hairline bg-raised'
                   }`}
@@ -421,56 +410,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               />
             </Card>
 
-            {/* Where it lands. A tap each, not five sliders. */}
-            <Card gap={3}>
-              <Text variant="heading">Where does it drain you?</Text>
-              <Stack direction="row" gap={2} wrap>
-                {DIAL_ORDER.map((area) => {
-                  const on = liveMix[area] > 0;
-                  return (
-                    <Pressable
-                      key={area}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: on }}
-                      accessibilityLabel={`${BUCKET_LABEL[area]}, ${AREA_HINT[area]}`}
-                      onPress={() => { tapFeedback(); setMixTouched(true); setMix((prev) => toggleArea(prev, area, dread)); }}
-                      className="items-center gap-1 rounded-lg border-2 px-2 py-3 active:opacity-70"
-                      style={{
-                        width: '31%',
-                        backgroundColor: on ? color.area[area].wash : color.surface.raised,
-                        borderColor: on ? color.area[area].ink : color.line.hairline,
-                      }}
-                    >
-                      <AreaIcon area={area} size={22} />
-                      <Text variant="caption" weight="semibold">{BUCKET_LABEL[area]}</Text>
-                      <Text variant="micro" tone="subtle">{AREA_HINT[area]}</Text>
-                      {on ? (
-                        <View className="absolute items-center justify-center rounded-pill" style={{ top: 6, right: 6, width: 18, height: 18, backgroundColor: color.area[area].ink }}>
-                          <Text variant="micro" tone="inverse">✓</Text>
-                        </View>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </Stack>
-              {shares ? (
-                <Stack direction="row" gap={2} wrap>
-                  {areasChosen.map((key) => (
-                    <View key={key} className="flex-row items-center gap-2 rounded-pill px-3 py-2" style={{ backgroundColor: color.area[key].wash }}>
-                      <AreaIcon area={key} size={15} />
-                      <Text variant="micro">{BUCKET_LABEL[key]} {Math.round(shares[key] * 100)}%</Text>
-                    </View>
-                  ))}
-                </Stack>
-              ) : null}
-            </Card>
-
-            {/* The five dials, for anyone who wants to say "a lot of head, a bit of time". */}
-            <Reveal label="Fine-tune each area">
-              {DIAL_ORDER.map((area) => (
-                <AreaDial key={area} area={area} value={liveMix[area]} onChange={(next) => setArea(area, next)} />
-              ))}
-            </Reveal>
           </Stack>
         ) : null}
 
@@ -484,9 +423,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                   <Text variant="heading" tone="recovery">{formatShort(due)}</Text>
                 </Stack>
                 <DatePicker value={due} min={addDays(today, 1)} onChange={setDeadline} />
-                <Text variant="footnote" tone="subtle">
-                  On every day's list until then, with the sittings plannable for you.
-                </Text>
               </Card>
             ) : (
               <Card gap={4}>
@@ -529,7 +465,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                   {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
                     <Chip
                       key={option}
-                      label={COMMITMENT_LABEL[option]}
+                      label={`${{ hard: '🔒', soft: '↔️', self: '🙋' }[option]} ${COMMITMENT_LABEL[option]}`}
                       tone={option === commit ? 'selected' : 'plain'}
                       onPress={() => { tapFeedback(); setCommitment(option); }}
                     />
@@ -538,21 +474,23 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               </Stack>
 
               {/* Asked next to "can it move" on purpose: together they are what
-                  turns a full day into a decision instead of a list. */}
-              <Stack gap={3}>
-                <Text variant="heading">Want to be there?</Text>
-                <Stack direction="row" gap={2} wrap>
-                  {WANT_CHOICES.map(([value, word]) => (
-                    <Chip
-                      key={value}
-                      label={word}
-                      tone={value === want ? 'selected' : 'plain'}
-                      onPress={() => { tapFeedback(); setWant(value); }}
-                    />
-                  ))}
+                  turns a full day into a decision instead of a list. Only for
+                  something you turn up to - nobody "wants to be at" an essay. */}
+              {needsPrep ? null : (
+                <Stack gap={3}>
+                  <Text variant="heading">Want to be there?</Text>
+                  <Stack direction="row" gap={2} wrap>
+                    {WANT_CHOICES.map(([value, word]) => (
+                      <Chip
+                        key={value}
+                        label={word}
+                        tone={value === want ? 'selected' : 'plain'}
+                        onPress={() => { tapFeedback(); setWant(value); }}
+                      />
+                    ))}
+                  </Stack>
                 </Stack>
-                <Text variant="footnote" tone="subtle">Lets the app swap things, not just drop them.</Text>
-              </Stack>
+              )}
             </Card>
 
             {/* What it does to you, before you commit to it. With nothing typed
@@ -575,23 +513,11 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                   <Text variant="footnote" weight="semibold">
                     {!after
                       ? 'Before you add anything'
-                      : reading.charge === after.charge
-                        ? 'No change to the battery'
-                        : `${after.charge - reading.charge}% from ${reading.charge}%`}
+                      : `🔋 Uses ${load / capacityOf(ceilings) * 100 < 1 ? 'under 1' : Math.round(load / capacityOf(ceilings) * 100)}% of your week`}
                   </Text>
                   <Text variant="footnote" tone="muted">{BAND_LABEL[bandFor(shown.overall)]} week</Text>
                 </Stack>
               </Stack>
-              {after ? (
-                <Stack direction="row" gap={2} wrap>
-                  {areasChosen.map((key) => (
-                    <View key={key} className="flex-row items-center gap-2 rounded-pill px-3 py-2" style={{ backgroundColor: color.area[key].wash }}>
-                      <AreaIcon area={key} size={15} />
-                      <Text variant="micro">{BUCKET_LABEL[key]} {after.percents[key]}%</Text>
-                    </View>
-                  ))}
-                </Stack>
-              ) : null}
             </Card>
           </Stack>
         ) : null}

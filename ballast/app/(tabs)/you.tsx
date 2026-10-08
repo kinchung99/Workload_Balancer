@@ -9,7 +9,7 @@ import { VISIBILITY_SHORT } from '@/lib/sharing';
 import { restOwedFrom, useStore } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { prioritise } from '@/lib/priority';
-import { moodEmoji } from '@/lib/logs';
+import { shownMood } from '@/lib/checkin';
 import { tapFeedback } from '@/lib/haptics';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
@@ -29,7 +29,7 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recove
  */
 export default function You() {
   const router = useRouter();
-  const { recovery, account, circle, requests, sharing, status, pic, moods } = useStore();
+  const { recovery, account, circle, requests, sharing, status, pic, moods, vibe } = useStore();
   const reading = useReading();
   const items = useItemsWithLogs();
   const { first } = prioritise(items, useStore.getState().today);
@@ -62,7 +62,7 @@ export default function You() {
         {/* The profile card: who you are, how you are, and what you share. */}
         <Card tone={band} gap={5}>
           <Stack direction="row" gap={5} align="center">
-            <Avatar initials={initials} band={band} size={84} charge={reading.charge} pic={pic} mood={moodEmoji(moods)} />
+            <Avatar initials={initials} band={band} size={84} charge={reading.charge} pic={pic} mood={shownMood(vibe, moods)} />
             <Stack gap={1} grow>
               <Text variant="title">{name}</Text>
               {account ? (
@@ -81,7 +81,7 @@ export default function You() {
           {/* Three numbers, the way a profile always opens. */}
           <Stack direction="row" gap={3}>
             {[
-              { value: `${reading.charge}%`, label: 'battery', to: '/checkin' as Href },
+              { value: `${reading.charge}%`, label: 'battery', to: '/battery' as Href },
               { value: String(friends), label: friends === 1 ? 'friend' : 'friends', to: '/friends' as Href },
               { value: VISIBILITY_SHORT[sharing], label: 'sharing', to: '/sharing' as Href },
             ].map((stat) => (
@@ -143,7 +143,7 @@ export default function You() {
         {/* Two kinds of place to go, kept apart: looking after yourself, and
             organising the week. Each door wears its own family's colour. */}
         <Section family="rest" title="Recharge">
-          <Door family="you" sticker="sun" title="Check in" sub="Mood, sleep, food" onPress={() => router.push('/checkin')} />
+          <Door family="you" sticker="sun" title="Check in" sub="Your note · ⚡ recharge" onPress={() => router.push('/checkin')} />
           <Door family="rest" sticker="battery" title="Recovery" sub={`${owed}h owed`} onPress={() => router.push('/recover')} />
           <Door family="rest" sticker="moon" title="Tonight" sub="Plan an evening" onPress={() => router.push('/tonight/night' as Href)} />
         </Section>

@@ -12,7 +12,8 @@
  * picker shows what each answer costs this student's own battery before they
  * choose. The point of the question is visible at the moment it is asked.
  */
-import { BUCKETS, overallPercent, percentByBucket } from './load';
+import { BUCKETS, overallOf } from './load';
+import { countedOnce } from './prep';
 import { isSameWeek } from './dates';
 import type { BucketKey, Dread, Item } from './types';
 
@@ -39,7 +40,7 @@ export const drainTone = (level: Dread): 'steady' | 'busy' | 'heavy' =>
  * would make the question look pointless exactly when it matters most.
  */
 const weekLoad = (items: Item[], anchor: string, ceilings: Record<BucketKey, number>): number =>
-  overallPercent(percentByBucket(items.filter((item) => isSameWeek(item.date, anchor)), ceilings));
+  overallOf(countedOnce(items).filter((item) => isSameWeek(item.date, anchor)), ceilings);
 
 /**
  * What something costs the week's battery at each level, in percentage points.

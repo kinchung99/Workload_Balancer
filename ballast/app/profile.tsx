@@ -12,7 +12,7 @@ import { api } from '@/lib/api';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 import { useReading } from '@/state/selectors';
-import { moodEmoji } from '@/lib/logs';
+import { shownMood } from '@/lib/checkin';
 import { FACES, canPickPhoto, pickPhoto } from '@/lib/photo';
 import { PersonRow } from '@/features/social/PersonRow';
 
@@ -33,7 +33,7 @@ const STATUS_MAX = 60;
  */
 export default function Profile() {
   const router = useRouter();
-  const { account, setAccount, status, setStatus, pic, setPic, moods } = useStore();
+  const { account, setAccount, status, setStatus, pic, setPic, moods, vibe } = useStore();
   const reading = useReading();
   const band = bandFor(reading.overall);
 
@@ -49,7 +49,7 @@ export default function Profile() {
   useEffect(() => setCanUpload(canPickPhoto), []);
 
   // What the circle will show. Typed initials win; otherwise they follow the name.
-  const shown = (initials.trim() || initialsFrom(name || 'You')).slice(0, 2).toUpperCase();
+  const shown = (initials.trim() || (name.trim() ? initialsFrom(name) : 'Y')).slice(0, 2).toUpperCase();
 
   const save = async () => {
     setBusy(true);
@@ -92,12 +92,12 @@ export default function Profile() {
         <Card tone={band} gap={3}>
           <Text variant="micro" tone="subtle">WHAT YOUR FRIENDS SEE</Text>
           <PersonRow
-            name={name.trim() || 'Your name'}
+            name={name.trim() || 'You'}
             initials={shown}
             band={band}
             charge={reading.charge}
             pic={pic}
-            mood={moodEmoji(moods)}
+            mood={shownMood(vibe, moods)}
             status={line.trim() || null}
             line="just now"
             active
@@ -156,7 +156,7 @@ export default function Profile() {
             <TextInput
               value={initials}
               onChangeText={(v) => { setInitials(v.slice(0, 2)); setSaved(false); }}
-              placeholder={initialsFrom(name || 'You')}
+              placeholder={name.trim() ? initialsFrom(name) : 'Y'}
               placeholderTextColor={color.ink.subtle}
               autoCapitalize="characters"
               autoCorrect={false}

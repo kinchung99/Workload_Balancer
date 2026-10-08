@@ -29,7 +29,7 @@ export default function SharePeople() {
     <Screen
       back="/sharing"
       backLabel="What they see"
-      footer={<Button label={`Done · ${seeing.length} of ${friends.length} can see your times`} onPress={() => router.back()} />}
+      footer={<Button label={`Done · ${seeing.length} of ${friends.length} can see your times`} onPress={() => (router.canGoBack() ? router.back() : router.replace('/sharing'))} />}
     >
       <Stack gap={5} className="pt-2">
         <PageHeader sticker="people" wash={color.decor.mint} eyebrow="Your privacy" title="Who sees your times" sub="Hidden friends still see your battery." />

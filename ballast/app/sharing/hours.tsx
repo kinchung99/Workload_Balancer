@@ -45,7 +45,7 @@ export default function ShareHours() {
           label={custom ? `Done · ${shown.flat().length} windows this week` : 'Use custom hours'}
           onPress={() => {
             if (!custom) { setSharing('custom'); successFeedback(); return; }
-            router.back();
+            (router.canGoBack() ? router.back() : router.replace('/sharing'));
           }}
         />
       }

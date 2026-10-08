@@ -13,7 +13,7 @@
  * points are additive and legible; the bucket model stays the authority on the
  * week that actually happened.
  */
-import type { BucketKey, SimAction } from './types';
+import type { BucketKey, Item, SimAction } from './types';
 
 export const ACTIONS: SimAction[] = [
   {
@@ -63,7 +63,7 @@ export const ACTIONS: SimAction[] = [
     label: 'Late-night screen',
     bucket: 'mental',
     min: 0, max: 4, step: 0.5, baseline: 0, unit: 'h',
-    ptsPerUnit: -12,
+    ptsPerUnit: -8,
     goodNote: '',
     badNote: 'Significant disruption to sleep and recovery',
   },
@@ -91,8 +91,8 @@ export function customAction(id: string, label: string, hours: number, bucket: S
     step: 0.5,
     baseline: 0,
     unit: 'h',
-    // Worth its own weight back per hour: it is your recovery, not a chore.
-    ptsPerUnit: 4,
+    // An hour of your own evening is an hour of rest.
+    ptsPerUnit: 8,
     goodNote: 'Your own evening, counted',
     badNote: 'Skipped tonight',
     preferred: [18, 22],
@@ -132,7 +132,7 @@ export const PRESETS: Array<{ id: string; label: string; note: string; state: Si
 export const initialSim = (): SimState =>
   Object.fromEntries(ACTIONS.map((action) => [action.id, action.baseline]));
 
-/** Charge points this action is worth at its current slider position. */
+/** Load this action gives back at its current slider position (negative: what it costs). */
 export const pointsOf = (action: SimAction, value: number): number =>
   Math.round((value - action.baseline) * action.ptsPerUnit * 10) / 10;
 
@@ -169,3 +169,51 @@ export function busiestBucket(state: SimState): BucketKey | null {
   const best = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
   return best ? best[0] : null;
 }
+
+/** One part of an evening, as a block to put in the week. */
+export interface PlanBlock {
+  id: string;
+  label: string;
+  bucket: BucketKey;
+  hours: number;
+  /** Load given back; negative when it costs. */
+  credit: number;
+  startHour?: number;
+}
+
+/** Every part of the evening that differs from doing nothing, as blocks. Sleep is a log, not a block. */
+export function planBlocks(actions: SimAction[], state: SimState): Array<PlanBlock & { preferred?: readonly [number, number] }> {
+  return actions
+    .filter((action) => !action.logOnly && pointsOf(action, state[action.id] ?? action.baseline) !== 0)
+    .map((action) => {
+      const amount = state[action.id] ?? action.baseline;
+      const hours = action.unit === 'min' ? amount / 60 : Math.max(0.5, amount - action.baseline);
+      return {
+        id: action.id,
+        label: action.label,
+        bucket: action.bucket,
+        hours: Math.round(hours * 100) / 100,
+        credit: pointsOf(action, amount),
+        preferred: action.preferred,
+      };
+    });
+}
+
+/**
+ * A block as the item it becomes - the one shape both the preview and the
+ * booking use, so what the evening promises is what lands in the week.
+ */
+export const planItem = (block: PlanBlock, day: string): Item => ({
+  id: `plan-${block.id}-${day}`,
+  title: block.label,
+  bucket: block.bucket,
+  hours: block.hours,
+  dread: 1,
+  commitment: 'self',
+  date: day,
+  ...(block.startHour === undefined ? {} : { startHour: block.startHour }),
+  // Rest gives back what it is worth; a study session or late-night scrolling
+  // planned for the evening costs what it costs.
+  isRecovery: block.credit > 0,
+  loadOverride: -block.credit,
+});

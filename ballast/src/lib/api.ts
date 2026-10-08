@@ -12,8 +12,8 @@
  */
 import Constants from 'expo-constants';
 import type {
-  CircleMemberDTO, ComposeContext, ComposeDraftRequest, ComposeDraftResponse, ComposeIdeasResponse,
-  RestContext, RestIdeasResponse,
+  CircleMemberDTO, GroupDTO, ComposeContext, ComposeDraftRequest, ComposeDraftResponse, ComposeIdeasResponse,
+  RestContext, RestIdeasResponse, CoachAdviceResponse, PriorityContext, RebalanceContext,
   InviteDTO, InviteRequest, MeDTO, PendingRequestDTO, Presence, PublishRequest, SyncDoc, SyncResponse, Visibility,
 } from '@shared/contract';
 
@@ -154,6 +154,17 @@ export const api = {
   respondToFriend: (userId: string, action: 'accept' | 'decline' | 'remove') =>
     post<{ ok: true }>('/api/circle/respond', { userId, action }),
 
+  /* ---------------------------------------------------------------- groups */
+
+  groups: () => request<{ groups: GroupDTO[] }>('/api/groups'),
+  createGroup: (body: { name: string; emoji: string; invite: string[] }) =>
+    post<{ ok: true; id: string; invited: number }>('/api/groups', body),
+  inviteToGroup: (id: string, userIds: string[]) => post<{ ok: true; invited: number }>(`/api/groups/${id}/invite`, { userIds }),
+  respondToGroup: (id: string, action: 'accept' | 'decline') => post<{ ok: true }>(`/api/groups/${id}/respond`, { action }),
+  removeFromGroup: (id: string, userId: string) => post<{ ok: true }>(`/api/groups/${id}/remove`, { userId }),
+  updateGroup: (id: string, patch: { name?: string; emoji?: string }) => post<{ ok: true }>(`/api/groups/${id}`, patch),
+  deleteGroup: (id: string) => request<{ ok: true }>(`/api/groups/${id}`, { method: 'DELETE' }),
+
   /* --------------------------------------------------------------- sharing */
 
   publishPresence: (presence: Presence) => post<{ ok: true }>('/api/sharing/presence', presence),
@@ -178,6 +189,15 @@ export const api = {
   /** Five things that might help. Numbers and taps only; falls back to the phone's own list. */
   restIdeas: (context: Omit<RestContext, 'vibes' | 'exclude'> & Partial<Pick<RestContext, 'vibes' | 'exclude'>>) =>
     post<RestIdeasResponse>('/api/suggest/recovery', { context }, WRITING_TIMEOUT),
+
+  /* ----------------------------------------------------------------- coach */
+
+  /** A short reason for each ranked task, in the app's order. */
+  suggestPriority: (context: PriorityContext) =>
+    post<CoachAdviceResponse>('/api/suggest/priority', { context }, WRITING_TIMEOUT),
+  /** A reason for each of next week's trades, which to take, and a line on the swap. */
+  suggestRebalance: (context: Omit<RebalanceContext, 'swap'> & Partial<Pick<RebalanceContext, 'swap'>>) =>
+    post<CoachAdviceResponse>('/api/suggest/rebalance', { context }, WRITING_TIMEOUT),
 };
 
 export type { CircleMemberDTO, InviteDTO, MeDTO, PendingRequestDTO, Visibility };

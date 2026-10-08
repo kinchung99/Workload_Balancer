@@ -50,6 +50,11 @@ for (const [from, to] of [
   ['src/lib/simulate.ts', 'simulate.ts'],
   ['src/lib/marking.ts', 'marking.ts'],
   ['src/lib/access.ts', 'access.ts'],
+  ['src/lib/people.ts', 'people.ts'],
+  ['src/lib/notify.ts', 'notify.ts'],
+  ['src/lib/checkin.ts', 'checkin.ts'],
+  ['src/lib/coach.ts', 'coach.ts'],
+  ['src/lib/breakdown.ts', 'breakdown.ts'],
   ['src/data/seed.ts', 'seed.ts'],
   ['src/state/store.ts', 'store.ts'],
 ]) {
@@ -116,10 +121,12 @@ const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn, sleepWi
 const { categorise, errandLoad, outstandingLoad, openErrands } = await import(join(tmp, 'errands.ts'));
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
 const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
-const { openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, sittingsOf, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
+const { countedOnce, openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, sittingsOf, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
 const { dayFacts, whyThisDay, describeChange, durationLabel, nearestStart, nowHourFor } = await import(join(tmp, 'sittings.ts'));
 const { offlineIdeas, offlineDraft, offlineTweak, recipientOf, whatIsSent, TONES } = await import(join(tmp, 'compose.ts'));
-const { heatmap, everyoneFree, fitsWindow } = await import(join(tmp, 'together.ts'));
+const { heatmap, everyoneFree, fitsWindow, planBlocks: freeBlocks } = await import(join(tmp, 'together.ts'));
+const { quickUpdate, bells, unseen } = await import(join(tmp, 'notify.ts'));
+const { DEMO_ANSWER_MS } = await import(join(tmp, 'people.ts'));
 const { flagInfo, flagsFor, modulesFrom } = await import(join(tmp, 'timetable.ts'));
 const { CATALOGUE, rankRest, fromSeed, fromIdea, hoursFor } = await import(join(tmp, 'rest.ts'));
 const { wireVisibility, DEFAULT_SHARE_RULES } = await import(join(tmp, 'sharing.ts'));
@@ -133,20 +140,23 @@ const { CHECK_IN_MESSAGE, EVENING_FROM, PLAN_MESSAGE, VISIBILITY, busyFrom, free
 const { CADENCE_WORD, DEFAULT_WEIGHTS, REVIEW_FROM_HOUR, VERDICT, adherence, describeWeights, dueForReview, retune, reviewEvery, weightsFrom } = await import(join(tmp, 'review.ts'));
 const { applyPull, backoffFor, emptySync, enqueue, runSync, syncLabel, DEBOUNCE_MS, MAX_BACKOFF_MS } = await import(join(tmp, 'sync.ts'));
 const { diff, mergeInto, snapshotOf } = await import(join(tmp, 'snapshot.ts'));
-const { percentByBucket, overallPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
+const { REST_LOAD_PER_HOUR, percentByBucket, overallPercent, overallOf, capacityOf, costPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
 const { KIND, applyMark, autoMark, autoMarkedIn, canMark, clockHour, markKind, markStatus, outcomeWord, toMark } = await import(join(tmp, 'marking.ts'));
 const { moduleTerm, bestCase } = await import(join(tmp, 'timetable.ts'));
 const { moodEmoji } = await import(join(tmp, 'logs.ts'));
-const { guestAllowed } = await import(join(tmp, 'access.ts'));
+const { demoBuild, guestAllowed } = await import(join(tmp, 'access.ts'));
+const { priorityContext, rebalanceContext } = await import(join(tmp, 'coach.ts'));
+const { breakdown } = await import(join(tmp, 'breakdown.ts'));
+const { chargeExact, gainOf, gainLabel, signedLabel, weightOf, presenceLine, splitPresence, shownMood, upsertMeal } = await import(join(tmp, 'checkin.ts'));
 
 /** The reading a screen would show, logs folded in - mirrors state/selectors. */
 const charge = (extra = []) => {
   const st = useStore.getState();
   const all = [...st.items, ...extra, ...logItems({ today: st.today, sleepHours: st.sleepHours, meals: st.meals, moods: st.moods, errands: st.errands, moments: st.moments })];
-  return chargeOf(overallPercent(percentByBucket(itemsInWeek(all, st.today), st.ceilings)));
+  return chargeOf(overallOf(itemsInWeek(countedOnce(all), st.today), st.ceilings));
 };
 const { prescriptions } = await import(join(tmp, 'seed.ts'));
-const { ACTIONS, PRESETS, customAction, initialSim, pointsOf, project, totalPoints } = await import(join(tmp, 'simulate.ts'));
+const { ACTIONS, PRESETS, customAction, initialSim, pointsOf, project, totalPoints, planBlocks, planItem } = await import(join(tmp, 'simulate.ts'));
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -172,7 +182,7 @@ console.log('\nBooking recovery — "Put it in today at 5pm"');
   check('the new block is marked as recovery', s().items.at(-1).isRecovery, true);
   check('it is no longer offered', s().booked.includes('river'), true);
   check('the ledger is credited', restOwedFrom(s().recovery) < owedBefore, true);
-  check('credit equals the prescription', owedBefore - restOwedFrom(s().recovery), river.credit);
+  check('an hour of rest banks an hour', owedBefore - restOwedFrom(s().recovery), 1);
   check('the block has a real clock time', s().items.at(-1).startHour, 17);
   check('and recovery returns load rather than costing it', s().items.at(-1).isRecovery, true);
 }
@@ -230,7 +240,7 @@ console.log('\nCapture — adding a task changes the week');
   const before = weekReading(s().items, s().today, s().ceilings).overall;
   s().addItem({ title: 'OS assignment', bucket: 'mental', hours: 8, dread: 4, commitment: 'hard', date: s().today });
   const after = weekReading(s().items, s().today, s().ceilings).overall;
-  check('the week reads 53% used before', before, 53);
+  check('the week reads 52% used before', before, 52);
   check('the meter climbs on a 32-load task', after > before, true);
   check('and it is on today\'s list', itemsOnDay(s().items, s().today).some((i) => i.title === 'OS assignment'), true);
 }
@@ -269,7 +279,7 @@ console.log('\nLogging moves the battery immediately');
   s().setMealStatus('dinner', 'skipped');
   const skipped = logItems({ today: s().today, sleepHours: 9, meals: s().meals, moods: [] });
   check('a skipped meal shows up as load', skipped.some((i) => i.loadOverride > 0), true);
-  check('base week is unaffected by any of it', base, 47);
+  check('base week is unaffected by any of it', base, 48);
 }
 
 console.log('\nThe time layer');
@@ -683,9 +693,10 @@ console.log('\nThings do not pile up when you repeat yourself');
   check('and does not credit the ledger twice', restOwedFrom(s().recovery), owed);
 
   const invite = { title: 'Dinner', date: s().today, startHour: 19, hours: 2, people: ['amin'] };
+  const before = s().invites.length;
   s().sendInvite(invite);
   s().sendInvite(invite);
-  check('the same gathering twice is one gathering', s().invites.length, 1);
+  check('the same gathering twice is one gathering', s().invites.length - before, 1);
 }
 
 console.log('\nApplying a rebalance actually changes the week');
@@ -698,7 +709,7 @@ console.log('\nApplying a rebalance actually changes the week');
   const before = weekReading(s().items, anchor, s().ceilings).overall;
   const count = week().length;
 
-  check('next week starts at 59% used', before, 59);
+  check('next week starts at 58% used', before, 58);
   check('four trades come pre-selected', trades.filter((t) => t.selected).length, 4);
 
   // Exactly what the screen passes: the selection travels on the trades.
@@ -744,15 +755,22 @@ console.log('\nPressing apply twice does not move things');
   check('with still only one walk', daySchedule(s().items, s().today).timed.filter((i) => i.title === 'Take a walk').length, 1);
 }
 
-console.log('\nEvery launch starts from the seeded semester');
+console.log('\nWhat survives a reload');
 {
-  // Only the intro flag is written, so nothing about a week can outlive a reload.
-  const saved = { onboarded: true, items: [{ id: 'junk' }], sleepHours: 4, moments: [{ id: 'm' }] };
-  const kept = ((({ onboarded }) => ({ onboarded }))(saved));
-  check('the week is not persisted', kept.items, undefined);
-  check('nor is anything logged', kept.sleepHours, undefined);
-  check('nor are good moments', kept.moments, undefined);
-  check('only whether the intro has run', kept.onboarded, true);
+  s().reset();
+  const save = useStore.persist.getOptions().partialize;
+  s().startGuest();
+  s().logSleep(6);
+  const kept = save(s());
+  check('a guest keeps their week', kept.items.length, s().items.length);
+  check('and what they logged', kept.sleepHours, 6);
+  check('and whether setup has run', 'onboarded' in kept, true);
+  s().goLive({ id: 'u5', email: 'c@uni.edu', name: 'C', initials: 'C', phone: null, visibility: 'evenings' }, '2026-03-02');
+  const signedIn = save(s());
+  check('a signed-in week is left to the server', signedIn.items, undefined);
+  check('but who you are is kept', signedIn.lastAccountId, 'u5');
+  s().endSession();
+  s().reset();
 }
 
 console.log('\nA stale save does not carry a fixed bug forward');
@@ -890,13 +908,13 @@ console.log('\nEvery suggestion says why, every change says what it cost');
   const facts = dayFacts(algo, s().items, s().today, plan);
   const tue = facts.find((f) => f.date === addDaysISO(s().today, 1));
   check('Tuesday is the lightest day', whyThisDay(tue)[0], 'Lightest day');
-  check('and the reason carries its numbers', whyThisDay(tue).slice(1), ['19 load', '9.8h booked']);
+  check('and the reason carries its numbers', whyThisDay(tue, capacityOf(s().ceilings)).slice(1), ['🔋 −5%', '9.8h booked']);
   check('the due day is never "lightest"', whyThisDay(facts.find((f) => f.isDue))[0], 'Due day');
   check('a plan adds load to the days it uses', tue.adding > 0, true);
   check('and nothing to the days it does not', facts.filter((f) => !plan.some((p) => p.date === f.date)).every((f) => f.adding === 0), true);
 
-  const moved = describeChange(algo, s().items, plan[0], { ...plan[0], date: addDaysISO(s().today, 2), hours: 1.5 });
-  check('moving to a heavier day says by how much', moved.find((c) => c.key === 'day').note, '+14 load heavier');
+  const moved = describeChange(algo, s().items, plan[0], { ...plan[0], date: addDaysISO(s().today, 2), hours: 1.5 }, capacityOf(s().ceilings));
+  check('moving to a heavier day says by how much', moved.find((c) => c.key === 'day').note, 'A busier day · 🔋 −4%');
   check('and reads as a cost', moved.find((c) => c.key === 'day').tone, 'heavy');
   check('trimming says what goes back to loose', moved.find((c) => c.key === 'length').note, '30m back to loose');
   check('the due day is called out', describeChange(algo, s().items, plan[0], { ...plan[0], date: algo.deadline }).find((c) => c.key === 'day').note, 'Due day · no buffer');
@@ -1072,7 +1090,7 @@ console.log('\nGroups, and finding a time');
   check('silence is not availability', everyoneFree(s().items, [...people, { id: 'x', name: 'X', free: [] }], days, 2), []);
 
   s().sendInvite({ title: 'Dinner · Badminton', date: windows[0].date, startHour: 18, hours: 2, people: ['amin', 'ravi'], groupId: id });
-  check('an invite remembers its group', s().invites[0].groupId, id);
+  check('an invite remembers its group', s().invites.at(-1).groupId, id);
   check('asking some of a group leaves the group as it is', group().members, ['amin', 'ravi']);
 
   const act = s().addActivity({ label: '  Badminton  ', emoji: '🏸', hours: 2.2 }, id);
@@ -1249,7 +1267,7 @@ console.log('\nThe battery can go up, not only down');
   check('twenty taps of one thing tails off', spam < laughed.credit * 5, true);
   check('a genuinely varied day is worth more per tap', varied / 4 > spam / 20, true);
   check('but a good day is no longer capped', spam > 12, true);
-  check('base week unchanged by any of it', base, 47);
+  check('base week unchanged by any of it', base, 48);
 }
 
 console.log('\nEvery notch on a dial is reachable');
@@ -1291,19 +1309,14 @@ console.log('\nOne thing, five areas — the mix');
   check('and is said in words', describeMix({ mental: 4, social: 2 }, 'mental'), 'Mostly mental, some social');
   check('one area reads as just that area', describeMix({ social: 3 }, 'mental'), 'Social');
 
-  // Shape beats total. Held at equal ceilings first, so the property is the
-  // model's and not an artefact of one student's calibration.
-  const flat = { mental: 100, time: 100, errands: 100, social: 100, physical: 100 };
-  const concentrated = overallPercent(percentByBucket(one({ mental: 3 }), flat));
-  const spread = overallPercent(percentByBucket(one({ mental: 2, time: 2, social: 2 }), flat));
-  check('at equal ceilings, spreading the same load reads lower', spread < concentrated, true);
-  // And then the thing that makes per-area ceilings worth having: spreading into
-  // a SMALL ceiling is worse, not better. Four load of social is a quarter of
-  // Amira's social ceiling and a twenty-fifth of her mental one.
+  // The battery is a plain sum: an hour costs what it weighs, whichever area
+  // it lands in. The areas say where the week sits; they do not change prices.
   const ceil = s().ceilings;
-  const intoSocial = overallPercent(percentByBucket(one({ mental: 2, social: 2 }), ceil));
-  const allMental = overallPercent(percentByBucket(one({ mental: 3 }), ceil));
-  check('but spreading into a smaller ceiling reads higher, correctly', intoSocial > allMental, true);
+  const intoSocial = overallOf(one({ mental: 2, social: 2 }), ceil);
+  const allMental = overallOf(one({ mental: 2, social: 2 }).map((i) => ({ ...i, mix: { mental: 4 } })), ceil);
+  check('the same load costs the same in any area', intoSocial, allMental);
+  check('but it still shows in the area it lands in', percentByBucket(one({ mental: 2, social: 2 }), ceil).social > 0, true);
+  check('the week\'s capacity is the five limits added up', capacityOf(ceil), ceil.mental + ceil.time + ceil.errands + ceil.social + ceil.physical);
 
   // And it reaches the battery through the real store action.
   const before = charge();
@@ -1314,7 +1327,7 @@ console.log('\nOne thing, five areas — the mix');
   const row = rows.find((r) => r.title === 'Group presentation');
   check('and survives becoming a row on the day', row.mix, { mental: 3, social: 3 });
   check('it moves the battery', charge() < before, true);
-  check('the seeded week reads 47% left', before, 47);
+  check('the seeded week reads 48% left', before, 48);
   check('social carries half of it', mixShares(row.mix).social, 0.5);
 }
 
@@ -1447,7 +1460,8 @@ console.log('\nLooking after yourself moves the number');
   const walk = prescriptions[0];
   s().bookRecovery(walk, 12, 1, s().today);
   check('booking the recovery it suggested moves the battery up', charge() > pre, true);
-  check('by what the ledger says it is worth, not by one hour', s().items.at(-1).loadOverride, -walk.credit);
+  check('an hour of rest gives back about two percent', charge() - pre, 2);
+  check('and banks the same hour', s().recovery[0].hours, 1);
 }
 
 console.log('\nThe battery has room to move in both directions');
@@ -1460,12 +1474,12 @@ console.log('\nThe battery has room to move in both directions');
   // is what an ordinary quiet week looks like, and it is the reading the app has
   // to be able to get to, or "you are doing fine" is a state it can never show.
   const floor = itemsInWeek(s().items.filter((i) => i.repeats || i.spread), s().today);
-  const quiet = chargeOf(overallPercent(percentByBucket(floor, s().ceilings)));
+  const quiet = chargeOf(overallOf(floor, s().ceilings));
   console.log(`    (classes and the shift alone read ${quiet}%)`, JSON.stringify(percentByBucket(floor, s().ceilings)));
   check('a quiet week reads in the seventies', quiet >= 68 && quiet <= 88, true);
 
   const half = s().items.map((i) => (i.repeats || i.spread || i.isRecovery ? i : { ...i, hours: i.hours / 2 }));
-  const light = chargeOf(overallPercent(percentByBucket(itemsInWeek(half, s().today), s().ceilings)));
+  const light = chargeOf(overallOf(itemsInWeek(half, s().today), s().ceilings));
   console.log(`    (half the deadline work reads ${light}%)`);
   check('halving the work you chose is worth ten points', light - start >= 10, true);
 
@@ -1518,6 +1532,29 @@ console.log('\nYour circle, and how old each reading is');
   ]), null);
 }
 
+console.log('\nA timetable built by tapping');
+{
+  s().reset();
+  const { slotsOf } = await import(join(tmp, 'timetable.ts'));
+  const before = s().items.length;
+  const id = s().addModule({ name: 'Compilers', code: 'cs3050', emoji: '⚙️', weeks: 12, startDate: s().today, requiredAttendance: 80 });
+  const made = s().modules.find((m) => m.id === id);
+  check('a module made by hand arrives empty', [made.name, made.code, made.attended, made.held], ['Compilers', 'CS3050', 0, 0]);
+  s().addClass(id, { day: 2, startHour: 10, hours: 2, kind: 'lecture', room: 'LT2' });
+  check('a weekly class lands this week and next', s().items.length, before + 2);
+  check('on the day and hour picked', slotsOf(s().items, id, s().today), [{ day: 2, startHour: 10, hours: 2, kind: 'lecture', room: 'LT2' }]);
+  check('named after its module', s().items.at(-1).title, 'Compilers lecture');
+  s().addClass(id, { day: 2, startHour: 10, hours: 2, kind: 'lecture' });
+  check('adding the same class twice does nothing', s().items.length, before + 2);
+  s().setModuleDread(id, 4);
+  check('and it carries its module\'s drain', s().items.filter((i) => i.moduleId === id).every((i) => i.dread === 4), true);
+  s().removeClass(id, 2, 10);
+  check('taking a class away takes every week of it', s().items.length, before);
+  s().addClass(id, { day: 4, startHour: 14, hours: 1, kind: 'lab' });
+  s().removeModule(id);
+  check('and removing the module takes its classes with it', [s().items.length, s().modules.some((m) => m.id === id)], [before, false]);
+}
+
 console.log('\nSigned in, or a guest in a preview');
 {
   s().reset();
@@ -1538,6 +1575,174 @@ console.log('\nSigned in, or a guest in a preview');
   check('signing in is never a guest', s().guest, false);
   s().endSession();
   check('signing out leaves no guest behind', [s().guest, s().account], [false, null]);
+  process.env.EXPO_PUBLIC_API_URL = 'https://api.example.test';
+  process.env.EXPO_PUBLIC_DEMO = '1';
+  check('a demo flag alone never opens a real build', demoBuild(), false);
+  process.env.EXPO_PUBLIC_GUEST = '1';
+  check('on a preview build it opens straight onto the sample week', demoBuild(), true);
+  delete process.env.EXPO_PUBLIC_DEMO;
+  delete process.env.EXPO_PUBLIC_GUEST;
+  delete process.env.EXPO_PUBLIC_API_URL;
+  s().reset();
+}
+
+console.log('\nA check-in that shows what it gives back');
+{
+  s().reset();
+  const world = () => ({ items: s().items, ceilings: s().ceilings, today: s().today, meals: s().meals, moods: s().moods, errands: s().errands, moments: s().moments, sleepHours: s().sleepHours });
+  check('the exact battery rounds to the one on screen', Math.round(chargeExact(world())), charge());
+  const outside = MOMENT_KINDS.find((k) => k.id === 'outside');
+  const gain = gainOf(world(), { kind: 'moment', id: 'outside', bucket: outside.bucket, credit: outside.credit });
+  check('a good moment is priced before it is tapped', gain > 0, true);
+  const was = chargeExact(world());
+  s().logMoment('outside', outside.bucket, outside.credit);
+  check('and tapping it moves the battery by that much', Math.abs(chargeExact(world()) - was - gain) < 0.001, true);
+  const again = gainOf(world(), { kind: 'moment', id: 'outside', bucket: outside.bucket, credit: outside.credit });
+  check('the same moment again is worth less', again < gain, true);
+  check('a short night is never sold as a gain', gainOf(world(), { kind: 'sleep', hours: 5 }) < 0, true);
+  check('a buzzing day gives charge back', gainOf(world(), { kind: 'mood', quadrant: 'high-pleasant' }) > 0, true);
+  check('and the label is a plain "+N%"', [gainLabel(3.4), gainLabel(0.2), gainLabel(-2)], ['+3%', null, null]);
+  check('every answer reads with its sign', [signedLabel(3.4), signedLabel(-2.2), signedLabel(0.2)], ['+3%', '−2%', '±0%']);
+  const short = weightOf(world(), { kind: 'sleep', hours: 5 });
+  const long = weightOf(world(), { kind: 'sleep', hours: 9 });
+  check('sleep weighs both ways', [short < 0, long > 0], [true, true]);
+  s().logSleep(5);
+  check('and a night keeps its weight once picked', Math.abs(weightOf(world(), { kind: 'sleep', hours: 5 }) - short) < 0.001, true);
+  check('so does the one not picked', Math.abs(weightOf(world(), { kind: 'sleep', hours: 9 }) - long) < 0.001, true);
+  check('a skipped meal costs, a proper one gives back',
+    [weightOf(world(), { kind: 'meal', status: 'skipped' }) < 0, weightOf(world(), { kind: 'meal', status: 'filling' }) > 0], [true, true]);
+  check('a drained day costs, a calm one gives back',
+    [weightOf(world(), { kind: 'mood', quadrant: 'low-unpleasant' }) < 0, weightOf(world(), { kind: 'mood', quadrant: 'low-pleasant' }) > 0], [true, true]);
+  check('and sleep outweighs any one good moment',
+    -short > weightOf(world(), { kind: 'moment', id: 'rested', bucket: 'physical', credit: 4 }), true);
+  check('a week with no dinner logged gets one', upsertMeal([], 'dinner', 'filling').map((m) => [m.id, m.status]), [['dinner', 'filling']]);
+  s().goLive({ id: 'u1', email: 'a@uni.edu', name: 'A', initials: 'A', phone: null, visibility: 'evenings' }, '2026-03-02');
+  s().setMealStatus('dinner', 'filling');
+  check('so eating properly counts in a signed-in week too', s().meals.find((m) => m.id === 'dinner')?.status, 'filling');
+  s().endSession();
+  s().reset();
+}
+
+console.log('\nWhere the battery goes, as lines that add up');
+{
+  s().reset();
+  const st = s();
+  const weekOf = () => {
+    const all = [...s().items, ...logItems({ today: s().today, sleepHours: s().sleepHours, meals: s().meals, moods: s().moods, errands: s().errands, moments: s().moments })];
+    return itemsInWeek(countedOnce(all), s().today);
+  };
+  const split = breakdown(weekOf(), st.ceilings, st.today, 14.5);
+  check('a hundred, less every line, is what is left', 100 - split.lines.reduce((t, l) => t + l.percent, 0), split.left);
+  check('and what is left is the battery on Home', split.left, charge());
+  check('used, to come and left make a hundred, less what came back', split.spent + split.ahead - split.back + split.left, 100);
+  check('the costliest kind of thing comes first', split.lines[0].percent >= split.lines[1].percent, true);
+  s().logSleep(9);
+  const rested = breakdown(weekOf(), st.ceilings, st.today, 14.5);
+  const sleep = rested.lines.find((l) => l.key === 'sleep');
+  check('a good night shows as a line that gives back', sleep && sleep.percent < 0, true);
+  check('and still everything adds up', 100 - rested.lines.reduce((t, l) => t + l.percent, 0), charge());
+  check('a long night banks rest in hours', s().recovery.find((r) => r.id === `sleep-${s().today}`)?.hours, 2);
+  s().logSleep(5);
+  check('and a short one is rest owed - one row a night, not one per tap', s().recovery.filter((r) => r.id === `sleep-${s().today}`).map((r) => r.hours), [-2]);
+  check('what the night gave back is counted as back, not as less used', rested.back > 0 && rested.spent >= split.spent, true);
+  check('and the bar still adds up', rested.spent + rested.ahead - rested.back + rested.left, 100);
+  check('an hour costs the same in any area', costPercent({ hours: 1, dread: 3, bucket: 'physical' }, st.ceilings), costPercent({ hours: 1, dread: 3, bucket: 'mental' }, st.ceilings));
+  s().reset();
+}
+
+console.log('\nAn evening promises what it books');
+{
+  s().reset();
+  const world = () => ({ items: s().items, ceilings: s().ceilings, today: s().today, meals: s().meals, moods: s().moods, errands: s().errands, moments: s().moments, sleepHours: s().sleepHours });
+  for (const preset of PRESETS) {
+    s().reset();
+    const blocks = planBlocks(ACTIONS, preset.state);
+    const promised = chargeExact({ ...world(), items: [...s().items, ...blocks.map((b) => planItem(b, s().today))], sleepHours: preset.state.sleep });
+    s().applyPlan(blocks, preset.state.sleep, s().today);
+    check(`${preset.label}: the preview is the battery after booking`, Math.round(promised), Math.round(chargeExact(world())));
+  }
+  s().reset();
+  const before = chargeExact(world());
+  const push = PRESETS.find((p) => p.id === 'push');
+  s().applyPlan(planBlocks(ACTIONS, push.state), push.state.sleep, s().today);
+  check('pushing through costs battery, it never gives it', chargeExact(world()) < before, true);
+  check('and the study it plans is a cost, not rest', s().items.some((i) => i.id.startsWith('plan-study') && !i.isRecovery), true);
+  check('a recovery night lands in the rest bank in hours', (() => {
+    s().reset();
+    const rest = PRESETS.find((p) => p.id === 'recover');
+    s().applyPlan(planBlocks(ACTIONS, rest.state), rest.state.sleep, s().today);
+    return s().recovery.filter((r) => r.id.startsWith('plan-')).every((r) => r.hours > 0 && r.hours <= 2);
+  })(), true);
+  s().reset();
+}
+
+console.log('\nPlanning moves a cost, it never adds one');
+{
+  s().reset();
+  const before = charge();
+  const work = s().items.find((i) => i.id === 'emails');
+  s().scheduleSessions(work.id, [
+    { date: s().today, startHour: 18, hours: 1 },
+    { date: work.deadline, startHour: 10, hours: 2 },
+  ]);
+  check('booking sittings for the emails leaves the battery where it was', charge(), before);
+  const sitting = s().items.find((i) => i.parentId === work.id);
+  s().markItem(sitting.id, 'missed');
+  check('a missed sitting hands its hours back to the work', charge(), before);
+  s().reset();
+}
+
+console.log('\nWhat the AI coach is shown');
+{
+  s().reset();
+  const today = s().today;
+  const { first } = prioritise(s().items, today, 7);
+  const asked = priorityContext(first, today, 14.5, 47, 11);
+  check('the coach sees the ranked list, in order', asked.tasks.map((t) => t.id), first.slice(0, 10).map((r) => r.item.id));
+  check('ten at most', asked.tasks.length <= 10, true);
+  check('with what is left of owing work as a percent',
+    asked.tasks.filter((t) => t.kind === 'owing').every((t) => typeof t.percentLeft === 'number'), true);
+  check('and only the fields the contract allows',
+    [...new Set(asked.tasks.flatMap((t) => Object.keys(t)))].sort(), ['dread', 'due', 'hardness', 'hoursLeft', 'id', 'kind', 'percentLeft', 'title']);
+  check('the time reads like a person says it', asked.now.endsWith('2:30pm'), true);
+
+  const anchor = nextWeek(today);
+  const week = itemsInWeek(s().items, anchor);
+  const trades = buildTrades(week);
+  const byId = Object.fromEntries(s().items.map((i) => [i.id, i]));
+  const offered = rebalanceContext(trades, byId, 22);
+  check('every priced trade is offered, by its own id', offered.options.map((o) => o.id), trades.slice(0, 16).map((t) => t.id));
+  check('locked ones say so, so the coach can say why not',
+    offered.options.filter((o) => o.locked).length, trades.filter((t) => t.locked).length);
+
+  check('no swap unless one was found', 'swap' in offered, false);
+  const withSwap = rebalanceContext(trades, byId, 22, { keep: 'Distributed Systems seminar', drop: 'Café shift, covering Amin', day: 'Wed 12 Nov' });
+  check('and the one keep-this-drop-that when there is', withSwap.swap, { keep: 'Distributed Systems seminar', drop: 'Café shift, covering Amin', day: 'Wed 12 Nov' });
+  s().reset();
+}
+
+console.log('\nYour note: an emoji and a line');
+{
+  s().reset();
+  check('the emoji travels at the front of the line', presenceLine('🥳', ' Free tonight '), '🥳 Free tonight');
+  check('either half alone is fine', [presenceLine(null, 'Hi'), presenceLine('😴', null), presenceLine(null, '  ')], ['Hi', '😴', null]);
+  check('a friend\'s line comes apart again', splitPresence('🥳 Free tonight'), { mood: '🥳', status: 'Free tonight' });
+  check('with skin tones and joined emoji intact', splitPresence('👍🏽 ok').mood, '👍🏽');
+  check('a line with no emoji is all words', splitPresence('Two labs and a shift'), { status: 'Two labs and a shift' });
+  check('an emoji alone is all mood', splitPresence('😴'), { mood: '😴' });
+  check('and nothing is nothing', splitPresence(null), {});
+  check('your picture wears the emoji you picked', shownMood('🔥', s().moods), '🔥');
+  check('or today\'s mood when you picked none', shownMood(null, s().moods), moodEmoji(s().moods));
+  const me = { id: 'u7', email: 'b@uni.edu', name: 'B', initials: 'B', phone: null, visibility: 'evenings' };
+  s().goLive(me, '2026-03-02');
+  s().setStatus('Free tonight');
+  s().setVibe('🥳');
+  s().goLive(me, '2026-03-02');
+  check('coming back to the same account keeps the note', [s().vibe, s().status], ['🥳', 'Free tonight']);
+  s().goLive({ ...me, id: 'u8' }, '2026-03-02');
+  check('another account starts without it', [s().vibe, s().status], [null, null]);
+  s().endSession();
+  check('and signing out clears it', [s().vibe, s().status], [null, null]);
   s().reset();
 }
 
@@ -2060,9 +2265,97 @@ console.log('\nInviting people');
   const shared = overlap([[{ start: 18, end: 22 }], [{ start: 17, end: 23 }]], 2);
   check('two free evenings intersect', shared, [{ start: 18, end: 22 }]);
   s().sendInvite({ title: 'Dinner with Amin and Ravi', date: s().today, startHour: 19, hours: 2, people: ['amin', 'ravi'] });
-  check('the gathering lands in your own week', s().items.length, before + 1);
+  const sent = s().invites.at(-1);
+  check('a plan is an invitation first, not yet in your week', s().items.length, before);
+  check('waiting on everyone asked', Object.keys(sent.answers), []);
+  s().demoTick(Date.parse(sent.sentAt) + 1000);
+  check('nobody answers in the first second', Object.keys(s().invites.at(-1).answers).length, 0);
+  s().demoTick(Date.parse(sent.sentAt) + DEMO_ANSWER_MS + 1);
+  check('then each one says yes or no', Object.keys(s().invites.at(-1).answers).sort(), ['amin', 'ravi']);
+  check('and you hear about it', s().notices.some((n) => n.title.includes('is in for Dinner')), true);
+  s().scheduleInvite(sent.id);
+  check('putting it in your week adds it once', s().items.length, before + 1);
   check('with a real time on it', s().items.at(-1).startHour, 19);
   check('counted as social load, not hidden', s().items.at(-1).bucket, 'social');
+  s().scheduleInvite(sent.id);
+  check('and only once', s().items.length, before + 1);
+  s().cancelInvite(sent.id);
+  check('calling it off takes it out of your week too', [s().items.length, s().invites.some((i) => i.id === sent.id)], [before, false]);
+
+  // Asked to someone else's plan.
+  const asked = s().received[0];
+  s().answerReceived(asked.id, true);
+  check('saying yes to a plan puts it in your week', s().items.some((i) => i.id === `going-${asked.id}` && i.startHour === asked.startHour), true);
+  s().answerReceived(asked.id, false);
+  check('changing your mind takes it out again', s().items.some((i) => i.id === `going-${asked.id}`), false);
+  check('and your answer is kept', s().received[0].answer, 'no');
+}
+
+console.log('\nFriends and groups, asked rather than added');
+{
+  s().reset();
+  const before = s().circle.length;
+  s().sendFriendRequest('nadia.rahman@uni.edu');
+  check('a request is waiting, not a friend', [s().requests.some((r) => r.direction === 'outgoing' && r.name === 'Nadia Rahman'), s().circle.length], [true, before]);
+  s().sendFriendRequest('nadia.rahman@uni.edu');
+  check('asking twice is one request', s().requests.filter((r) => r.direction === 'outgoing').length, 1);
+  const out = s().requests.find((r) => r.direction === 'outgoing');
+  s().demoTick(Date.parse(out.at) + DEMO_ANSWER_MS + 1);
+  check('when they say yes they are in your circle', s().circle.length, before + 1);
+  check('and you are told', s().notices[0].title, 'Nadia accepted your request');
+
+  const theirs = s().requests.find((r) => r.direction === 'incoming');
+  s().answerFriendRequest(theirs.userId, true);
+  check('accepting someone who asked adds them', s().circle.some((p) => p.id === theirs.userId), true);
+
+  const id = s().createGroup({ name: 'Gym buddies', emoji: '🏋️', members: [] });
+  s().inviteToGroup(id, ['amin', 'jo']);
+  const made = () => s().groups.find((g) => g.id === id);
+  check('a group invitation is not membership', [made().members, made().invited.map((i) => i.id)], [[], ['amin', 'jo']]);
+  s().cancelGroupInvite(id, 'jo');
+  check('an invitation can be taken back', made().invited.map((i) => i.id), ['amin']);
+  s().demoTick(Date.parse(made().invited[0].at) + DEMO_ANSWER_MS + 1);
+  check('saying yes makes them a member', [made().members, made().invited], [['amin'], []]);
+  check('and you hear who joined', s().notices[0].title, 'Amin joined Gym buddies');
+  s().removeGroupMember(id, 'amin');
+  check('a member can be taken out', made().members, []);
+
+  const invite = s().groupInvites[0];
+  s().answerGroupInvite(invite.id, true);
+  check('joining a group you were asked to', s().groups.some((g) => g.id === invite.id && g.owner === false), true);
+  check('the invitation is answered', s().groupInvites.length, 0);
+  s().reset();
+}
+
+console.log('\nThe bell and the quick update');
+{
+  s().reset();
+  const state = s();
+  const update = quickUpdate({ items: state.items, today: state.today, moods: state.moods, sleepHours: state.sleepHours });
+  check('the quick update counts what is waiting', update.count, update.toMark.length + update.auto.length + (update.checkIn ? 1 : 0));
+  check('including today\'s check-in until it is done', update.checkIn, true);
+  const list = () => bells({ items: s().items, today: s().today, requests: s().requests, groupInvites: s().groupInvites, received: s().received, circle: s().circle, notices: s().notices, restOwed: restOwedFrom(s().recovery), charge: charge(), update });
+  const kinds = list().map((b) => b.kind);
+  check('a friend request, a group invitation and a plan all ask you', ['friend', 'group', 'plan'].every((k) => kinds.includes(k)), true);
+  check('everything is new at first', unseen(list(), s().seenNotices), list().length);
+  s().seeNotices(list().map((b) => b.id));
+  check('and nothing once seen', unseen(list(), s().seenNotices), 0);
+  s().answerFriendRequest(s().requests.find((r) => r.direction === 'incoming').userId, false);
+  check('an answered request leaves the bell', list().some((b) => b.kind === 'friend'), false);
+  s().reset();
+}
+
+console.log('\nWhen to meet, in blocks the length of the plan');
+{
+  s().reset();
+  const days = [addDaysISO(s().today, 2)];
+  const people = s().circle.filter((p) => ['amin', 'ravi'].includes(p.id));
+  const blocks = freeBlocks(s().items, people, days, 3);
+  check('every block is the plan\'s length', blocks.every((b) => b.end - b.start === 3), true);
+  check('no two blocks overlap', blocks.every((b, i) => blocks.every((o, j) => i === j || b.end <= o.start || o.end <= b.start)), true);
+  check('green means everyone picked is free', blocks.filter((b) => b.everyone).every((b) => b.who.length === people.length), true);
+  check('blue means somebody, not nobody', blocks.filter((b) => !b.everyone).every((b) => b.who.length > 0), true);
+  check('nobody picked, nothing offered', freeBlocks(s().items, [], days, 3).length, 0);
 }
 
 rmSync(tmp, { recursive: true, force: true });

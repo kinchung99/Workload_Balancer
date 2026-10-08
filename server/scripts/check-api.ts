@@ -19,16 +19,19 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
-import type { Writer } from '../src/routes/compose.js';
+import { geminiWriter, type Writer } from '../src/routes/compose.js';
+import { ApiError as GeminiApiError, FinishReason, type GoogleGenAI } from '@google/genai';
 import { makeAuth } from '../src/lib/auth.js';
 import * as schema from '../src/db/schema.js';
 import type { Database } from '../src/db/client.js';
+import type { GroupDTO } from '../../shared/contract.js';
 
 process.env.NODE_ENV = 'test';
 process.env.AUTH_SECRET = 'test-secret-at-least-32-characters-long!!';
 process.env.BASE_URL = 'http://localhost';
 // The default app must not reach a real model from a test run, whatever the shell has set.
 delete process.env.ANTHROPIC_API_KEY;
+delete process.env.GEMINI_API_KEY;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -208,6 +211,46 @@ section('The circle');
   check('the request is no longer pending', gone.requests.length, 0);
 }
 
+section('Groups, by invitation');
+{
+  const groupsOf = async (cookie: string) => ((await (await call('/api/groups', {}, cookie)).json()) as { groups: GroupDTO[] }).groups;
+  check('groups need an account', (await call('/api/groups')).status, 401);
+
+  // Amira and Ravi are friends by now; Jo is a stranger to her.
+  const made = await (await post('/api/groups', { name: 'Study crew', emoji: '📚', invite: [ravi.id, jo.id] }, amira.cookie)).json() as { id: string; invited: number };
+  check('a group is made with its maker in it', (await groupsOf(amira.cookie)).map((g) => [g.name, g.you]), [['Study crew', 'member']]);
+  check('only friends can be invited', made.invited, 1);
+  check('a stranger gets nothing', (await groupsOf(jo.cookie)).length, 0);
+
+  const asked = await groupsOf(ravi.cookie);
+  check('the invitation reaches the friend, saying who asked', asked.map((g) => [g.name, g.you, g.invitedBy]), [['Study crew', 'invited', 'Amira Hassan']]);
+  check('and shows nobody inside until they say yes', asked[0].people.length, 0);
+  check('the maker sees them as invited, not in', (await groupsOf(amira.cookie))[0].people.map((p) => [p.name, p.status]), [['Ravi Patel', 'invited']]);
+  check('nobody can accept for somebody else', (await post(`/api/groups/${made.id}/respond`, { action: 'accept' }, amira.cookie)).status, 409);
+
+  await post(`/api/groups/${made.id}/respond`, { action: 'accept' }, ravi.cookie);
+  check('saying yes makes them a member', (await groupsOf(amira.cookie))[0].people.map((p) => p.status), ['member']);
+  check('and they see who is in it', (await groupsOf(ravi.cookie))[0].people.map((p) => p.name), ['Amira Hassan']);
+
+  check('a member cannot remove others', (await post(`/api/groups/${made.id}/remove`, { userId: amira.id }, ravi.cookie)).status, 403);
+  check('someone outside cannot invite into it', (await post(`/api/groups/${made.id}/invite`, { userIds: [jo.id] }, jo.cookie)).status, 404);
+  check('a member who did not make it cannot delete it', (await call(`/api/groups/${made.id}`, { method: 'DELETE' }, ravi.cookie)).status, 403);
+
+  check('but anyone can leave', (await post(`/api/groups/${made.id}/remove`, { userId: ravi.id }, ravi.cookie)).status, 200);
+  check('and is gone from it', (await groupsOf(ravi.cookie)).length, 0);
+
+  await post(`/api/groups/${made.id}/invite`, { userIds: [ravi.id] }, amira.cookie);
+  await post(`/api/groups/${made.id}/respond`, { action: 'decline' }, ravi.cookie);
+  check('saying no leaves no trace', [(await groupsOf(ravi.cookie)).length, (await groupsOf(amira.cookie))[0].people.length], [0, 0]);
+
+  await post(`/api/groups/${made.id}/invite`, { userIds: [ravi.id] }, amira.cookie);
+  await post(`/api/groups/${made.id}/remove`, { userId: ravi.id }, amira.cookie);
+  check('the maker can take an invitation back', (await groupsOf(ravi.cookie)).length, 0);
+
+  check('the maker can delete it', (await call(`/api/groups/${made.id}`, { method: 'DELETE' }, amira.cookie)).status, 200);
+  check('and it is gone for everyone', (await groupsOf(amira.cookie)).length, 0);
+}
+
 section('Guests, and friend codes');
 {
   // One tap, no form. The path a judge with ninety seconds actually takes.
@@ -335,6 +378,8 @@ section('Writing a message');
       seen.push(ctx);
       return [{ id: 'idea-walk', title: 'Walk somewhere green', detail: 'Physical has room', emoji: '🌳', area: 'physical', minutes: 30, from: 12, to: 19, tags: ['Costs nothing'] }];
     },
+    priority: async (ctx) => { seen.push(ctx); return { headline: 'Essay first, while you are fresh', picks: [{ id: ctx.tasks[0].id, why: 'Due tomorrow' }] }; },
+    rebalance: async (ctx) => { seen.push(ctx); return { headline: 'Drop the shift', picks: [{ id: ctx.options[0].id, why: 'Gives back the most', take: true }] }; },
   };
   const withWriter = createApp(db, auth, fake);
   const ask = (path: string, body: unknown, cookie?: string) =>
@@ -378,11 +423,88 @@ section('Writing a message');
   check('an unknown mood is refused', (await ask('/api/suggest/recovery', { context: { ...restContext, vibes: ['rave'] } }, amira.cookie)).status, 400);
   check('so is an area missing its number', (await ask('/api/suggest/recovery', { context: { ...restContext, areas: { mental: 10 } } }, amira.cookie)).status, 400);
 
+  // The coach: what to do first, what to put down, when to rest.
+  const priorityContext = {
+    now: 'Tue 3pm', charge: 47, restOwed: 11,
+    tasks: [{ id: 'essay', title: 'Essay draft', kind: 'owing', due: 'tomorrow', hoursLeft: 4, percentLeft: 60, dread: 4, hardness: 'hard' }],
+  };
+  check('what to do first needs an account', (await ask('/api/suggest/priority', { context: priorityContext })).status, 401);
+  const priority = await ask('/api/suggest/priority', { context: priorityContext }, amira.cookie);
+  check('what to do first comes back as a headline and picks',
+    (await priority.json()), { headline: 'Essay first, while you are fresh', picks: [{ id: 'essay', why: 'Due tomorrow' }] });
+  check('a task with no title is refused',
+    (await ask('/api/suggest/priority', { context: { ...priorityContext, tasks: [{ ...priorityContext.tasks[0], title: '' }] } }, amira.cookie)).status, 400);
+  const rebalanceContext = { charge: 22, options: [{ id: 't1', title: 'Pick up the shift', detail: 'Move it to someone else', saves: 12, day: 'Wed 12 Nov' }] };
+  const rebalance = await ask('/api/suggest/rebalance', { context: rebalanceContext }, amira.cookie);
+  check('what to put down comes back with a reason and a verdict',
+    ((await rebalance.json()) as { picks: unknown[] }).picks, [{ id: 't1', why: 'Gives back the most', take: true }]);
+  check('a swap with no names is refused',
+    (await ask('/api/suggest/rebalance', { context: { ...rebalanceContext, swap: { keep: '', drop: 'x', day: 'Wed' } } }, amira.cookie)).status, 400);
+
   // Thirty per ten minutes, per person. Jo has made none yet.
   let last = 0;
   for (let i = 0; i < 31; i += 1) last = (await ask('/api/compose/ideas', { context }, jo.cookie)).status;
   check('the thirty-first call in ten minutes is slowed down', last, 429);
   check('without affecting anyone else', (await ask('/api/compose/ideas', { context }, ravi.cookie)).status, 200);
+}
+
+section('Gemini, through Google AI Studio');
+{
+  const context = { kind: 'decline', subject: "Aisyah's birthday dinner", to: 'Aisyah', when: 'Thu 20 Nov', commitment: 'soft', dread: 3 };
+  const calls: Array<Record<string, any>> = [];
+  let reply: () => unknown = () => ({ text: JSON.stringify({ message: 'Hey, I can’t make it tonight - next week?' }), candidates: [{ finishReason: FinishReason.STOP }] });
+  const fakeGemini = { models: { generateContent: async (req: Record<string, any>) => { calls.push(req); return reply(); } } } as unknown as GoogleGenAI;
+  const gemini = createApp(db, auth, geminiWriter(fakeGemini, 'gemini-test'));
+  const ask = (path: string, body: unknown) =>
+    gemini.request(`http://localhost${path}`, {
+      method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', cookie: ravi.cookie },
+    });
+
+  const draft = await ask('/api/compose/draft', { context, intent: { title: 'Say no, kindly' }, tone: 'warm' });
+  check('a Gemini draft comes back like any other', ((await draft.json()) as { message: string }).message, 'Hey, I can’t make it tonight - next week?');
+  check('on the model configured', calls[0].model, 'gemini-test');
+  check('with the same rules as Claude', String(calls[0].config.systemInstruction).startsWith('You help a stressed university student'), true);
+  check('asking for JSON back', calls[0].config.responseMimeType, 'application/json');
+  check('in the draft\'s shape', calls[0].config.responseJsonSchema, { type: 'object', properties: { message: { type: 'string' } }, required: ['message'] });
+
+  reply = () => ({ text: JSON.stringify({ ideas: [{ title: 'Walk by the river', emoji: '🌳', detail: 'Physical has room', area: 'physical', minutes: 30, from: 12, to: 19, tags: ['Costs nothing'] }] }) });
+  const rest = await ask('/api/suggest/recovery', { context: { areas: { mental: 118, time: 64, physical: 22, social: 40, errands: 51 }, charge: 47, vibes: [], exclude: [] } });
+  check('recovery ideas parse from Gemini too', ((await rest.json()) as { ideas: Array<{ area: string }> }).ideas.map((i) => i.area), ['physical']);
+
+  // The order is the phone's; the model only explains it.
+  reply = () => ({ text: JSON.stringify({ headline: 'Essay, then the labs', picks: [
+    { id: 'made-up', why: 'Invented' }, { id: 'labs', why: 'Due Thursday.' }, { id: 'essay', why: 'Due tomorrow' }, { id: 'essay', why: 'Twice' },
+  ] }) });
+  const tasks = ['essay', 'labs'].map((id) => ({ id, title: id, kind: 'owing', hoursLeft: 3, dread: 3, hardness: 'hard' }));
+  const advice = (await (await ask('/api/suggest/priority', { context: { now: 'Tue 3pm', charge: 40, tasks } })).json()) as { picks: Array<{ id: string; why: string }> };
+  check('a reason naming nothing on the list is dropped, and repeats too', advice.picks.map((p) => p.id).sort(), ['essay', 'labs']);
+  check('and the reasons come back in the phone\'s order, not the model\'s', advice.picks.map((p) => p.id), ['essay', 'labs']);
+  check('short, with no full stop', advice.picks[1].why, 'Due Thursday');
+
+  reply = () => ({ text: JSON.stringify({ headline: 'Lighter', swap: 'You wanted the seminar more.', picks: [
+    { id: 'locked', why: 'x', take: true }, { id: 'open', why: 'Frees Wednesday evening', take: true }, { id: 'keep', why: 'Cheap to keep', take: false },
+  ] }) });
+  const options = [
+    { id: 'locked', title: 'Presentation', detail: 'Hard deadline', saves: 9, day: 'Thu', locked: true },
+    { id: 'open', title: 'Extra shift', detail: 'Swap it', saves: 6, day: 'Wed' },
+    { id: 'keep', title: 'Gym', detail: 'Move it', saves: 1, day: 'Fri' },
+  ];
+  const trade = (await (await ask('/api/suggest/rebalance', { context: { charge: 20, options } })).json()) as { picks: Array<{ id: string; take: boolean }>; swap?: string };
+  check('every trade gets a reason', trade.picks.map((p) => p.id), ['locked', 'open', 'keep']);
+  check('a locked trade is never taken, whatever the model says', trade.picks.map((p) => p.take), [false, true, false]);
+  check('no swap was asked about, so none is answered', trade.swap, undefined);
+  const withSwap = (await (await ask('/api/suggest/rebalance', { context: { charge: 20, options, swap: { keep: 'Seminar', drop: 'Shift', day: 'Wed' } } })).json()) as { swap?: string };
+  check('a swap gets its one line', withSwap.swap, 'You wanted the seminar more');
+
+  reply = () => ({ text: undefined, candidates: [{ finishReason: FinishReason.SAFETY }] });
+  check('a blocked answer is a decline the app can draft around', (await ask('/api/compose/ideas', { context })).status, 422);
+  reply = () => ({ text: 'not json at all' });
+  check('so is an answer that is not the shape asked for', (await ask('/api/compose/ideas', { context })).status, 422);
+  reply = () => { throw new GeminiApiError({ message: 'Resource exhausted', status: 429 }); };
+  const busy = await ask('/api/compose/ideas', { context });
+  check('a used-up free tier reads as busy, not broken', [busy.status, ((await busy.json()) as { error: string }).error], [503, 'busy']);
+  reply = () => { throw new GeminiApiError({ message: 'Bad key', status: 400 }); };
+  check('and any other Gemini failure as unavailable', (await ask('/api/compose/ideas', { context })).status, 502);
 }
 
 section('Gatherings');

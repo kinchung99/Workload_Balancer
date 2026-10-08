@@ -14,7 +14,7 @@
 import { useEffect } from 'react';
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { api, hasServer } from '@/lib/api';
-import { guestAllowed } from '@/lib/access';
+import { demoBuild, guestAllowed } from '@/lib/access';
 import { localISO } from '@/lib/marking';
 import { useStore } from '@/state/store';
 import { useHydrated } from './useHydrated';
@@ -31,7 +31,10 @@ export function useSession(): void {
       const me = await api.me();
       if (!live) return;
       const state = useStore.getState();
-      if (me.ok) {
+      if (me.ok && me.data.isGuest && state.guest && guestAllowed()) {
+        // A preview guest's AI pass (see lib/ai): a session for asking the
+        // model, never an account - the sample week stays on screen.
+      } else if (me.ok) {
         if (state.mode !== 'live' || state.account?.id !== me.data.id) state.goLive(me.data, localISO());
         else state.setAccount(me.data);
       } else if (state.lastAccountId && me.status === 401) {
@@ -73,7 +76,14 @@ export function useGate(): void {
     const now = useStore.getState();
     if (now.lastAccountId && !now.account && !now.sessionChecked) return;
     const allowed = !!now.account || (now.guest && guestAllowed());
-    const top = segments[0] ?? '';
+    const top: string = segments[0] ?? '';
+    if (!allowed && demoBuild()) {
+      // A demo link: straight into the sample week, set up already.
+      now.startGuest();
+      useStore.getState().finishOnboarding();
+      if (top === 'welcome' || top === 'setup') router.replace('/');
+      return;
+    }
     if (!allowed && !OPEN.has(top)) router.replace('/welcome');
   }, [navigation?.key, hydrated, waiting, account, guest, segments, router]);
 }

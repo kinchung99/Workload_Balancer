@@ -6,11 +6,12 @@ import {
 } from '@/components';
 import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
-import { BUCKETS, BUCKET_LABEL, bandFor } from '@/lib/load';
+import { BUCKETS, BUCKET_LABEL, REST_LOAD_PER_HOUR, bandFor, capacityOf } from '@/lib/load';
 import { formatHour, freeSlots, placeIn, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
-import { api, hasServer } from '@/lib/api';
+import { api } from '@/lib/api';
+import { ensureAi, useAiOpen } from '@/lib/ai';
 import { CATALOGUE, DURATIONS, VIBES, fromIdea, fromSeed, hoursFor, rankRest, type RestEntry } from '@/lib/rest';
 import type { Item } from '@/lib/types';
 import type { RestContext, VibeId } from '@shared/contract';
@@ -37,10 +38,10 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   const router = useRouter();
-  const { ceilings, today, booked, recovery, bookRecovery, mode, account, sleepHours } = useStore();
+  const { ceilings, today, booked, recovery, bookRecovery, mode, sleepHours } = useStore();
   const items = useItemsWithLogs();
   const reading = useReading();
-  const online = hasServer() && !!account;
+  const online = useAiOpen();
 
   const fullest = BUCKETS.reduce((a, b) => (reading.percents[a] >= reading.percents[b] ? a : b));
   const emptiest = BUCKETS.reduce((a, b) => (reading.percents[a] <= reading.percents[b] ? a : b));
@@ -83,7 +84,7 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   const fetchRound = async (moods: VibeId[], fresh: boolean) => {
     if (fresh) shown.current = [];
     const exclude = [...shown.current];
-    if (online) {
+    if (online && (await ensureAi())) {
       setLoading(true);
       const result = await api.restIdeas({
         areas: Object.fromEntries(
@@ -276,11 +277,11 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
             </Stack>
 
             <Stack direction="row" align="center" justify="between">
-              <View className="rounded-pill px-3 py-1" style={{ backgroundColor: source === 'claude' || loading ? color.area.mental.wash : color.surface.sunken }}>
-                <Text variant="micro" tone={source === 'claude' || loading ? 'default' : 'subtle'}>
-                  {loading ? '✨ ASKING CLAUDE…' : source === 'claude' ? '✨ IDEAS FROM CLAUDE' : '📱 IDEAS ON YOUR PHONE'}
-                </Text>
-              </View>
+              {source === 'claude' || loading ? (
+                <View className="rounded-pill px-3 py-1" style={{ backgroundColor: color.area.mental.wash }}>
+                  <Text variant="micro">{loading ? '✨ ASKING AI…' : '✨ IDEAS FROM AI'}</Text>
+                </View>
+              ) : <View />}
               {chosen ? <Text variant="micro" tone="subtle">ROUND {round} · {index + 1} OF {deck.length}</Text> : null}
             </Stack>
 
@@ -290,6 +291,7 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
               loading={loading}
               onNext={another}
               onPick={() => setStep(1)}
+              gain={chosen ? ((REST_LOAD_PER_HOUR * hours) / capacityOf(ceilings)) * 100 : undefined}
             />
 
             {/* Two small choices, shown as they are. */}

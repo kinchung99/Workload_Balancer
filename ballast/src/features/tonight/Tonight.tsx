@@ -8,13 +8,15 @@ import {
 } from '@/components';
 import { SCREEN } from '@design/screens';
 import {
-  ACTIONS, OFF_HOURS, PRESETS, customAction, initialSim, note, pointsOf, project, readout, totalPoints,
+  ACTIONS, OFF_HOURS, PRESETS, customAction, initialSim, note, planBlocks, planItem, pointsOf, readout,
 } from '@/lib/simulate';
+import { chargeExact } from '@/lib/checkin';
+import { capacityOf } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
 import { bandFor } from '@/lib/load';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
-import { daySchedule, formatHour, placeIn, sleepWindow, startOptions } from '@/lib/schedule';
+import { daySchedule, formatHour, freeSlots, placeIn, sleepWindow, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
 import type { Item } from '@/lib/types';
 import { color } from '@design/tokens';
@@ -42,11 +44,21 @@ const ART = [
  * charge back; a study session and late-night screen time take it. Nothing here
  * is a health claim: these are coefficients for one student's week, not advice.
  */
+/** A change to the battery as people say it: "+10%", "−27%". */
+const pctWord = (points: number): string => {
+  const rounded = Math.round(points);
+  return rounded > 0 ? `+${rounded}%` : rounded < 0 ? `−${-rounded}%` : '0%';
+};
+
 export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
   const router = useRouter();
-  const { today, applyPlan, clearPlan, offHour, setOffHour, customActions, addCustomAction, removeCustomAction } = useStore();
+  const {
+    today, applyPlan, clearPlan, offHour, setOffHour, customActions, addCustomAction, removeCustomAction,
+    items: stored, ceilings, meals, moods, errands, moments, sleepHours,
+  } = useStore();
   const items = useItemsWithLogs();
   const { overall } = useReading();
+  const capacity = capacityOf(ceilings);
 
   const now = chargeOf(overall);
   // The shipped five plus whatever the student added for their own evening.
@@ -59,31 +71,48 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
   /** Hours the student chose by hand, overriding where the app would put a block. */
   const [chosenHour, setChosenHour] = useState<Record<string, number>>({});
   const [pickingFor, setPickingFor] = useState<string | null>(null);
-  // One evening at a time. A plan that spans days is a rebalance, not a night.
-  const [day, setDay] = useState(today);
+  /** Free hours in an evening, from when the day becomes yours until eleven. */
+  const eveningFree = (date: string): number =>
+    freeSlots(items, date, 0.5)
+      .map((slot) => Math.max(0, Math.min(slot.end, 23) - Math.max(slot.start, offHour)))
+      .reduce((sum, hours) => sum + hours, 0);
+  const evenings = [today, addDays(today, 1), addDays(today, 2)];
+  // One evening at a time - starting on the first one that is actually free.
+  const [day, setDay] = useState(() => evenings.find((date) => eveningFree(date) >= 2) ?? today);
   const dayName = day === today ? 'Tonight' : day === addDays(today, 1) ? 'Tomorrow night' : formatShort(day);
   const [committed, setCommitted] = useState<{ blocks: number; points: number } | null>(null);
   const value = (id: string) => sim[id] ?? 0;
   const isPlanBlock = (id: string) => id.startsWith('plan-') && id.endsWith(`-${day}`);
 
-  const projected = project(now, sim, allActions);
-  const delta = totalPoints(sim, allActions);
-  const projectedLoad = 100 - projected;
+  /*
+   * Every part of the evening becomes a real block - rest that gives charge
+   * back, and a study session or late-night scrolling that costs it - and the
+   * projection is the battery measured with exactly those blocks in the week,
+   * by the same sum as everywhere else. So the number promised here is the
+   * number you get after booking. Sleep is the night, not a block: it lands as
+   * a log, like the check-in's.
+   */
+  const sleepAction = allActions.find((a) => a.logOnly)!;
+  const blocksFor = (state: Record<string, number>) => planBlocks(allActions, state);
+  const chargeWith = (state: Record<string, number>): number => {
+    const plan = blocksFor(state).map((block) => planItem(block, day));
+    const sleep = state[sleepAction.id] ?? sleepAction.baseline;
+    return chargeExact({
+      items: [...stored.filter((item) => !isPlanBlock(item.id)), ...plan],
+      ceilings, today, meals, moods, errands, moments,
+      sleepHours: sleep !== sleepAction.baseline ? sleep : sleepHours,
+    });
+  };
+  /** What one part of the evening does on its own, in battery points. */
+  const partOf = (action: (typeof allActions)[number], state: Record<string, number>): number =>
+    action.logOnly
+      ? chargeWith(state) - chargeWith({ ...state, [action.id]: action.baseline })
+      : (pointsOf(action, state[action.id] ?? action.baseline) / capacity) * 100;
 
-  // Only the actions that give charge back become blocks. A study session and
-  // late-night scrolling are things you do, not things worth protecting time for.
-  // Sleep is the night, not a block, so it is committed as a log instead.
-  const gains = allActions.filter((action) => !action.logOnly && pointsOf(action, value(action.id)) > 0).map((action) => {
-    const hours = action.unit === 'min' ? value(action.id) / 60 : Math.max(0.5, value(action.id) - action.baseline);
-    return {
-      id: action.id,
-      label: action.label,
-      bucket: action.bucket,
-      hours: Math.round(hours * 100) / 100,
-      credit: pointsOf(action, value(action.id)),
-      preferred: action.preferred,
-    };
-  });
+  const projected = Math.round(chargeWith(sim));
+  const delta = projected - now;
+  const projectedLoad = 100 - projected;
+  const gains = blocksFor(sim);
 
   // Blocks this plan would replace must not be treated as occupied, or pressing
   // apply twice makes the walk hop to a different hour each time.
@@ -111,12 +140,13 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
     return [...acc, { ...block, startHour: chosenHour[block.id] ?? suggested, suggested }];
   }, []);
 
-  const sleepAction = allActions.find((a) => a.logOnly)!;
   const sleepChanged = sim[sleepAction.id] !== sleepAction.baseline;
   // What a night of this length would actually mean in clock time.
   const night = sleepWindow(items, day, value(sleepAction.id));
   const firstTomorrow = daySchedule(items, addDays(day, 1)).timed[0];
-  const toBook = placed.filter((b) => b.startHour !== undefined);
+  // Booked whether or not a gap was found: a block with no time still costs, or
+  // gives back, what it says - it just waits in the day's list.
+  const toBook = placed;
 
   if (committed) {
     return (
@@ -148,7 +178,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
             <Stack direction="row" gap={4} align="center">
               <Sticker name="star" size={48} />
               <Stack gap={1} grow>
-                <Text variant="heading" tone="steady">+{committed.points} points</Text>
+                <Text variant="heading" tone="steady">{pctWord(committed.points)} battery</Text>
                 <Text variant="footnote" tone="muted">Protected time now.</Text>
               </Stack>
             </Stack>
@@ -177,9 +207,9 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
             step === 0
               ? `Plan ${dayName.toLowerCase()}`
               : step === 1
-                ? delta === 0 ? 'Pick a night first' : `See what ${delta > 0 ? '+' : ''}${delta} books`
+                ? delta === 0 ? 'Pick a night first' : 'Next'
                 : toBook.length || sleepChanged
-                  ? `${alreadyBooked.length ? 'Replace' : 'Book'} ${dayName.toLowerCase()} — ${toBook.length + (sleepChanged ? 1 : 0)} thing${toBook.length + (sleepChanged ? 1 : 0) === 1 ? '' : 's'}`
+                  ? `${alreadyBooked.length ? 'Replace' : 'Book'} · ${toBook.length + (sleepChanged ? 1 : 0)} thing${toBook.length + (sleepChanged ? 1 : 0) === 1 ? '' : 's'}`
                   : 'Pick a night first'
           }
           onBack={() => setStep(step - 1)}
@@ -207,9 +237,10 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
           <Stack gap={4}>
             {/* Which evening: three big tiles, one tap. */}
             <Stack direction="row" gap={3}>
-              {[today, addDays(today, 1), addDays(today, 2)].map((option) => {
+              {evenings.map((option) => {
                 const chosen = option === day;
                 const label = option === today ? 'Tonight' : option === addDays(today, 1) ? 'Tomorrow' : formatShort(option).slice(0, 3);
+                const free = Math.floor(eveningFree(option));
                 return (
                   <Pressable
                     key={option}
@@ -222,7 +253,9 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                     }`}
                   >
                     <Text variant="callout" weight="semibold" tone={chosen ? 'inverse' : 'default'}>{label}</Text>
-                    <Text variant="micro" tone={chosen ? 'inverse' : 'subtle'}>{formatShort(option).slice(4)}</Text>
+                    <Text variant="micro" tone={chosen ? 'inverse' : free >= 2 ? 'steady' : 'heavy'}>
+                      {free >= 1 ? `${free}h free` : 'Busy'}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -279,7 +312,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                   <Text variant="heading" tone={TONE[bandFor(overall)]}>{now}%</Text>
                 </Stack>
                 <Chip
-                  label={delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta}`}
+                  label={delta === 0 ? '—' : pctWord(delta)}
                   tone={delta > 0 ? 'steady' : delta < 0 ? 'heavy' : 'plain'}
                   readOnly
                 />
@@ -307,8 +340,8 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
             {/* Most people are choosing a kind of night, not dialling in sliders. */}
             <Section family="rest" title="Pick a night" sticker="moon">
               {PRESETS.map((preset) => {
-                const points = totalPoints(preset.state, allActions);
-                const outcome = project(now, preset.state, allActions);
+                const outcome = Math.round(chargeWith({ ...sim, ...preset.state }));
+                const points = outcome - now;
                 const active = ACTIONS.every((action) => sim[action.id] === preset.state[action.id]);
                 return (
                   <Pressable
@@ -336,7 +369,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                           {outcome}%
                         </Text>
                         <Text variant="micro" tone={points > 0 ? 'steady' : points < 0 ? 'heavy' : 'subtle'}>
-                          {points > 0 ? `+${points}` : points}
+                          {pctWord(points)}
                         </Text>
                       </Stack>
                     </Stack>
@@ -355,7 +388,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
               <Stack gap={4}>
                 {allActions.map((action) => {
                   const current = value(action.id);
-                  const { points } = note(action, current);
+                  const points = Math.round(partOf(action, sim));
                   return (
                     <Stack key={action.id} gap={2}>
                       <Stack direction="row" justify="between" align="center" gap={3}>
@@ -363,7 +396,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                         <Text variant="body" tone="muted">{readout(action, current)}</Text>
                         {points !== 0 ? (
                           <Text variant="micro" weight="semibold" tone={points > 0 ? 'steady' : 'heavy'}>
-                            {points > 0 ? '+' : ''}{points}
+                            {pctWord(points)}
                           </Text>
                         ) : null}
                       </Stack>
@@ -489,7 +522,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                     <Text variant="display" tone={TONE[bandFor(projectedLoad)]}>{projected}%</Text>
                   </Stack>
                   <Text variant="micro" tone={delta > 0 ? 'steady' : delta < 0 ? 'heavy' : 'subtle'}>
-                    {delta === 0 ? 'Nothing chosen yet' : `${delta > 0 ? '+' : ''}${delta} points`}
+                    {delta === 0 ? 'Nothing chosen yet' : `${pctWord(delta)} battery`}
                   </Text>
                 </Stack>
               </Stack>
@@ -514,8 +547,8 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                     </Text>
                   </Stack>
                   <Chip
-                    label={`${pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? '+' : ''}${pointsOf(sleepAction, sim[sleepAction.id])}`}
-                    tone={pointsOf(sleepAction, sim[sleepAction.id]) > 0 ? 'steady' : 'heavy'}
+                    label={pctWord(partOf(sleepAction, sim))}
+                    tone={partOf(sleepAction, sim) > 0 ? 'steady' : 'heavy'}
                     readOnly
                   />
                 </Stack>
@@ -532,10 +565,10 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                         <Text variant="micro" tone={block.startHour === undefined ? 'heavy' : 'subtle'}>
                           {block.startHour === undefined
                             ? `No gap after ${formatHour(offHour)} is long enough`
-                            : `${formatHour(block.startHour)}–${formatHour(block.startHour + block.hours)} · protected`}
+                            : `${formatHour(block.startHour)}–${formatHour(block.startHour + block.hours)}${block.credit > 0 ? ' · protected' : ''}`}
                         </Text>
                       </Stack>
-                      <Chip label={`+${block.credit}`} tone="steady" readOnly />
+                      <Chip label={pctWord((block.credit / capacity) * 100)} tone={block.credit > 0 ? 'steady' : 'heavy'} readOnly />
                       {options.length ? (
                         <Chip
                           label={picking ? 'Close' : 'Change time'}

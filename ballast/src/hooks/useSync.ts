@@ -22,6 +22,7 @@ import { diff, snapshotOf, type Snapshot } from '@/state/snapshot';
 import { useStore } from '@/state/store';
 import { readingFrom } from '@/state/selectors';
 import { logItems } from '@/lib/logs';
+import { presenceLine, splitPresence } from '@/lib/checkin';
 
 /** How often to look for other people's changes when nothing of ours moved. */
 const PULL_EVERY_MS = 60_000;
@@ -93,11 +94,16 @@ export function useSync(): void {
        * ever as true as their last check-in. Pulling it fresh each round makes
        * "22 min ago" mean what it says.
        */
-      const [people, pending] = await Promise.all([api.circle(), api.requests()]);
+      const [people, pending, shared, plans] = await Promise.all([api.circle(), api.requests(), api.groups(), api.invites()]);
+      const me = useStore.getState().account?.id ?? '';
+      if (shared.ok) useStore.getState().setGroupsFromServer(shared.data.groups, me);
+      if (plans.ok) useStore.getState().setInvitesFromServer(plans.data.invites, me);
       if (people.ok) {
         useStore.getState().setCircle(people.data.circle.map((p) => ({
           id: p.id, name: p.name, initials: p.initials, band: p.band,
-          charge: p.charge ?? undefined, status: p.status ?? undefined,
+          charge: p.charge ?? undefined,
+          // Their emoji rides at the front of their line; it goes back on their picture.
+          ...splitPresence(p.status),
           heavyForDays: p.heavyForDays,
           updatedMinsAgo: p.updatedMinsAgo ?? undefined,
           free: p.free,
@@ -170,7 +176,7 @@ export function useSync(): void {
       await api.publishPresence({
         band: bandFor(reading.overall),
         charge: chargeOf(reading.overall),
-        status: state.status,
+        status: presenceLine(state.vibe, state.status),
         heavyForDays: 0,
       });
 
@@ -187,6 +193,10 @@ export function useSync(): void {
 
     void publish();
     const every = setInterval(() => void publish(), 5 * 60_000);
-    return () => clearInterval(every);
+    // A note you just shared should not wait five minutes to be seen.
+    const unsubscribe = useStore.subscribe((state, prev) => {
+      if (state.status !== prev.status || state.vibe !== prev.vibe) void publish();
+    });
+    return () => { clearInterval(every); unsubscribe(); };
   }, []);
 }

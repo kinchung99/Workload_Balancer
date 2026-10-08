@@ -12,22 +12,29 @@ import type {
   BucketKey, CircleMember, Contact, ContributionTag, DayReport, Dread, Errand, Item, Meal, MealStatus, MoodCheckIn,
   MoodQuadrant, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
   RecoveryEntry, SimAction, Trade, Mix, CustomFlag, FlagId, Group, PlanActivity, ShareRules, ShareWindow, Outcome,
+  GroupInvite, Notice, ReceivedInvite,
 } from '@/lib/types';
 import { DEFAULT_SHARE_RULES, type PhoneContact, type ShareMode } from '@/lib/sharing';
-import type { Collection, MeDTO, PendingRequestDTO } from '@shared/contract';
+import type { Collection, GroupDTO, InviteDTO, MeDTO, PendingRequestDTO } from '@shared/contract';
+import { DEMO_ANSWER_MS, firstName, initialsOf, nameFromEmail } from '@/lib/people';
 import { DEFAULT_CEILINGS, DEFAULT_OVERALL_CEILING } from '@/lib/load';
 import { mergeInto } from './snapshot';
-import { loadOf, percentByBucket, overallPercent, isMovable, recalibrate } from '@/lib/load';
+import { REST_LOAD_PER_HOUR, loadOf, percentByBucket, overallOf, isMovable, recalibrate } from '@/lib/load';
 import { applySelection } from '@/lib/rebalance';
 import { completionCredit } from '@/lib/errands';
-import { customFlagId } from '@/lib/timetable';
+import { classItems, customFlagId, type ClassSlot } from '@/lib/timetable';
 import { applyMark, applyRegister, autoMark } from '@/lib/marking';
+import { countedOnce } from '@/lib/prep';
+import { upsertMeal } from '@/lib/checkin';
+import { SLEEP_TARGET } from '@/lib/logs';
 import { isSameWeek, addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
+import { planItem } from '@/lib/simulate';
 import {
   CEILINGS, OVERALL_CEILING, TODAY, circle as seedCircle, contacts as seedContacts,
   customActions as seedCustomActions, errands as seedErrands, meals as seedMeals, modules as seedModules,
   moodHistory, phoneContacts as seedPhoneContacts, recoveryLedger, seedItems, groups as seedGroups,
+  friendRequests as seedRequests, groupInvites as seedGroupInvites, receivedInvites as seedReceived, sentInvites as seedSent,
 } from '@/data/seed';
 
 /**
@@ -122,6 +129,8 @@ interface State {
    * chose says something a number cannot.
    */
   status: string | null;
+  /** The emoji you picked for your note, on the corner of your picture. */
+  vibe: string | null;
   /**
    * Friend requests waiting on an answer, in live mode.
    *
@@ -129,6 +138,14 @@ interface State {
    * door without every screen that shows it making its own request.
    */
   requests: PendingRequestDTO[];
+  /** Groups somebody asked you into, waiting on your answer. */
+  groupInvites: GroupInvite[];
+  /** Plans other people made and asked you to. */
+  received: ReceivedInvite[];
+  /** Things that happened, newest first. */
+  notices: Notice[];
+  /** Notification ids already seen, so the bell counts only what is new. */
+  seenNotices: string[];
   /**
    * Your picture: a photo (an image URI) or an emoji you chose instead.
    * Null shows your initials on your ring. A fact about you, so it survives a reload.
@@ -170,10 +187,35 @@ interface State {
   removeActivity: (id: string, groupId?: string) => void;
   setAccount: (account: MeDTO | null) => void;
   setStatus: (status: string | null) => void;
+  setVibe: (vibe: string | null) => void;
   goLive: (account: MeDTO, today: string) => void;
   /** The circle as the server last reported it. Seeded in demo, fetched in live. */
   setCircle: (circle: CircleMember[]) => void;
   setRequests: (requests: PendingRequestDTO[]) => void;
+  /** Ask someone to be friends. They are not in your circle until they say yes. */
+  sendFriendRequest: (email: string, name?: string, id?: string) => void;
+  /** Your answer to someone who asked - or taking back your own request. */
+  answerFriendRequest: (userId: string, accept: boolean) => void;
+  /** Ask friends into a group. They join only when they say yes. */
+  inviteToGroup: (groupId: string, friendIds: string[]) => void;
+  cancelGroupInvite: (groupId: string, friendId: string) => void;
+  removeGroupMember: (groupId: string, friendId: string) => void;
+  /** Your answer to a group somebody asked you into. */
+  answerGroupInvite: (id: string, accept: boolean) => void;
+  addNotice: (notice: Omit<Notice, 'id' | 'at'>) => void;
+  seeNotices: (ids: string[]) => void;
+  /** The sample week's friends answering, a few seconds after being asked. */
+  demoTick: (now: number) => void;
+  /** Groups as the server holds them, in a signed-in week. */
+  setGroupsFromServer: (groups: GroupDTO[], me: string) => void;
+  /** A plan you sent, into your own week - once enough people said yes. */
+  scheduleInvite: (id: string) => void;
+  /** Call a plan off: gone for everyone, and out of your week. */
+  cancelInvite: (id: string) => void;
+  /** Yes or no to a plan you were asked to. Yes puts it in your week. */
+  answerReceived: (id: string, yes: boolean) => void;
+  /** Plans as the server holds them, sent and received, in a signed-in week. */
+  setInvitesFromServer: (invites: InviteDTO[], me: string) => void;
   goDemo: () => void;
   hydrate: (upserts: Map<Collection, Array<{ id: string; data: unknown }>>, deletes: Map<Collection, string[]>) => void;
   setShowEverything: (value: boolean) => void;
@@ -182,7 +224,7 @@ interface State {
   bookRecovery: (prescription: Prescription, startHour: number, hours: number, date?: string) => void;
   markContacted: (id: string) => void;
   logSleep: (hours: number) => void;
-  sendInvite: (invite: Omit<Invite, 'id'>) => void;
+  sendInvite: (invite: Omit<Invite, 'id'> & { id?: string }) => void;
   logMoment: (kind: string, bucket: BucketKey, credit: number, note?: string) => void;
   logProgress: (id: string, hours: number) => void;
   moveItem: (id: string, date: string) => void;
@@ -228,6 +270,12 @@ interface State {
   endSession: () => void;
   setSessionChecked: () => void;
   importTimetable: (items: Item[], modules: Module[]) => void;
+  /** A module made by hand, ready for its classes. Returns its id. */
+  addModule: (module: Pick<Module, 'name' | 'code' | 'emoji' | 'weeks' | 'startDate' | 'requiredAttendance'> & { dread?: Dread }) => string;
+  removeModule: (moduleId: string) => void;
+  /** A weekly class, into this week and the next. Adding the same one twice does nothing. */
+  addClass: (moduleId: string, slot: ClassSlot) => void;
+  removeClass: (moduleId: string, day: number, startHour: number) => void;
   reportDay: (felt: 'fine' | 'meh' | 'hard', percent: number, verdict?: DayReport['verdict']) => void;
   logMood: (quadrant: MoodQuadrant, tags: ContributionTag[]) => void;
   setMealStatus: (id: string, status: MealStatus) => void;
@@ -247,6 +295,25 @@ interface State {
   reset: () => void;
 }
 
+/** Someone who said yes, as a circle member, before their first reading arrives. */
+const newFriend = (request: PendingRequestDTO): CircleMember => ({
+  id: request.userId, name: request.name, initials: request.initials, band: 'steady', charge: 72, updatedMinsAgo: 1, frequency: 0,
+});
+
+/** A plan as the block it becomes in your week. */
+const planAsItem = (plan: { id: string; title: string; date: string; startHour: number; hours: number }): Item => ({
+  id: plan.id, title: plan.title, bucket: 'social', hours: plan.hours, dread: 1, commitment: 'soft', date: plan.date, startHour: plan.startHour,
+});
+
+/** "Dinner with Amin and Ravi" → "Dinner", for a line that has to stay short. */
+const shortTitle = (title: string): string => title.split(/ with | · /)[0] ?? title;
+
+let noticeCount = 0;
+/** One thing that happened, stamped now. */
+const notice = (emoji: string, title: string, to?: string, body?: string): Notice => ({
+  id: `n-${Date.now().toString(36)}-${(noticeCount += 1)}`, at: new Date().toISOString(), emoji, title, ...(to ? { to } : {}), ...(body ? { body } : {}),
+});
+
 export const useStore = create<State>()(
   persist(
     (set) => ({
@@ -265,7 +332,7 @@ export const useStore = create<State>()(
   recovery: recoveryLedger,
   booked: [],
   sleepHours: null,
-  invites: [],
+  invites: seedSent,
   moments: [],
   offHour: 17,
   customActions: seedCustomActions,
@@ -281,8 +348,13 @@ export const useStore = create<State>()(
   planActivities: [],
   account: null,
   mode: 'demo',
-  requests: [],
+  requests: seedRequests,
+  groupInvites: seedGroupInvites,
+  received: seedReceived,
+  notices: [],
+  seenNotices: [],
   status: null,
+  vibe: null,
   pic: null,
   marksSnoozed: false,
   guest: false,
@@ -397,21 +469,152 @@ export const useStore = create<State>()(
    * already been through.
    */
   goLive: (account, today) =>
-    set({
+    set((state) => ({
       mode: 'live', account, today, guest: false, lastAccountId: account.id,
+      // Your note is yours: coming back to the same account keeps it.
+      status: state.lastAccountId === account.id ? state.status : null,
+      vibe: state.lastAccountId === account.id ? state.vibe : null,
       items: [], errands: [], modules: [], moods: [], meals: [], moments: [],
       recovery: [], contacts: [], dayReports: [], booked: [], invites: [],
-      circle: [], phoneContacts: [], customActions: [], requests: [], status: null,
+      circle: [], phoneContacts: [], customActions: [], requests: [], groupInvites: [], received: [], notices: [],
       sleepHours: null, showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: DEFAULT_CEILINGS, overallCeiling: DEFAULT_OVERALL_CEILING,
       sharing: 'evenings', offHour: 17,
       shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: [], planActivities: [],
-    }),
+    })),
 
   /** Back to the interface study. What the public link shows, and what the checks assert. */
   setStatus: (status) => set({ status: status && status.trim() ? status.trim() : null }),
+  setVibe: (vibe) => set({ vibe }),
   setCircle: (circle) => set({ circle }),
   setRequests: (requests) => set({ requests }),
+
+  sendFriendRequest: (email, name, id) =>
+    set((state) => {
+      const key = id ?? `email-${email.trim().toLowerCase()}`;
+      if (state.requests.some((r) => r.userId === key) || state.circle.some((p) => p.id === key)) return {};
+      const shown = name ?? nameFromEmail(email.trim());
+      return {
+        requests: [...state.requests, { userId: key, name: shown, initials: initialsOf(shown), direction: 'outgoing' as const, at: new Date().toISOString() }],
+      };
+    }),
+
+  answerFriendRequest: (userId, accept) =>
+    set((state) => {
+      const request = state.requests.find((r) => r.userId === userId);
+      if (!request) return {};
+      const requests = state.requests.filter((r) => r.userId !== userId);
+      if (!accept || request.direction === 'outgoing') return { requests };
+      return {
+        requests,
+        circle: [...state.circle, newFriend(request)],
+        phoneContacts: state.phoneContacts.map((c) => (c.id === userId ? { ...c, added: true } : c)),
+        notices: [notice('🤝', `You and ${firstName(request.name)} are friends`, '/friends'), ...state.notices].slice(0, 40),
+      };
+    }),
+
+  inviteToGroup: (groupId, friendIds) =>
+    set((state) => ({
+      groups: state.groups.map((g) => {
+        if (g.id !== groupId) return g;
+        const asked = new Set([...g.members, ...(g.invited ?? []).map((i) => i.id)]);
+        const at = new Date().toISOString();
+        const fresh = [...new Set(friendIds)].filter((id) => !asked.has(id)).map((id) => ({ id, at }));
+        return { ...g, invited: [...(g.invited ?? []), ...fresh] };
+      }),
+    })),
+
+  cancelGroupInvite: (groupId, friendId) =>
+    set((state) => ({
+      groups: state.groups.map((g) => (g.id !== groupId ? g : { ...g, invited: (g.invited ?? []).filter((i) => i.id !== friendId) })),
+    })),
+
+  removeGroupMember: (groupId, friendId) =>
+    set((state) => ({
+      groups: state.groups.map((g) => (g.id !== groupId ? g : { ...g, members: g.members.filter((m) => m !== friendId) })),
+    })),
+
+  answerGroupInvite: (id, accept) =>
+    set((state) => {
+      const invite = state.groupInvites.find((i) => i.id === id);
+      if (!invite) return {};
+      const groupInvites = state.groupInvites.filter((i) => i.id !== id);
+      if (!accept) return { groupInvites };
+      const known = new Set(state.circle.map((p) => p.id));
+      return {
+        groupInvites,
+        groups: [...state.groups, { id: invite.id, name: invite.name, emoji: invite.emoji, members: (invite.members ?? []).filter((m) => known.has(m)), owner: false }],
+        notices: [notice(invite.emoji, `You joined ${invite.name}`, `/group/${invite.id}`), ...state.notices].slice(0, 40),
+      };
+    }),
+
+  addNotice: (made) => set((state) => ({ notices: [notice(made.emoji, made.title, made.to, made.body), ...state.notices].slice(0, 40) })),
+
+  seeNotices: (ids) =>
+    set((state) => {
+      const fresh = ids.filter((id) => !state.seenNotices.includes(id));
+      return fresh.length ? { seenNotices: [...state.seenNotices, ...fresh].slice(-300) } : {};
+    }),
+
+  /*
+   * Nobody in the sample week is real, so nobody can say yes. They answer by
+   * themselves a few seconds after being asked, which is what lets the whole
+   * ask-then-wait-then-join loop be tried out.
+   */
+  demoTick: (now) =>
+    set((state) => {
+      if (state.mode !== 'demo') return {};
+      const ready = (at: string) => now - Date.parse(at) >= DEMO_ANSWER_MS;
+      const answered = state.requests.filter((r) => r.direction === 'outgoing' && ready(r.at));
+      const joined = state.groups.flatMap((g) => (g.invited ?? []).filter((i) => ready(i.at)).map((i) => ({ group: g, id: i.id })));
+      // Guests of a plan you sent answer too: yes, unless they are running on empty.
+      const replies = state.invites.flatMap((invite) => (invite.sentAt && ready(invite.sentAt)
+        ? invite.people.filter((id) => !invite.answers?.[id]).map((id) => ({
+          invite, id, yes: (state.circle.find((p) => p.id === id)?.charge ?? 60) >= 30,
+        }))
+        : []));
+      if (!answered.length && !joined.length && !replies.length) return {};
+      const names = Object.fromEntries(state.circle.map((p) => [p.id, p.name]));
+      const fresh: Notice[] = [
+        ...answered.map((r) => notice('🎉', `${firstName(r.name)} accepted your request`, '/friends', 'Now in your circle')),
+        ...joined.map(({ group, id }) => notice(group.emoji, `${firstName(names[id] ?? 'A friend')} joined ${group.name}`, `/group/${group.id}`)),
+        ...replies.map(({ invite, id, yes }) => notice(yes ? '✅' : '❌', `${firstName(names[id] ?? 'A friend')} ${yes ? 'is in for' : "can't make"} ${shortTitle(invite.title)}`, '/plans')),
+      ];
+      return {
+        requests: state.requests.filter((r) => !answered.includes(r)),
+        circle: [...state.circle, ...answered.map(newFriend)],
+        groups: state.groups.map((g) => {
+          const mine = joined.filter((j) => j.group.id === g.id).map((j) => j.id);
+          return mine.length
+            ? { ...g, members: [...g.members, ...mine], invited: (g.invited ?? []).filter((i) => !mine.includes(i.id)) }
+            : g;
+        }),
+        invites: state.invites.map((invite) => {
+          const mine = replies.filter((r) => r.invite.id === invite.id);
+          return mine.length
+            ? { ...invite, answers: { ...invite.answers, ...Object.fromEntries(mine.map((r) => [r.id, r.yes ? 'yes' as const : 'no' as const])) } }
+            : invite;
+        }),
+        notices: [...fresh, ...state.notices].slice(0, 40),
+      };
+    }),
+
+  setGroupsFromServer: (dtos, me) =>
+    set((state) => ({
+      groups: dtos.filter((g) => g.you === 'member').map((g) => ({
+        id: g.id,
+        name: g.name,
+        emoji: g.emoji,
+        owner: g.ownerId === me,
+        members: g.people.filter((p) => p.status === 'member').map((p) => p.id),
+        invited: g.people.filter((p) => p.status === 'invited').map((p) => ({ id: p.id, at: '' })),
+        // Usual activities are yours, kept on the phone; the server keeps who is in it.
+        activities: state.groups.find((old) => old.id === g.id)?.activities,
+      })),
+      groupInvites: dtos.filter((g) => g.you === 'invited').map((g) => ({
+        id: g.id, name: g.name, emoji: g.emoji, from: g.invitedBy ?? 'A friend', at: '',
+      })),
+    })),
 
 
   goDemo: () =>
@@ -420,7 +623,8 @@ export const useStore = create<State>()(
       items: SEEDED.items, moods: moodHistory, meals: seedMeals, errands: seedErrands,
       contacts: seedContacts, recovery: recoveryLedger, modules: SEEDED.modules,
       circle: seedCircle, phoneContacts: seedPhoneContacts, customActions: seedCustomActions,
-      requests: [], booked: [], dayReports: [], invites: [], moments: [], sleepHours: null, status: null,
+      requests: seedRequests, groupInvites: seedGroupInvites, received: seedReceived, notices: [],
+      booked: [], dayReports: [], invites: seedSent, moments: [], sleepHours: null, status: null, vibe: null,
       showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: CEILINGS, overallCeiling: OVERALL_CEILING, sharing: 'evenings', offHour: 17,
       shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups, planActivities: [],
@@ -501,8 +705,8 @@ export const useStore = create<State>()(
     set((state) => {
       // One block per prescription. Booking the same walk twice is not two walks.
       if (state.booked.includes(prescription.id)) return {};
-      // Credit scales with how long you actually give it, not a fixed figure.
-      const credit = Math.round(prescription.credit * hours * 10) / 10;
+      // An hour of rest gives back the same everywhere, scaled by how long.
+      const credit = Math.round(REST_LOAD_PER_HOUR * hours * 10) / 10;
       return {
         booked: [...state.booked, prescription.id],
         items: [
@@ -530,7 +734,8 @@ export const useStore = create<State>()(
             id: `booked-${prescription.id}`,
             label: prescription.title,
             detail: `Booked for ${formatHour(startHour)}${date && date !== state.today ? ` on ${date.slice(8)}` : ''}`,
-            hours: credit,
+            // The rest bank counts hours of rest.
+            hours: Math.round(hours * 10) / 10,
             emoji: prescription.emoji ?? '🌿',
             tag: `Booked · ${formatHour(startHour)}`,
           },
@@ -561,27 +766,16 @@ export const useStore = create<State>()(
         ...(sleepHours === undefined ? {} : { sleepHours }),
         items: [
           ...state.items.filter((item) => !isPlanBlock(item.id)),
-          ...blocks.map((block, index) => ({
-            id: ids[index],
-            title: block.label,
-            bucket: block.bucket,
-            hours: block.hours,
-            dread: 1 as const,
-            commitment: 'self' as const,
-            date: day,
-            startHour: block.startHour,
-            isRecovery: true,
-            // Same rule as a booked prescription: rest is worth its credit.
-            loadOverride: -block.credit,
-          })),
+          ...blocks.map((block) => planItem(block, day)),
         ],
+        // The rest bank counts hours of rest, so only the rest goes in it.
         recovery: [
-          ...blocks.map((block, index) => ({
+          ...blocks.flatMap((block, index) => (block.credit > 0 ? [{
             id: ids[index],
             label: block.label,
             detail: 'From tonight’s plan',
-            hours: block.credit,
-          })),
+            hours: block.hours,
+          }] : [])),
           ...state.recovery.filter((row) => !isPlanBlock(row.id)),
         ],
       };
@@ -596,6 +790,41 @@ export const useStore = create<State>()(
    * at once - which is the only way the number stays honest without asking for a
    * rating on all fourteen contact hours.
    */
+  addModule: (module) => {
+    const slug = module.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'module';
+    const id = `mod-${slug}-${Date.now().toString(36)}`;
+    set((state) => ({
+      modules: [...state.modules, {
+        id, name: module.name.trim(), code: (module.code ?? '').trim().toUpperCase() || module.name.trim().slice(0, 6).toUpperCase(),
+        emoji: module.emoji, weeks: module.weeks, startDate: module.startDate, requiredAttendance: module.requiredAttendance,
+        dread: module.dread ?? 2, importance: 2, attended: 0, held: 0,
+      }],
+    }));
+    return id;
+  },
+
+  removeModule: (moduleId) =>
+    set((state) => ({
+      modules: state.modules.filter((m) => m.id !== moduleId),
+      items: state.items.filter((item) => item.moduleId !== moduleId),
+    })),
+
+  addClass: (moduleId, slot) =>
+    set((state) => {
+      const module = state.modules.find((m) => m.id === moduleId);
+      if (!module) return {};
+      const taken = new Set(state.items.map((item) => item.id));
+      const fresh = classItems(module, slot, state.today).filter((item) => !taken.has(item.id));
+      return fresh.length ? { items: [...state.items, ...fresh] } : {};
+    }),
+
+  removeClass: (moduleId, day, startHour) =>
+    set((state) => ({
+      items: state.items.filter((item) => !(
+        item.moduleId === moduleId && item.startHour === startHour && (new Date(`${item.date}T00:00:00Z`).getUTCDay() + 6) % 7 === day
+      )),
+    })),
+
   setModuleDread: (moduleId, dread) =>
     set((state) => ({
       modules: state.modules.map((m) => (m.id === moduleId ? { ...m, dread } : m)),
@@ -894,7 +1123,24 @@ export const useStore = create<State>()(
     })),
 
   /** One tap on waking. The battery moves before you put the phone down. */
-  logSleep: (hours) => set({ sleepHours: hours }),
+  /**
+   * Last night, in both places it belongs: the battery (through today's log)
+   * and the rest bank, where a short night is rest owed and a long one is
+   * rest banked - against the same seven hours the battery uses.
+   */
+  logSleep: (hours) =>
+    set((state) => {
+      const id = `sleep-${state.today}`;
+      const kept = state.recovery.filter((row) => row.id !== id);
+      const banked = Math.round((hours - SLEEP_TARGET) * 10) / 10;
+      return {
+        sleepHours: hours,
+        recovery: banked === 0 ? kept : [
+          { id, label: 'Last night', detail: `${hours}h of sleep`, hours: banked, emoji: '😴', tag: `${hours}h slept` },
+          ...kept,
+        ],
+      };
+    }),
 
   /**
    * Proposing a gathering puts it in your own week straight away. Seeing people
@@ -911,26 +1157,63 @@ export const useStore = create<State>()(
           existing.people.join() === invite.people.join(),
       );
       if (duplicate) return {};
-      const id = `invite-${invite.date}-${invite.startHour}-${invite.people.join('-')}`;
+      const id = invite.id ?? `invite-${invite.date}-${invite.startHour}-${invite.people.join('-')}`;
       return {
-        invites: [...state.invites, { ...invite, id }],
+        // An invitation, not yet a plan: it goes in your week when you say so,
+        // usually once the people you asked have said yes.
+        invites: [...state.invites, { ...invite, id, answers: invite.answers ?? {}, sentAt: new Date().toISOString() }],
         // Planning with people is the other thing that makes them frequent.
         circle: state.circle.map((p) => (invite.people.includes(p.id) ? { ...p, frequency: (p.frequency ?? 0) + 1 } : p)),
-        items: [
-          ...state.items,
-          {
-            id,
-            title: invite.title,
-            bucket: 'social',
-            hours: invite.hours,
-            dread: 1,
-            commitment: 'soft',
-            date: invite.date,
-            startHour: invite.startHour,
-          },
-        ],
       };
     }),
+
+  scheduleInvite: (id) =>
+    set((state) => {
+      const invite = state.invites.find((i) => i.id === id);
+      if (!invite || state.items.some((item) => item.id === id)) return {};
+      return {
+        invites: state.invites.map((i) => (i.id === id ? { ...i, scheduled: true } : i)),
+        items: [...state.items, planAsItem(invite)],
+      };
+    }),
+
+  cancelInvite: (id) =>
+    set((state) => ({
+      invites: state.invites.filter((i) => i.id !== id),
+      items: state.items.filter((item) => item.id !== id),
+    })),
+
+  answerReceived: (id, yes) =>
+    set((state) => {
+      const invite = state.received.find((r) => r.id === id);
+      if (!invite) return {};
+      const itemId = `going-${id}`;
+      return {
+        received: state.received.map((r) => (r.id === id ? { ...r, answer: yes ? 'yes' as const : 'no' as const } : r)),
+        items: yes
+          ? [...state.items.filter((item) => item.id !== itemId), planAsItem({ ...invite, id: itemId })]
+          : state.items.filter((item) => item.id !== itemId),
+      };
+    }),
+
+  setInvitesFromServer: (dtos, me) =>
+    set((state) => ({
+      invites: dtos.filter((d) => d.fromMe).map((d) => ({
+        id: d.id, title: d.title, date: d.date, startHour: d.startHour, hours: d.hours,
+        people: d.guests.map((g) => g.id),
+        answers: Object.fromEntries(d.guests.filter((g) => g.response !== 'pending').map((g) => [g.id, g.response as 'yes' | 'no'])),
+        scheduled: state.items.some((item) => item.id === d.id),
+        groupId: state.invites.find((i) => i.id === d.id)?.groupId,
+      })),
+      received: dtos.filter((d) => !d.fromMe).map((d) => {
+        const mine = d.guests.find((g) => g.id === me)?.response;
+        return {
+          id: d.id, title: d.title, date: d.date, startHour: d.startHour, hours: d.hours, from: d.host.name,
+          others: d.guests.filter((g) => g.id !== me).map((g) => ({ id: g.id, name: g.name, ...(g.response === 'pending' ? {} : { answer: g.response as 'yes' | 'no' }) })),
+          ...(mine && mine !== 'pending' ? { answer: mine as 'yes' | 'no' } : {}),
+        };
+      }),
+    })),
 
   /**
    * "Actually, I'm going." Going is not the wrong answer, so the week re-plans
@@ -958,8 +1241,9 @@ export const useStore = create<State>()(
       ],
     })),
 
+  // A signed-in week starts with no meals, so the first answer adds the meal.
   setMealStatus: (id, status) =>
-    set((state) => ({ meals: state.meals.map((m) => (m.id === id ? { ...m, status } : m)) })),
+    set((state) => ({ meals: upsertMeal(state.meals, id, status) })),
 
   /**
    * Ticking one off. Yours stops costing you; a seeded one pays out its weight
@@ -1025,9 +1309,10 @@ export const useStore = create<State>()(
       items: SEEDED.items, showEverythingAnyway: false, minimumViableWeek: false,
       moods: moodHistory, meals: seedMeals, errands: seedErrands, contacts: seedContacts,
       recovery: recoveryLedger, booked: [], dayReports: [],
-      sleepHours: null, invites: [], moments: [], offHour: 17, customActions: seedCustomActions, modules: SEEDED.modules,
+      sleepHours: null, invites: seedSent, moments: [], offHour: 17, customActions: seedCustomActions, modules: SEEDED.modules,
       circle: seedCircle, phoneContacts: seedPhoneContacts, sharing: 'evenings',
       shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups, planActivities: [],
+      requests: seedRequests, groupInvites: seedGroupInvites, received: seedReceived, notices: [],
       // Ceilings too. They move when you report a hard day below your line, and
       // reset clears the day reports that moved them - leaving the lowered line
       // in place with the evidence for it gone made every later reading read
@@ -1039,17 +1324,28 @@ export const useStore = create<State>()(
       name: STORAGE_KEY,
       storage,
       /**
-       * Only whether the intro has run, and your picture, survive a reload.
+       * What survives a reload.
        *
-       * Every launch starts from the seeded semester on purpose. A week you can
-       * accidentally wreck and cannot get back is worse than one that forgets:
-       * the demo is repeatable, nothing half-finished carries over, and a bug
-       * fixed in code cannot be kept alive by data written before it. The intro
-       * flag is the exception because replaying a three-step tour on every
-       * refresh would be its own kind of punishment; the picture because it is
-       * a fact about you, not about your week.
+       * Always: whether setup has run, your picture, and your note - facts about
+       * you. A signed-in week lives on the server and comes back through sync.
+       * A guest's week has nowhere else to live, so it is kept here too: a task
+       * added, a class marked or a night planned is still there after a
+       * refresh, the way it would be in a real app. "Reset the sample week"
+       * in Settings starts it fresh whenever you want.
        */
-      partialize: ({ onboarded, pic, guest, lastAccountId }) => ({ onboarded, pic, guest, lastAccountId }) as unknown as State,
+      partialize: (state) => ({
+        onboarded: state.onboarded, pic: state.pic, guest: state.guest, lastAccountId: state.lastAccountId,
+        status: state.status, vibe: state.vibe, seenNotices: state.seenNotices,
+        ...(state.guest ? {
+          items: state.items, errands: state.errands, modules: state.modules, moods: state.moods,
+          meals: state.meals, moments: state.moments, recovery: state.recovery, contacts: state.contacts,
+          dayReports: state.dayReports, ceilings: state.ceilings, overallCeiling: state.overallCeiling,
+          offHour: state.offHour, sleepHours: state.sleepHours, booked: state.booked, sharing: state.sharing,
+          shareRules: state.shareRules, customActions: state.customActions, customFlags: state.customFlags,
+          groups: state.groups, planActivities: state.planActivities, invites: state.invites, circle: state.circle,
+          requests: state.requests, groupInvites: state.groupInvites, received: state.received, notices: state.notices, phoneContacts: state.phoneContacts,
+        } : {}),
+      }) as unknown as State,
       /**
        * Bump this whenever a fix changes what a *saved* week can contain.
        *
@@ -1075,9 +1371,9 @@ export const itemsOnDay = (items: Item[], day: string): Item[] =>
   items.filter((i) => i.date === day && !i.spread);
 
 export function weekReading(items: Item[], anchor: string, ceilings: Record<BucketKey, number>) {
-  const week = itemsInWeek(items, anchor);
+  const week = itemsInWeek(countedOnce(items), anchor);
   const percents = percentByBucket(week, ceilings);
-  return { week, percents, overall: overallPercent(percents) };
+  return { week, percents, overall: overallOf(week, ceilings) };
 }
 
 export const nextWeek = (anchor: string): string => addDays(anchor, 7);

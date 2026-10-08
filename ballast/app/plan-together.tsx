@@ -28,7 +28,7 @@ export default function PlanTogether() {
           eyebrow="Plan something"
           title="Find an evening"
         />
-        <Planner pool={friends} initial={['amin', 'ravi']} quickGroups={groups} />
+        <Planner pool={friends} initial={[]} quickGroups={groups} />
         <View className="h-2" />
       </Stack>
     </Screen>

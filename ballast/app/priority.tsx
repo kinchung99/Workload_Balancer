@@ -10,7 +10,7 @@ import { BUCKET_LABEL, bandFor } from '@/lib/load';
 import {
   hoursNeeded, nextFit, prioritise, rowWeight, weekAhead, whyFirst, type Push, type Ranked,
 } from '@/lib/priority';
-import { CADENCE_WORD, adherence, describeWeights, weightsFrom } from '@/lib/review';
+import { weightsFrom } from '@/lib/review';
 import { DAY_LETTER, addDays, dayIndex, daysBetween, formatShort, parseISO } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import { percentUndone, remaining, scheduledHours } from '@/lib/prep';
@@ -21,6 +21,10 @@ import { tapFeedback } from '@/lib/haptics';
 import { restOwedFrom, useStore } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { prescriptions } from '@/data/seed';
+import { api } from '@/lib/api';
+import { priorityContext } from '@/lib/coach';
+import { clockHour } from '@/lib/marking';
+import { useAiAnswer } from '@/lib/ai';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -76,8 +80,6 @@ export default function Priority() {
 
   const weights = useMemo(() => weightsFrom(dayReports), [dayReports]);
   const { first, couldMove } = useMemo(() => prioritise(items, today, 7, weights), [items, today, weights]);
-  const learned = describeWeights(weights);
-  const kept = adherence(items, today);
   const ahead = useMemo(() => weekAhead(first, items, today), [first, items, today]);
 
   const [showAll, setShowAll] = useState(false);
@@ -92,6 +94,21 @@ export default function Priority() {
    * eleven hours down and have been for nine days.
    */
   const restFirst = reading.charge < 30 || restOwed >= 8;
+
+  /*
+   * The order is the app's, from what you entered. The AI only says why each
+   * thing sits where it does, and how to take the day - the reasons arrive a
+   * moment after the list and slot into it.
+   */
+  const ranked = first.slice(0, 10);
+  const advice = useAiAnswer(
+    ranked.length ? `priority:${today}:${reading.charge}:${ranked.map((row) => row.item.id).join(',')}` : null,
+    async () => {
+      const res = await api.suggestPriority(priorityContext(ranked, today, clockHour(today), reading.charge, restOwed));
+      return res.ok && res.data.picks.length ? res.data : null;
+    },
+  );
+  const aiWhy = (id: string): string | undefined => advice?.picks.find((pick) => pick.id === id)?.why;
 
   const go = (row: Ranked) => {
     tapFeedback();
@@ -115,6 +132,7 @@ export default function Priority() {
           wash={color.decor.lemon}
           eyebrow="What to do first"
           title={first.length ? 'Start with this' : 'Nothing is pressing'}
+          sub={advice ? `✨ ${advice.headline}` : undefined}
         />
 
         {/* Under a quarter, rest is not the reward for finishing the list. */}
@@ -141,6 +159,7 @@ export default function Priority() {
             needs={hoursNeeded(top, items)}
             booked={scheduledHours(top.item, items)}
             today={today}
+            why={aiWhy(top.item.id)}
             onGo={() => go(top)}
           />
         ) : (
@@ -173,6 +192,7 @@ export default function Priority() {
                 rank={index + 2}
                 pressure={top ? row.score / top.score : 0}
                 today={today}
+                why={aiWhy(row.item.id)}
                 onOpen={() => { tapFeedback(); router.push(`/item/${row.item.id}` as Href); }}
                 onAction={() => go(row)}
               />
@@ -213,23 +233,6 @@ export default function Priority() {
           </Section>
         ) : null}
 
-        {/*
-          Where this order came from. A ranking nobody can question is a ranking
-          nobody believes, so this says what the app has been told and by whom.
-        */}
-        <Card tone="sunken" gap={3}>
-          <Stack direction="row" gap={4} align="center">
-            <Sticker name="scales" size={32} />
-            <Stack gap={1} grow>
-              <Text variant="footnote" weight="semibold">{learned ?? 'Ranked the standard way'}</Text>
-              <Text variant="micro" tone="muted">
-                {kept.booked
-                  ? `${kept.kept} of ${kept.booked} sittings kept · ${CADENCE_WORD(kept.rate).toLowerCase()}`
-                  : CADENCE_WORD(kept.rate)}
-              </Text>
-            </Stack>
-          </Stack>
-        </Card>
 
         <View className="h-2" />
       </Stack>
@@ -242,7 +245,7 @@ export default function Priority() {
  * will take out of you, why it is first, and when it could actually happen.
  */
 function Hero({
-  row, pushes, cost, fit, needs, booked, today, onGo,
+  row, pushes, cost, fit, needs, booked, today, why, onGo,
 }: {
   row: Ranked;
   pushes: Push[];
@@ -251,6 +254,8 @@ function Hero({
   needs: number;
   booked: number;
   today: string;
+  /** The AI's reason, in a line, when it has given one. */
+  why?: string;
   onGo: () => void;
 }) {
   const { item } = row;
@@ -273,6 +278,7 @@ function Hero({
         </Stack>
 
         <Text variant="title">{item.title}</Text>
+        {why ? <Text variant="callout" weight="semibold">✨ {why}</Text> : null}
 
         {/* Three facts, as tiles: due, needs, costs. */}
         <Stack direction="row" gap={2}>
@@ -447,8 +453,8 @@ function WeekAhead({
  * time, or change the one it has.
  */
 function Row({
-  row, rank, pressure, today, onOpen, onAction,
-}: { row: Ranked; rank: number; pressure: number; today: string; onOpen: () => void; onAction: () => void }) {
+  row, rank, pressure, today, why, onOpen, onAction,
+}: { row: Ranked; rank: number; pressure: number; today: string; why?: string; onOpen: () => void; onAction: () => void }) {
   const { item } = row;
   const due = item.deadline ?? item.date;
   const left = row.kind === 'owing' ? percentUndone(item) : null;
@@ -473,6 +479,7 @@ function Row({
           <Stack gap={1} grow>
             <Text variant="body" weight="semibold">{item.title}</Text>
             <Text variant="micro" tone={row.kind === 'loose' ? 'busy' : 'subtle'}>{when}</Text>
+            {why ? <Text variant="footnote" tone="muted">✨ {why}</Text> : null}
           </Stack>
           {left !== null ? (
             // How much of it is left, as a ring that fills as it gets done.

@@ -25,8 +25,11 @@ export function IdeaDeck({
   loading,
   onNext,
   onPick,
+  gain,
 }: {
   entry: Prescription | null;
+  /** Battery points it gives back, at the length picked. */
+  gain?: number;
   /** "BEST FIT", "IDEA 2 OF 5" - where in the deck this one sits. */
   label: string;
   loading: boolean;
@@ -127,9 +130,16 @@ export function IdeaDeck({
             <View className="gap-4 rounded-xl border-2 p-5" style={{ backgroundColor: color.band.recovery.wash, borderColor: color.band.recovery.fill }}>
               <Stack direction="row" justify="between" align="center">
                 <Text variant="micro" tone="recovery">{label}</Text>
-                <View className="rounded-pill bg-raised px-3 py-1">
-                  <Text variant="micro" tone="recovery">{GIVES_BACK[entry.refills]}</Text>
-                </View>
+                <Stack direction="row" gap={2} align="center">
+                  <View className="rounded-pill bg-raised px-3 py-1">
+                    <Text variant="micro" tone="recovery">{GIVES_BACK[entry.refills]}</Text>
+                  </View>
+                  {gain !== undefined && gain >= 0.5 ? (
+                    <View className="rounded-pill px-3 py-1" style={{ backgroundColor: color.band.steady.fill }}>
+                      <Text variant="micro" tone="inverse">⚡ +{Math.round(gain)}%</Text>
+                    </View>
+                  ) : null}
+                </Stack>
               </Stack>
               <Stack direction="row" gap={4} align="center">
                 <View className="items-center justify-center rounded-pill bg-raised" style={{ width: 72, height: 72 }}>
@@ -193,7 +203,7 @@ function Skeleton() {
       <View className="rounded-pill" style={{ width: '70%', height: 18, backgroundColor: color.surface.page }} />
       <View className="rounded-pill" style={{ width: '90%', height: 12, backgroundColor: color.surface.page }} />
       <View className="rounded-pill" style={{ width: '60%', height: 12, backgroundColor: color.surface.page }} />
-      <Text variant="footnote" tone="muted">Claude is thinking about what would help…</Text>
+      <Text variant="footnote" tone="muted">Thinking about what would help…</Text>
     </Animated.View>
   );
 }

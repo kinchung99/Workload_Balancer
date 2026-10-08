@@ -14,45 +14,73 @@ import { momentCredits } from './moments';
 import type { BucketKey, Errand, Item, Meal, MealStatus, Moment, MoodCheckIn, MoodQuadrant } from './types';
 
 /**
- * Hours below which a night starts costing you, and what each hour is worth.
+ * Sleep, food and mood are the heavy three.
  *
- * A short night costs less than it did and a good one gives back twice as much.
- * The old numbers were symmetrical and punishing: four load an hour down, capped
- * at two hours up, so sleeping well could never undo sleeping badly.
+ * They are what a day actually runs on, so they move the battery the most - a
+ * proper night is worth several good moments, not a fraction of one. Sleep and
+ * food land in the head as well as the body: a short night is a foggy morning,
+ * not only tired legs.
+ *
+ * Every answer has a weight, plus or minus, in the same load units as a task
+ * (four load is about one percent of a week). Seven hours is a decent night
+ * and gives a little back; each hour under it costs sixteen - about four
+ * percent, the price of a lost morning - and each hour over it gives twelve
+ * back, up to nine hours, so one long night never quite undoes a short one.
  */
-export const SLEEP_TARGET = 7.5;
-const SLEEP_LOAD_PER_HOUR = 2.5;
-/** A good night is worth something, and now genuinely worth something. */
-const SLEEP_CREDIT_CAP = 4;
+export const SLEEP_TARGET = 7;
+const SLEEP_COST_PER_HOUR = 16;
+const SLEEP_DECENT_CREDIT = 4;
+const SLEEP_CREDIT_PER_HOUR = 12;
+const SLEEP_CREDIT_CAP_HOURS = 2;
+
+/** Signed load for a night's sleep: positive costs, negative gives back. */
+export const sleepLoad = (hours: number): number =>
+  hours < SLEEP_TARGET
+    ? Math.round((SLEEP_TARGET - hours) * SLEEP_COST_PER_HOUR * 10) / 10
+    : -Math.round((SLEEP_DECENT_CREDIT + Math.min(hours - SLEEP_TARGET, SLEEP_CREDIT_CAP_HOURS) * SLEEP_CREDIT_PER_HOUR) * 10) / 10;
+const SLEEP_MIX = { mental: 2, physical: 1 };
+const MEAL_MIX = { mental: 1, physical: 1 };
 
 /**
  * Still calibrated so an ordinary day nets to zero - one proper meal, one light,
  * one still to come - because the seeded week has to read exactly what the model
  * check says until the student logs something themselves.
  *
- * What changed is the size of the swing. Logging dinner as a proper meal used to
- * move two load; it now moves four, which is the difference between a number
- * that twitches and one that rewards you.
+ * The swing is the heavy part, both ways: dinner logged as a proper meal gives
+ * sixteen load back against one still to come, a light one eight, and a
+ * skipped one costs twenty - eating matters more than any one good moment.
  */
 const MEAL_LOAD: Record<MealStatus, number> = {
-  filling: -2,
+  filling: -8,
   light: 0,
-  skipped: 3,
-  pending: 2,
+  skipped: 28,
+  pending: 8,
+};
+
+/**
+ * A week with only the one answer - "ate today" on the check-in, with no meals
+ * logged one by one - is that answer about the whole day, so it carries the
+ * whole day's weight.
+ */
+const WHOLE_DAY_LOAD: Record<MealStatus, number> = {
+  filling: -16,
+  light: -6,
+  skipped: 20,
+  pending: 0,
 };
 
 /**
  * How today feels, as load.
  *
- * Asymmetric on purpose, and now asymmetric the other way. A bad day costs less
- * than it did and a good one is worth roughly twice as much, because a battery
- * that only ever falls is both bleak and wrong.
+ * One of the heavy three, and it cuts both ways: a drained or stressed day
+ * costs, a good one gives back a little more than a bad one takes, because a
+ * battery that only ever falls is both bleak and wrong.
  */
 const MOOD_LOAD: Record<MoodQuadrant, number> = {
-  'low-unpleasant': 4,
-  'high-unpleasant': 3,
-  'low-pleasant': -4,
-  'high-pleasant': -8,
+  'low-unpleasant': 16,
+  'high-unpleasant': 12,
+  'low-pleasant': -16,
+  'high-pleasant': -20,
 };
 
 /** How a check-in reads as one emoji, for the corner of your picture. */
@@ -79,7 +107,7 @@ export interface LogState {
   moments?: Moment[];
 }
 
-const entry = (id: string, title: string, bucket: Item['bucket'], load: number): Item => ({
+const entry = (id: string, title: string, bucket: Item['bucket'], load: number, mix?: Item['mix']): Item => ({
   id: `log-${id}`,
   title,
   bucket,
@@ -90,6 +118,7 @@ const entry = (id: string, title: string, bucket: Item['bucket'], load: number):
   loadOverride: load,
   isLog: true,
   spread: true,
+  ...(mix ? { mix } : {}),
 });
 
 /**
@@ -100,21 +129,20 @@ export function logItems({ today, sleepHours, meals, moods, errands = [], moment
   const out: Item[] = [];
 
   if (sleepHours !== null) {
-    const deficit = SLEEP_TARGET - sleepHours;
-    const load = deficit > 0
-      ? Math.round(deficit * SLEEP_LOAD_PER_HOUR * 10) / 10
-      : Math.max(-SLEEP_CREDIT_CAP * SLEEP_LOAD_PER_HOUR, deficit * SLEEP_LOAD_PER_HOUR);
+    const load = sleepLoad(sleepHours);
     if (load !== 0) {
       out.push({
-        ...entry('sleep', deficit > 0 ? 'Short night' : 'Slept well', 'physical', load),
+        ...entry('sleep', load > 0 ? 'Short night' : 'Slept well', 'physical', load, SLEEP_MIX),
         date: today,
       });
     }
   }
 
-  const mealLoad = meals.reduce((total, meal) => total + MEAL_LOAD[meal.status], 0);
+  const mealLoad = meals.length === 1
+    ? WHOLE_DAY_LOAD[meals[0].status]
+    : meals.reduce((total, meal) => total + MEAL_LOAD[meal.status], 0);
   if (mealLoad !== 0) {
-    out.push({ ...entry('meals', mealLoad > 0 ? 'Meals missed' : 'Eaten well', 'physical', mealLoad), date: today });
+    out.push({ ...entry('meals', mealLoad > 0 ? 'Meals missed' : 'Eaten well', 'physical', mealLoad, MEAL_MIX), date: today });
   }
 
   const todaysMood = moods.find((mood) => mood.date === today);

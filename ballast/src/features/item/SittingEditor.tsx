@@ -10,6 +10,8 @@ import {
   timeNote, type Draft,
 } from '@/lib/sittings';
 import { tapFeedback } from '@/lib/haptics';
+import { capacityOf } from '@/lib/load';
+import { useStore } from '@/state/store';
 import type { Item } from '@/lib/types';
 
 const LENGTHS = [0.5, 1, 1.5, 2, 2.5, 3];
@@ -51,6 +53,7 @@ export function SittingEditor({
   maxHours: number;
   onChange: (next: Draft) => void;
 }) {
+  const capacity = capacityOf(useStore((state) => state.ceilings));
   const days = workDays(item, today);
   const notBefore = (date: string) => (date === today ? nowHour : undefined);
   const startsFor = (date: string, hours: number) => sittingStarts(busy, date, hours, notBefore(date));
@@ -85,7 +88,7 @@ export function SittingEditor({
     onChange({ ...value, startHour: next });
   };
 
-  const changes = origin ? describeChange(item, base, origin, value) : [];
+  const changes = origin ? describeChange(item, base, origin, value, capacity) : [];
   const note = timeNote(value);
   const lengths = LENGTHS.filter((h) => h <= Math.max(maxHours, value.hours));
 
@@ -105,7 +108,7 @@ export function SittingEditor({
                   key={date}
                   accessibilityRole="radio"
                   accessibilityState={{ selected, disabled: full }}
-                  accessibilityLabel={`${formatShort(date)}, ${Math.round(loads[i])} load${isDue ? ', due day' : ''}${full ? ', no gap long enough' : ''}`}
+                  accessibilityLabel={`${formatShort(date)}, uses ${Math.round((loads[i] / capacity) * 100)} percent${isDue ? ', due day' : ''}${full ? ', no gap long enough' : ''}`}
                   disabled={full}
                   onPress={() => pickDay(date)}
                   className={`min-h-min items-center gap-1 rounded-md px-2 py-2 ${
@@ -129,7 +132,7 @@ export function SittingEditor({
                   <Text variant="footnote" weight="semibold" tone={selected ? 'inverse' : 'default'}>
                     {parseISO(date).getUTCDate()}
                   </Text>
-                  <Text variant="micro" tone={selected ? 'inverse' : 'subtle'}>{full ? 'Full' : Math.round(loads[i])}</Text>
+                  <Text variant="micro" tone={selected ? 'inverse' : 'subtle'}>{full ? 'Full' : `${Math.round((loads[i] / capacity) * 100)}%`}</Text>
                 </Pressable>
               );
             })}
@@ -192,7 +195,7 @@ export function SittingEditor({
       <Stack direction="row" gap={2} align="center" className="rounded-md bg-sunken px-3 py-3">
         <Text variant="footnote" weight="semibold" className="flex-1">{formatShort(value.date)}</Text>
         <Text variant="footnote" tone="muted">
-          {Math.round(loadOnDay(base, value.date))} → {Math.round(loadOnDay(base, value.date) + adds)} load
+          🔋 −{Math.round((loadOnDay(base, value.date) / capacity) * 100)}% → −{Math.round(((loadOnDay(base, value.date) + adds) / capacity) * 100)}%
         </Text>
       </Stack>
 

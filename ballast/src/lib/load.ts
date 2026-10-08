@@ -186,30 +186,53 @@ export function percentByBucket(
 }
 
 /**
- * How much the worst bucket counts for, over and above its share.
- *
- * It was half, which made the emptiest area almost the only thing the headline
- * number could say: one area over its line pinned the battery near zero however
- * well the other four were going, and no amount of looking after yourself moved
- * it. Two fifths still counts the worst bucket for double its one-fifth share -
- * the claim is unchanged - while leaving room for the rest of the week to show.
+ * What an hour of real rest gives back: eight load, about two percent of a
+ * week - the same as an hour of Exhausting work takes, and a little more than
+ * a good moment. Booked rest, a planned evening of your own and the rest bank
+ * all count it this way.
  */
-export const WORST_WEIGHT = 0.4;
+export const REST_LOAD_PER_HOUR = 8;
+
+/** The week's whole battery, in load: the five area limits added together. */
+export const capacityOf = (ceilings: Record<BucketKey, number> = DEFAULT_CEILINGS): number =>
+  BUCKETS.reduce((total, key) => total + ceilings[key], 0);
 
 /**
- * One honest number from five bucket readings.
+ * One honest number: how much of the week's capacity everything in it uses.
  *
- * Not a plain average: the worst bucket counts for double its share. That is the
- * whole "shape beats total" claim made arithmetic. A student sitting evenly at
- * 75% reads 75%; a student at 60% average with one bucket at 100% reads 76%, and
- * they are in fact closer to the edge.
+ * A plain sum, on purpose. Every item costs its load - hours x how draining -
+ * out of one weekly capacity, the five area limits added together; sleep, food,
+ * mood and rest put load back. So every percentage in the app adds up: the cost
+ * on a task, the lines on the battery page and the headline are the same sum,
+ * and an hour of Tiring costs the same whichever area it lands in.
+ *
+ * It used to weight the fullest area double ("shape beats total"), which made a
+ * gym hour cost three lectures and left no way to say where the battery went -
+ * the parts never summed to the whole. The areas still say where the week
+ * sits; they no longer change what anything costs.
  */
-export function overallPercent(percents: Record<BucketKey, number>): number {
-  const values = BUCKETS.map((key) => percents[key]);
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const worst = Math.max(...values);
-  return Math.round((1 - WORST_WEIGHT) * mean + WORST_WEIGHT * worst);
+export function overallOf(items: Item[], ceilings: Record<BucketKey, number> = DEFAULT_CEILINGS): number {
+  return Math.round(exactOverall(items, ceilings));
 }
+
+/** The same, unrounded - for sums that have to add up to the decimal. */
+export function exactOverall(items: Item[], ceilings: Record<BucketKey, number> = DEFAULT_CEILINGS): number {
+  const load = loadByBucket(items);
+  const total = BUCKETS.reduce((sum, key) => sum + load[key], 0);
+  return (total / capacityOf(ceilings)) * 100;
+}
+
+/** The same figure from area percentages: each counts by the size of its limit. */
+export function overallPercent(
+  percents: Record<BucketKey, number>,
+  ceilings: Record<BucketKey, number> = DEFAULT_CEILINGS,
+): number {
+  return Math.round(BUCKETS.reduce((sum, key) => sum + percents[key] * ceilings[key], 0) / capacityOf(ceilings));
+}
+
+/** What one thing costs the week's battery, in percentage points. Negative gives back. */
+export const costPercent = (item: Item, ceilings: Record<BucketKey, number> = DEFAULT_CEILINGS): number =>
+  (loadOf(item) / capacityOf(ceilings)) * 100;
 
 export function bandFor(percent: number): Exclude<BandName, 'recovery'> {
   if (percent < threshold.steadyMax) return 'steady';

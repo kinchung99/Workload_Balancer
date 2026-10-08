@@ -26,31 +26,37 @@ export interface Refusal {
  * told exactly which three things will not let them have it has been given
  * something; a student shown an empty card has been given nothing.
  */
-export function SwapCard({ swap, refusal, onSwap }: {
+export function SwapCard({ swap, refusal, why, capacity, onSwap }: {
   swap: DaySwap | null;
   refusal: Refusal | null;
+  /** The AI's one line on the swap, when it has given one. */
+  why?: string;
+  /** The week's capacity in load, so the swap can say what it gives back. */
+  capacity: number;
   onSwap: () => void;
 }) {
   if (swap) {
+    const back = Math.max(1, Math.round((swap.saves / capacity) * 100));
     return (
-      <Card tone="recovery" gap={5}>
-        <Stack direction="row" gap={4} align="center">
-          <View
-            className="items-center justify-center rounded-pill"
-            style={{ width: 56, height: 56, backgroundColor: color.decor.mint }}
-          >
-            <Sticker name="scales" size={38} wiggle />
+      <Card tone="recovery" gap={4}>
+        <Stack direction="row" gap={2} align="center">
+          <Sticker name="scales" size={28} wiggle />
+          <Text variant="micro" tone="recovery" className="flex-1">A SWAP · {dayName(swap.date).toUpperCase()}</Text>
+          <View className="rounded-pill px-3 py-1" style={{ backgroundColor: color.band.steady.fill }}>
+            <Text variant="caption" weight="bold" tone="inverse">⚡ +{back}%</Text>
           </View>
-          <Stack gap={1} grow>
-            <Text variant="micro" tone="recovery">A SWAP, {dayName(swap.date).toUpperCase()}</Text>
-            <Text variant="heading">Go to one, not both.</Text>
-          </Stack>
         </Stack>
 
-        <Stack gap={3}>
-          <Row word="KEEP" title={swap.keep.title} note="You said you want this" tone="recovery" />
-          <Row word="DROP" title={swap.drop.title} note={`${swap.cost} · ${swap.saves} load back`} tone="muted" />
+        {/* Keep one, drop the other - side by side. */}
+        <Stack direction="row" gap={2} align="stretch">
+          <Side word="KEEP" emoji="💚" title={swap.keep.title} keep />
+          <View className="items-center justify-center">
+            <Text variant="heading" tone="subtle">vs</Text>
+          </View>
+          <Side word="DROP" emoji="✂️" title={swap.drop.title} />
         </Stack>
+
+        {why ? <Text variant="footnote" weight="semibold">✨ {why}</Text> : null}
 
         <Button label="Make the swap" onPress={onSwap} />
       </Card>
@@ -80,6 +86,18 @@ export function SwapCard({ swap, refusal, onSwap }: {
         ))}
       </Stack>
     </Card>
+  );
+}
+
+function Side({ word, emoji, title, keep = false }: { word: string; emoji: string; title: string; keep?: boolean }) {
+  return (
+    <View
+      className="flex-1 gap-1 rounded-lg px-3 py-3"
+      style={{ backgroundColor: color.surface.raised, borderWidth: 2, borderColor: keep ? color.band.recovery.fill : color.line.hairline, opacity: keep ? 1 : 0.75 }}
+    >
+      <Text variant="micro" tone={keep ? 'recovery' : 'subtle'}>{emoji} {word}</Text>
+      <Text variant="callout" weight="semibold" numberOfLines={3} className={keep ? '' : 'line-through'}>{title}</Text>
+    </View>
   );
 }
 

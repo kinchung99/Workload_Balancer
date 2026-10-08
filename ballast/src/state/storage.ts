@@ -45,8 +45,9 @@ export const STORAGE_KEY = 'ballast/v1';
  *   8  one list for tasks and errands; each lands on its own day
  *   9  timetable as real classes, with modules and flags
  *  10  one thing can drain several areas; capture is four pages
+ *  11  a guest's week survives a reload
  */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /**
  * What survives an upgrade.

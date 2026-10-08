@@ -2,16 +2,18 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Button, Chip, Door, Mascot, PageHeader, Screen, Section, Stack, StepDots, StepNav, Sticker, Text,
+  Avatar, Button, Chip, Door, DrainBadge, DrainPicker, Mascot, PageHeader, Screen, Section, Stack, StepDots, StepNav, Sticker, Text,
   type StickerName,
 } from '@/components';
 import { color, radius } from '@design/tokens';
 import { addDays, formatShort, startOfWeek } from '@/lib/dates';
 import { frequentFriends } from '@/lib/circle';
 import { VISIBILITY } from '@/lib/sharing';
-import { moduleEmoji, modulesFrom, parseTimetable, toItems } from '@/lib/timetable';
+import { COMMITMENT_LABEL } from '@/lib/load';
+import type { CommitmentKind, Dread } from '@/lib/types';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
+import { ClassBuilder } from '@/features/timetable/ClassBuilder';
 import { useReading } from '@/state/selectors';
 
 const STEPS = ['timetable', 'tasks', 'friends', 'ready'] as const;
@@ -22,9 +24,6 @@ export async function generateStaticParams() {
   return STEPS.map((step) => ({ step }));
 }
 
-const SAMPLE = `Mon 09:00-11:00 CS2040 Operating Systems Lecture Kilburn LT1
-Tue 14:00-16:00 CS2011 Algorithms Lab in Lab A
-Thu 8-10am CS2035 Networks Lecture Stopford TH2`;
 
 const inputStyle = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : undefined;
 
@@ -79,87 +78,10 @@ export default function Setup() {
 /* --------------------------------------------------------------- timetable */
 
 function TimetableStep() {
-  const { modules, items, today, importTimetable } = useStore();
-  const [paste, setPaste] = useState('');
-  const [weekNow, setWeekNow] = useState(1);
-  const [replacing, setReplacing] = useState(false);
-  const preview = useMemo(() => (paste.trim() ? parseTimetable(paste) : null), [paste]);
-  const importing = useMemo(() => (preview?.classes.length ? toItems(preview.classes, today, 2) : []), [preview, today]);
-  const start = addDays(startOfWeek(today), -(weekNow - 1) * 7);
-  const found = useMemo(() => modulesFrom(importing, {}, {}, start), [importing, start]);
-  const weekly = (id: string) => items.filter((item) => item.moduleId === id && item.date >= startOfWeek(today) && item.date < addDays(startOfWeek(today), 7)).length;
-
   return (
     <Stack gap={5}>
-      <PageHeader sticker="class" wash={color.decor.lilac} title="Import your timetable" sub="Paste it from your student portal." />
-
-      {modules.length && !replacing ? (
-        <Section family="week" title="Your modules" sticker="class" meta={`${modules.length}`}>
-          {modules.map((module) => (
-            <Stack key={module.id} direction="row" gap={3} align="center" className="rounded-lg bg-raised px-3 py-2">
-              <View className="items-center justify-center rounded-pill bg-sunken" style={{ width: 40, height: 40 }}>
-                <Text variant="heading">{moduleEmoji(module)}</Text>
-              </View>
-              <Stack gap={0} grow>
-                <Text variant="micro" tone="subtle">{module.code}</Text>
-                <Text variant="body" weight="semibold">{module.name}</Text>
-              </Stack>
-              <Text variant="micro" tone="muted">{weekly(module.id)} a week</Text>
-            </Stack>
-          ))}
-          <Chip label="Paste a new timetable" onPress={() => { tapFeedback(); setReplacing(true); }} />
-        </Section>
-      ) : (
-        <Stack gap={3}>
-          <TextInput
-            value={paste}
-            onChangeText={setPaste}
-            multiline
-            placeholder={SAMPLE}
-            placeholderTextColor={color.ink.subtle}
-            accessibilityLabel="Paste your timetable"
-            className="rounded-lg border-2 border-line-hairline bg-sunken px-4 py-3 text-footnote text-ink-default"
-            style={[{ minHeight: 140 }, inputStyle as object]}
-          />
-          {preview ? (
-            <Stack gap={3}>
-              <Stack direction="row" gap={2} wrap>
-                <Chip label={`📚 ${preview.classes.length} classes`} tone="steady" readOnly />
-                <Chip label={`🎓 ${found.length} modules`} tone="steady" readOnly />
-                {preview.skipped.length ? <Chip label={`${preview.skipped.length} not read`} tone="heavy" readOnly /> : null}
-              </Stack>
-              {found.map((module) => (
-                <Stack key={module.id} direction="row" gap={3} align="center" className="rounded-lg bg-raised px-3 py-2">
-                  <Text variant="heading">{module.emoji}</Text>
-                  <Text variant="body" weight="semibold" className="flex-1">{module.name}</Text>
-                  <Text variant="micro" tone="muted">{module.code}</Text>
-                </Stack>
-              ))}
-              {found.length ? (
-                <Stack direction="row" gap={3} align="center" className="rounded-lg bg-sunken px-3 py-2">
-                  <Text variant="callout" weight="semibold" className="flex-1">Teaching week now</Text>
-                  <Nudge label="−" onPress={() => setWeekNow(Math.max(1, weekNow - 1))} />
-                  <Text variant="callout" weight="bold">{weekNow}</Text>
-                  <Nudge label="+" onPress={() => setWeekNow(Math.min(20, weekNow + 1))} />
-                </Stack>
-              ) : null}
-              {preview.classes.length ? (
-                <Button
-                  label={`Import ${preview.classes.length} classes`}
-                  onPress={() => {
-                    importTimetable(importing, found);
-                    successFeedback();
-                    setPaste('');
-                    setReplacing(false);
-                  }}
-                />
-              ) : null}
-            </Stack>
-          ) : (
-            <Text variant="micro" tone="subtle">One class per line: day, time, module, room.</Text>
-          )}
-        </Stack>
-      )}
+      <PageHeader sticker="class" wash={color.decor.lilac} title="Your timetable" sub="Add each module, then its classes." />
+      <ClassBuilder />
     </Stack>
   );
 }
@@ -171,6 +93,8 @@ const DUE = [
 ];
 const WHEN = [{ label: 'Today', days: 0 }, { label: 'Tomorrow', days: 1 }, { label: 'This weekend', days: -1 }];
 const NEEDS = [1, 2, 4, 8];
+/** Whether it can move, at a glance. */
+const MOVE_EMOJI: Record<CommitmentKind, string> = { hard: '🔒', soft: '↔️', self: '🙋' };
 const TAKES = [0.25, 0.5, 1];
 
 function TasksStep() {
@@ -179,6 +103,8 @@ function TasksStep() {
   const [title, setTitle] = useState('');
   const [days, setDays] = useState(3);
   const [hours, setHours] = useState(4);
+  const [dread, setDread] = useState<Dread>(3);
+  const [commitment, setCommitment] = useState<CommitmentKind>('soft');
   const weekend = addDays(startOfWeek(today), 5);
 
   const owing = items.filter((item) => item.prepHours && !item.parentId && (item.deadline ?? item.date) >= today);
@@ -190,12 +116,12 @@ function TasksStep() {
     if (kind === 'owing') {
       const due = addDays(today, days);
       addItem({
-        title: name, bucket: 'mental', hours, dread: 3, commitment: 'soft',
-        date: due, deadline: due, prepHours: hours, prepDone: 0, importance: 2,
+        title: name, bucket: 'mental', hours, dread, commitment,
+        date: due, deadline: due, prepHours: hours, prepDone: 0, importance: commitment === 'hard' ? 3 : 2,
       });
     } else {
       addItem({
-        title: name, bucket: 'errands', hours, dread: 2, commitment: 'self',
+        title: name, bucket: 'errands', hours, dread, commitment,
         date: days < 0 ? weekend : addDays(today, days),
       });
     }
@@ -208,6 +134,8 @@ function TasksStep() {
     setKind(next);
     setDays(next === 'owing' ? 3 : 0);
     setHours(next === 'owing' ? 4 : 0.5);
+    setDread(next === 'owing' ? 3 : 2);
+    setCommitment(next === 'owing' ? 'soft' : 'self');
   };
 
   return (
@@ -248,6 +176,20 @@ function TasksStep() {
             />
           ))}
         </Stack>
+        {/* The two answers the priority list runs on. */}
+        <Text variant="micro" tone="subtle">HOW DRAINING</Text>
+        <DrainPicker compact value={dread} onChange={(next) => { setDread(next); }} />
+        <Text variant="micro" tone="subtle">CAN IT MOVE?</Text>
+        <Stack direction="row" gap={2} wrap>
+          {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
+            <Chip
+              key={option}
+              label={`${MOVE_EMOJI[option]} ${COMMITMENT_LABEL[option]}`}
+              tone={commitment === option ? 'selected' : 'plain'}
+              onPress={() => { tapFeedback(); setCommitment(option); }}
+            />
+          ))}
+        </Stack>
         <Button label={title.trim() ? `Add “${title.trim()}”` : 'Name it first'} kind={title.trim() ? 'primary' : 'secondary'} onPress={add} />
       </Stack>
 
@@ -260,6 +202,8 @@ function TasksStep() {
               <Text variant="micro" tone="muted">
                 {item.prepHours ? `Due ${formatShort(item.deadline ?? item.date).slice(0, 3)} · ${item.prepHours}h` : formatShort(item.date).slice(0, 3)}
               </Text>
+              <Text variant="micro">{MOVE_EMOJI[item.commitment]}</Text>
+              <DrainBadge value={item.dread} />
             </Stack>
           ))}
           {owing.length + errands.length > 7 ? (
@@ -374,19 +318,5 @@ function ReadyStep() {
         ))}
       </Stack>
     </Stack>
-  );
-}
-
-function Nudge({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label === '+' ? 'One week later' : 'One week earlier'}
-      onPress={() => { tapFeedback(); onPress(); }}
-      className="items-center justify-center rounded-pill border border-line-strong bg-raised active:opacity-60"
-      style={{ width: 32, height: 32 }}
-    >
-      <Text variant="callout" weight="bold">{label}</Text>
-    </Pressable>
   );
 }

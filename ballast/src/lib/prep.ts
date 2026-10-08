@@ -46,6 +46,31 @@ export const sittingsOf = (item: Item, items: Item[]): Item[] =>
 export const unplanned = (item: Item, items: Item[]): number =>
   Math.max(0, Math.round((remaining(item) - scheduledHours(item, items)) * 10) / 10);
 
+/**
+ * The week as the battery counts it: each piece of work costs once.
+ *
+ * An assignment carries its whole cost on its due date until it is planned;
+ * each sitting booked for it then carries its own hours on its own day, so
+ * those hours come off the assignment. Planning moves the cost to the days you
+ * will actually spend it - it never adds to it. A missed sitting hands its
+ * hours back to the assignment, because the work is still there.
+ *
+ * Every reading goes through this before it is split into weeks, so a sitting
+ * this week for something due next week is counted once, this week.
+ */
+export function countedOnce(items: Item[]): Item[] {
+  const booked = new Map<string, number>();
+  for (const item of items) {
+    if (item.parentId && item.outcome !== 'missed') booked.set(item.parentId, (booked.get(item.parentId) ?? 0) + item.hours);
+  }
+  if (!booked.size) return items;
+  return items.map((item) => {
+    const hours = booked.get(item.id);
+    if (!hours || !item.prepHours || item.parentId) return item;
+    return { ...item, hours: Math.max(0, Math.round((item.hours - hours) * 10) / 10) };
+  });
+}
+
 /** 100 means nothing is planned or done. 0 means it is all accounted for. */
 export const percentUnplanned = (item: Item, items: Item[]): number =>
   item.prepHours ? Math.round((unplanned(item, items) / item.prepHours) * 100) : 0;

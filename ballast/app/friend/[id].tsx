@@ -6,7 +6,7 @@ import {
 } from '@/components';
 import { color } from '@design/tokens';
 import { BAND_WORD, isStale, lastSeen } from '@/lib/circle';
-import { CHECK_IN_MESSAGE, PLAN_MESSAGE, busyFrom, freeOn, whatsapp } from '@/lib/sharing';
+import { PLAN_MESSAGE, busyFrom, freeOn, whatsapp } from '@/lib/sharing';
 import { DAY_END, DAY_START, formatHour, slotHours, weekDays } from '@/lib/schedule';
 import { dayName, formatShort } from '@/lib/dates';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
@@ -112,35 +112,8 @@ export default function FriendDay() {
             ) : null}
           </Stack>
 
-          {/* Three numbers, the same row your own profile opens with. */}
-          <Stack direction="row" gap={3}>
-            {[
-              { value: `${charge}%`, label: 'battery' },
-              { value: String(shared.filter((d) => d.free.length).length), label: 'free' },
-              { value: stale ? 'stale' : 'fresh', label: 'reading' },
-            ].map((stat) => (
-              <Stack key={stat.label} gap={1} align="center" className="flex-1 rounded-md bg-raised px-2 py-3">
-                <Text variant="callout" weight="bold" tone={stale ? 'subtle' : 'default'}>{stat.value}</Text>
-                <Text variant="micro" tone="subtle">{stat.label}</Text>
-              </Stack>
-            ))}
-          </Stack>
         </Card>
 
-        {/* A reading nobody has confirmed is not news, and the app says so. */}
-        {stale ? (
-          <Card tone="sunken" gap={2}>
-            <Stack direction="row" gap={3} align="center">
-              <Sticker name="cloud" size={28} />
-              <Text variant="footnote" weight="semibold" className="flex-1">
-                This may be out of date.
-              </Text>
-            </Stack>
-            <Text variant="micro" tone="muted">
-              {person.name.split(' ')[0]} has not updated since {lastSeen(person)}.
-            </Text>
-          </Card>
-        ) : null}
 
         {/* The published week. Filled is theirs to give, empty is only "taken". */}
         <Stack gap={3}>
@@ -205,18 +178,11 @@ export default function FriendDay() {
             </Card>
           )}
 
-          <Text variant="footnote" tone="subtle">
-            Free time only. Never what they are doing.
-          </Text>
         </Stack>
 
         <Stack direction="row" gap={2} wrap>
-          {sent ? (
-            <Chip label="Opened in WhatsApp" tone="steady" readOnly />
-          ) : (
-            <Chip label="Say hello instead" onPress={() => open(CHECK_IN_MESSAGE(person.name))} />
-          )}
-          <Chip label="Plan with everyone" onPress={() => { tapFeedback(); router.push('/plan-together'); }} />
+          {sent ? <Chip label="Opened in WhatsApp" tone="steady" readOnly /> : null}
+          <Chip label="👥 Plan with others" onPress={() => { tapFeedback(); router.push('/plan-together'); }} />
         </Stack>
 
         {best ? (

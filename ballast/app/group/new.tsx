@@ -9,13 +9,14 @@ import { useStore } from '@/state/store';
 import { frequentFriends } from '@/lib/circle';
 import { PeopleList } from '@/features/social/PeopleList';
 import { GROUP_EMOJIS } from '@/features/social/groupArt';
+import { createGroupAndInvite } from '@/lib/social';
 
 /**
  * `/group/new` — a picture, a name, some people. Three things, one screen.
  */
 export default function NewGroup() {
   const router = useRouter();
-  const { circle, createGroup } = useStore();
+  const { circle } = useStore();
   const friends = circle.filter((person) => !person.isYou);
   const [emoji, setEmoji] = useState(GROUP_EMOJIS[0]);
   const [name, setName] = useState('');
@@ -37,14 +38,15 @@ export default function NewGroup() {
       backLabel="Friends"
       footer={
         <Button
-          label={ready ? `Create ${name.trim() || 'group'} · ${members.length + 1} people` : 'Pick at least one friend'}
+          label={ready ? `Create & invite ${members.length}` : 'Pick who to invite'}
           kind={ready ? 'primary' : 'secondary'}
           disabled={!ready}
-          onPress={() => {
+          onPress={async () => {
             if (!ready) return;
-            const id = createGroup({ name: name.trim() || 'New group', emoji, members });
+            // They are asked, not added: each one joins when they say yes.
+            const id = await createGroupAndInvite(name.trim() || 'New group', emoji, members);
             successFeedback();
-            router.replace(`/group/${id}` as Href);
+            if (id) router.replace(`/group/${id}` as Href);
           }}
         />
       }
@@ -93,7 +95,7 @@ export default function NewGroup() {
         />
 
         <Stack gap={3}>
-          <Text variant="micro" tone="subtle">WHO’S IN · {members.length} PICKED</Text>
+          <Text variant="micro" tone="subtle">INVITE · {members.length} PICKED</Text>
           <PeopleList
             people={friends}
             frequent={frequentFriends(circle, 6)}

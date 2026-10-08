@@ -19,6 +19,7 @@ export { DatePicker } from './primitives/DatePicker';
 export { Reveal } from './primitives/Reveal';
 export { Disclosure } from './primitives/Disclosure';
 export { MarkBadge } from './primitives/MarkBadge';
+export { CostChip } from './primitives/CostChip';
 export { Door } from './primitives/Door';
 export { AreaIcon } from './primitives/AreaIcon';
 export { Avatar, isPhoto } from './primitives/Avatar';

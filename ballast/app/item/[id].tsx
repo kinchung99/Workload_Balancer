@@ -4,7 +4,7 @@ import {
   AreaIcon, Button, Chip, Disclosure, Door, PageHeader, Screen, Section, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
-import { BUCKET_LABEL, COMMITMENT_LABEL, describeMix, loadOf } from '@/lib/load';
+import { BUCKET_LABEL, COMMITMENT_LABEL, costPercent } from '@/lib/load';
 import { daysLeft, needsPrep, remaining, sittingsOf } from '@/lib/prep';
 import { formatHour, startOptions } from '@/lib/schedule';
 import { addDays, formatShort } from '@/lib/dates';
@@ -38,7 +38,7 @@ export async function generateStaticParams() {
 export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { today, scheduleItem, moveItem, customFlags } = useStore();
+  const { today, scheduleItem, moveItem, customFlags, ceilings } = useStore();
   const items = useItemsWithLogs();
 
   const item = items.find((candidate) => candidate.id === id);
@@ -64,7 +64,7 @@ export default function ItemDetail() {
     <Screen
       back="/plan"
       backLabel="Plan"
-      footer={<Button label="Done" kind="secondary" onPress={() => router.back()} />}
+      footer={<Button label="Done" kind="secondary" onPress={() => (router.canGoBack() ? router.back() : router.replace('/plan'))} />}
     >
       <Stack gap={5} className="pt-2">
         <PageHeader
@@ -72,7 +72,6 @@ export default function ItemDetail() {
           wash={color.area[item.bucket].wash}
           eyebrow={owing || finished ? `Due ${formatShort(item.deadline ?? item.date)}` : formatShort(item.date)}
           title={item.title}
-          sub={describeMix(item.mix, item.bucket)}
           wiggle={false}
         />
 
@@ -83,7 +82,7 @@ export default function ItemDetail() {
               <AreaIcon area={item.bucket} size={15} />
               <Text variant="micro">{BUCKET_LABEL[item.bucket]}</Text>
             </View>
-            <Chip label={`${loadOf(item)} load`} readOnly />
+            <Chip label={`🔋 −${Math.max(1, Math.round(costPercent(item, ceilings)))}% of your week`} tone="busy" readOnly />
             <Chip label={COMMITMENT_LABEL[item.commitment]} tone={item.commitment === 'hard' ? 'heavy' : 'plain'} readOnly />
             {item.room ? <Chip label={item.room} readOnly /> : null}
             {item.startHour !== undefined ? (

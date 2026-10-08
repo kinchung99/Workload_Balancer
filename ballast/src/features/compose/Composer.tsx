@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, TextInput, View } from 'react-native';
 import { Button, Chip, Reveal, Section, Stack, Text } from '@/components';
 import { color, radius } from '@design/tokens';
-import { api, hasServer } from '@/lib/api';
+import { api } from '@/lib/api';
+import { ensureAi, useAiOpen } from '@/lib/ai';
 import { LENGTHS, TONES, TWEAKS, offlineDraft, offlineIdeas, offlineTweak, whatIsSent } from '@/lib/compose';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { useStore } from '@/state/store';
 import type { ComposeContext, ComposeIdea, MessageLength, ToneId } from '@shared/contract';
 
 type Source = 'claude' | 'phone';
@@ -25,8 +25,7 @@ const OWN = '__own__';
  * hand-written parts, and says so. Either way the app never sends anything.
  */
 export function Composer({ context: initial, onChange }: { context: ComposeContext; onChange: (text: string | null) => void }) {
-  const { account } = useStore();
-  const online = hasServer() && !!account;
+  const online = useAiOpen();
   const reduceMotion = useReducedMotion();
 
   const [to, setTo] = useState(initial.to);
@@ -51,6 +50,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
   const fetchIdeas = async () => {
     if (!online) return;
     setLoadingIdeas(true);
+    if (!(await ensureAi())) { setLoadingIdeas(false); return; }
     const result = await api.composeIdeas(context);
     if (result.ok && result.data.ideas.length) {
       setIdeas(result.data.ideas);
@@ -82,7 +82,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
     let text: string | null = null;
     let source: Source = 'phone';
 
-    if (online) {
+    if (online && (await ensureAi())) {
       const result = await api.composeDraft({
         context,
         intent: { title: intent.title, detail: 'detail' in intent ? intent.detail : undefined },
@@ -148,7 +148,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
             <Stack direction="row" gap={3} wrap>
               {[0, 1, 2, 3].map((i) => <IdeaSkeleton key={i} delay={i * 120} />)}
             </Stack>
-            <Text variant="footnote" tone="muted" accessibilityLiveRegion="polite">Claude is reading the situation…</Text>
+            <Text variant="footnote" tone="muted" accessibilityLiveRegion="polite">Reading the situation…</Text>
           </Stack>
         ) : (
           <Stack direction="row" gap={3} wrap>
@@ -212,7 +212,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
           !intent ? 'Pick what to say first'
             : draft && wrote !== signature ? '✨ Rewrite it'
             : draft ? '✨ Write it again'
-            : online ? '✨ Write it with Claude' : '✨ Write it'
+            : online ? '✨ Write it with AI' : '✨ Write it'
         }
         kind={intent ? 'primary' : 'secondary'}
         disabled={!intent || writing}
@@ -249,7 +249,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
       ) : null}
 
       {online ? (
-        <Reveal label="What Claude sees">
+        <Reveal label="What the AI sees">
           {whatIsSent(context).map(([label, value]) => (
             <Stack key={label} direction="row" gap={3}>
               <Text variant="micro" tone="subtle" style={{ width: 92 }}>{label.toUpperCase()}</Text>
@@ -260,7 +260,7 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
         </Reveal>
       ) : (
         <Text variant="footnote" tone="subtle">
-          Written on your phone. Sign in for ideas and drafts from Claude.
+          Written on your phone. Sign in for AI ideas and drafts.
         </Text>
       )}
     </Stack>
@@ -269,14 +269,16 @@ export function Composer({ context: initial, onChange }: { context: ComposeConte
 
 function SourcePill({ source, loading, what }: { source: Source; loading?: boolean; what: 'ideas' | 'draft' }) {
   const claude = source === 'claude' || loading;
+  // Only the AI is worth naming; the phone's own wording needs no label.
+  if (!claude) return null;
   return (
     <View
       className="self-start rounded-pill px-3 py-1"
       style={{ backgroundColor: claude ? color.area.mental.wash : color.surface.sunken }}
     >
       <Text variant="micro" tone={claude ? 'default' : 'subtle'}>
-        {loading ? '✨ ASKING CLAUDE…' : claude
-          ? (what === 'ideas' ? '✨ IDEAS FROM CLAUDE' : '✨ WRITTEN BY CLAUDE')
+        {loading ? '✨ ASKING AI…' : claude
+          ? (what === 'ideas' ? '✨ IDEAS FROM AI' : '✨ WRITTEN BY AI')
           : (what === 'ideas' ? '📱 IDEAS ON YOUR PHONE' : '📱 WRITTEN ON YOUR PHONE')}
       </Text>
     </View>

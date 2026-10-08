@@ -67,7 +67,12 @@ export default function Sharing() {
                 accessibilityRole="radio"
                 accessibilityState={{ checked: picked }}
                 accessibilityLabel={`${option.word}. ${option.note}`}
-                onPress={() => { tapFeedback(); setSharing(option.value); }}
+                onPress={() => {
+                  tapFeedback();
+                  setSharing(option.value);
+                  // Custom means choosing them: straight to the hours.
+                  if (option.value === 'custom') router.push('/sharing/hours' as Href);
+                }}
                 className={`min-h-row flex-row items-center gap-4 rounded-lg border-2 bg-raised px-4 py-3 active:opacity-70 ${
                   picked ? 'border-inverse' : 'border-line-hairline'
                 }`}
@@ -93,23 +98,21 @@ export default function Sharing() {
           })}
         </Section>
 
-        {/* One level down: your own hours, and who sees anything at all. */}
+        {/* One level down: your own hours (once you have chosen them), and who sees anything at all. */}
         <Section family="people" title="Fine-tune" sticker="sparkle">
-          <Door
-            emoji="🎛️"
-            title="Custom hours"
-            sub={sharing === 'custom'
-              ? shareRules.week.map((w, i) => (w ? DAY_LETTER[i] : '·')).join(' ')
-              : 'Pick the days and hours you share'}
-            onPress={() => router.push('/sharing/hours' as Href)}
-            extra={<HoursStrip week={shareRules.week} on={sharing === 'custom'} />}
-          />
+          {sharing === 'custom' ? (
+            <Door
+              emoji="🎛️"
+              title="Your hours"
+              sub={shareRules.week.map((w, i) => (w ? DAY_LETTER[i] : '·')).join(' ')}
+              onPress={() => router.push('/sharing/hours' as Href)}
+              extra={<HoursStrip week={shareRules.week} on />}
+            />
+          ) : null}
           <Door
             emoji="👀"
             title="Who sees your times"
-            sub={hidden.length === 0
-              ? `Everyone in your circle · ${friends.length}`
-              : `${seeing.length} of ${friends.length} · hidden from ${friends.filter((p) => hidden.includes(p.id)).map((p) => p.name).join(', ')}`}
+            sub={hidden.length === 0 ? `Everyone · ${friends.length}` : `${hidden.length} hidden · ${seeing.length} can see`}
             onPress={() => router.push('/sharing/people' as Href)}
           />
         </Section>

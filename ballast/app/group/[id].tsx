@@ -10,8 +10,9 @@ import { formatHour } from '@/lib/schedule';
 import { freeOn } from '@/lib/sharing';
 import { useStore } from '@/state/store';
 import type { CircleMember } from '@/lib/types';
-import { InvitedList } from '@/features/social/Planner';
+import { SentPlanCard } from '@/features/social/PlanCards';
 import { GROUP_EMOJIS, groupWash } from '@/features/social/groupArt';
+import { leaveOrDelete, removeFromGroup, renameGroup } from '@/lib/social';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
 
@@ -33,11 +34,12 @@ export async function generateStaticParams() {
 export default function GroupPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { groups, circle, today, invites, toggleGroupMember, updateGroup, deleteGroup } = useStore();
+  const { groups, circle, today, invites } = useStore();
   const group = groups.find((g) => g.id === id);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
 
   if (!group) {
     return (
@@ -51,6 +53,9 @@ export default function GroupPage() {
   }
 
   const members = circle.filter((person) => group.members.includes(person.id));
+  const invited = circle.filter((person) => (group.invited ?? []).some((i) => i.id === person.id));
+  // Only the person who made a group takes other people out of it.
+  const owner = group.owner !== false;
   const wash = groupWash(group.id);
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
@@ -74,11 +79,11 @@ export default function GroupPage() {
                 </View>
               </Pressable>
               <Stack gap={1} grow>
-                <Text variant="micro">GROUP · {members.length + 1} PEOPLE</Text>
+                <Text variant="micro">GROUP · {members.length ? `${members.length + 1} PEOPLE` : 'JUST YOU'}{invited.length ? ` · ${invited.length} INVITED` : ''}</Text>
                 {editing ? (
                   <TextInput
                     value={group.name}
-                    onChangeText={(name) => updateGroup(group.id, { name: name.slice(0, 32) })}
+                    onChangeText={(name) => void renameGroup(group.id, { name: name.slice(0, 32) })}
                     accessibilityLabel="Group name"
                     autoFocus
                     className="min-h-min rounded-md border border-line-strong bg-page px-3 py-2 text-heading text-ink-default"
@@ -98,7 +103,7 @@ export default function GroupPage() {
                     accessibilityRole="radio"
                     accessibilityState={{ selected: emoji === group.emoji }}
                     accessibilityLabel={`Picture ${emoji}`}
-                    onPress={() => { tapFeedback(); updateGroup(group.id, { emoji }); }}
+                    onPress={() => { tapFeedback(); void renameGroup(group.id, { emoji }); }}
                     className="items-center justify-center rounded-md active:opacity-60"
                     style={{
                       width: 40, height: 40,
@@ -131,18 +136,40 @@ export default function GroupPage() {
               days={days}
               open={open === person.id}
               confirming={confirm === person.id}
+              canRemove={owner}
               onToggle={() => { tapFeedback(); setOpen(open === person.id ? null : person.id); setConfirm(null); }}
               onMessage={() => { tapFeedback(); router.push(`/message?kind=checkin&to=${person.id}` as Href); }}
+              onAskRemove={() => { tapFeedback(); setConfirm(person.id); }}
+              onKeep={() => { tapFeedback(); setConfirm(null); }}
               onRemove={() => {
-                if (confirm !== person.id) { tapFeedback(); setConfirm(person.id); return; }
-                toggleGroupMember(group.id, person.id);
+                void removeFromGroup(group.id, person.id, false);
                 successFeedback();
                 setOpen(null);
                 setConfirm(null);
               }}
             />
           ))}
-          <Door family="people" sticker="wave" title="Add members" sub="From your circle" onPress={() => router.push(`/group/${group.id}/add` as Href)} />
+          {/* Asked, not in yet: they join when they say yes. */}
+          {invited.map((person) => (
+            <Stack key={person.id} direction="row" gap={3} align="center" className="rounded-lg border-2 border-dashed border-line-strong bg-raised px-4 py-3">
+              <View style={{ opacity: 0.55 }}><Avatar initials={person.initials} band={person.band} size={40} pic={person.pic} /></View>
+              <Stack gap={0} grow>
+                <Text variant="body" weight="semibold">{person.name}</Text>
+                <Text variant="micro" tone="busy">✉️ Invited · waiting for a yes</Text>
+              </Stack>
+              {owner ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Take back the invitation to ${person.name}`}
+                  onPress={() => { tapFeedback(); void removeFromGroup(group.id, person.id, true); }}
+                  className="min-h-min items-center justify-center rounded-pill border-2 border-line-hairline bg-sunken px-3 active:opacity-70"
+                >
+                  <Text variant="caption" weight="bold">Take back</Text>
+                </Pressable>
+              ) : null}
+            </Stack>
+          ))}
+          <Door family="people" sticker="wave" title="Invite friends" sub="They join when they say yes" onPress={() => router.push(`/group/${group.id}/add` as Href)} />
         </Section>
 
         {/* Planning is its own page; here is the way in, starting from what you usually do. */}
@@ -162,19 +189,36 @@ export default function GroupPage() {
           <Button label="Find a time together" onPress={() => { tapFeedback(); router.push(`/group/${group.id}/plan` as Href); }} />
         </Section>
 
+        {/* Plans made in this group, with who has said yes. */}
         {invites.some((invite) => invite.groupId === group.id) ? (
-          <InvitedList invites={invites.filter((invite) => invite.groupId === group.id)} />
+          <Section family="people" title="Plans" sticker="heart" meta={`${invites.filter((invite) => invite.groupId === group.id).length}`}>
+            {invites.filter((invite) => invite.groupId === group.id).map((invite) => <SentPlanCard key={invite.id} invite={invite} />)}
+          </Section>
         ) : null}
 
-        <Button
-          label="Delete this group"
-          kind="quiet"
-          onPress={() => {
-            deleteGroup(group.id);
-            successFeedback();
-            router.replace('/friends');
-          }}
-        />
+        {/* Ending it asks twice: the button, then a yes. */}
+        {ending ? (
+          <Stack gap={3} className="rounded-lg border-2 border-heavy-fill bg-heavy-wash px-4 py-4">
+            <Text variant="heading" tone="heavy">{owner ? `Delete ${group.name} for everyone?` : `Leave ${group.name}?`}</Text>
+            <Stack direction="row" gap={2}>
+              <Button label="Keep it" kind="secondary" className="flex-1" onPress={() => { tapFeedback(); setEnding(false); }} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={owner ? 'Yes, delete the group' : 'Yes, leave the group'}
+                onPress={async () => {
+                  await leaveOrDelete(group.id, owner);
+                  successFeedback();
+                  router.replace('/friends');
+                }}
+                className="min-h-button flex-1 items-center justify-center rounded-pill bg-heavy-fill px-4 active:opacity-70"
+              >
+                <Text variant="callout" weight="bold" tone="inverse">{owner ? 'Yes, delete' : 'Yes, leave'}</Text>
+              </Pressable>
+            </Stack>
+          </Stack>
+        ) : (
+          <Button label={owner ? 'Delete this group' : 'Leave this group'} kind="quiet" onPress={() => { tapFeedback(); setEnding(true); }} />
+        )}
       </Stack>
     </Screen>
   );
@@ -186,14 +230,17 @@ export default function GroupPage() {
  * them out of the group, which asks once more before it happens.
  */
 function MemberBlock({
-  person, days, open, confirming, onToggle, onMessage, onRemove,
+  person, days, open, confirming, canRemove, onToggle, onMessage, onAskRemove, onKeep, onRemove,
 }: {
   person: CircleMember;
   days: string[];
   open: boolean;
   confirming: boolean;
+  canRemove: boolean;
   onToggle: () => void;
   onMessage: () => void;
+  onAskRemove: () => void;
+  onKeep: () => void;
   onRemove: () => void;
 }) {
   const stale = isStale(person);
@@ -230,21 +277,37 @@ function MemberBlock({
                 : 'Nothing shared'}
             </Text>
           </Stack>
-          <Stack direction="row" gap={2}>
-            <Button label="✨ Message" kind="secondary" className="flex-1" onPress={onMessage} />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={confirming ? `Confirm removing ${person.name}` : `Remove ${person.name} from the group`}
-              onPress={onRemove}
-              className={`min-h-button flex-1 items-center justify-center rounded-pill border-2 px-4 active:opacity-70 ${
-                confirming ? 'border-heavy-fill bg-heavy-fill' : 'border-heavy-fill bg-heavy-wash'
-              }`}
-            >
-              <Text variant="callout" weight="semibold" tone={confirming ? 'inverse' : 'heavy'} className="text-center">
-                {confirming ? `Tap to remove ${person.name}` : 'Remove from group'}
-              </Text>
-            </Pressable>
-          </Stack>
+          {confirming ? (
+            // Two buttons, side by side: removing someone is never one tap.
+            <Stack gap={2} className="rounded-md bg-heavy-wash px-3 py-3">
+              <Text variant="callout" weight="semibold" tone="heavy">Remove {person.name} from the group?</Text>
+              <Stack direction="row" gap={2}>
+                <Button label="Keep" kind="secondary" className="flex-1" onPress={onKeep} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Yes, remove ${person.name}`}
+                  onPress={onRemove}
+                  className="min-h-button flex-1 items-center justify-center rounded-pill bg-heavy-fill px-4 active:opacity-70"
+                >
+                  <Text variant="callout" weight="bold" tone="inverse">Yes, remove</Text>
+                </Pressable>
+              </Stack>
+            </Stack>
+          ) : (
+            <Stack direction="row" gap={2}>
+              <Button label="✨ Message" kind="secondary" className="flex-1" onPress={onMessage} />
+              {canRemove ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${person.name} from the group`}
+                  onPress={onAskRemove}
+                  className="min-h-button flex-1 items-center justify-center rounded-pill border-2 border-heavy-fill bg-heavy-wash px-4 active:opacity-70"
+                >
+                  <Text variant="callout" weight="semibold" tone="heavy" className="text-center">Remove</Text>
+                </Pressable>
+              ) : null}
+            </Stack>
+          )}
         </Stack>
       ) : null}
     </Stack>

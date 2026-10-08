@@ -24,6 +24,7 @@ import { AreaIcon } from '../primitives/AreaIcon';
 import { Chip } from '../primitives/Chip';
 import { DrainBadge } from '../primitives/DrainPicker';
 import { MarkBadge } from '../primitives/MarkBadge';
+import { CostChip } from '../primitives/CostChip';
 import { Sticker, type StickerName } from '../primitives/Sticker';
 import { Stack } from '../primitives/Stack';
 import { Text } from '../primitives/Text';
@@ -114,6 +115,7 @@ export function DayTimeline({
   showGaps = true,
   customFlags = [],
   clock,
+  capacity,
 }: {
   /** The student's own flags, so a class wearing one can name it. */
   customFlags?: CustomFlag[];
@@ -130,7 +132,10 @@ export function DayTimeline({
   showGaps?: boolean;
   /** Today and the hour now. With it, blocks say what happened and a line marks now. */
   clock?: { today: string; hour: number };
+  /** The week's capacity in load. With it, every block says what it costs the battery. */
+  capacity?: number;
 }) {
+  const cost = (item: Item) => (capacity ? <CostChip percent={(loadOf(item) / capacity) * 100} /> : null);
   const [trays, setTrays] = useState({ day: false, owing: false });
   const { timed, anytime } = daySchedule(items, date);
   const gaps = showGaps ? freeSlots(items, date, 1) : [];
@@ -255,6 +260,7 @@ export function DayTimeline({
                       {` · ${item.hours < 1 ? `${Math.round(item.hours * 60)}m` : `${item.hours}h`}`}
                     </Text>
                     {item.isRecovery ? null : <DrainBadge value={item.dread} />}
+                    {quiet ? null : cost(item)}
                   </Stack>
 
                   {/* The hour where the hints get given is worth saying out loud. */}
@@ -315,9 +321,12 @@ export function DayTimeline({
                       </View>
                       <Stack gap={1} grow>
                         <Text variant="body" weight="semibold">{item.title}</Text>
-                        <Text variant="micro" tone={TONE[intensity(item)]}>
-                          {shortMix(item.mix, item.bucket)} · {loadOf(item)} · {item.hours < 1 ? `${Math.round(item.hours * 60)}m` : `${item.hours}h`}
-                        </Text>
+                        <Stack direction="row" gap={2} align="center">
+                          <Text variant="micro" tone={TONE[intensity(item)]}>
+                            {shortMix(item.mix, item.bucket)} · {item.hours < 1 ? `${Math.round(item.hours * 60)}m` : `${item.hours}h`}
+                          </Text>
+                          {cost(item)}
+                        </Stack>
                       </Stack>
                       {status && status !== 'later' && status !== 'due' ? (
                         <MarkBadge status={status} word={outcomeWord(item)} auto={item.autoMarked} />

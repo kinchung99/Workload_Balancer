@@ -29,6 +29,9 @@ const DREAD_PHRASES: Array<[RegExp, Dread]> = [
   [/\blooking forward\b|\bexcited\b|\benjoy\b|\blove\b|\bfun\b/i, 1],
 ];
 
+/** Things you work on before the day, not things you turn up to. */
+const PREP_WORDS = /\b(assignment|essay|report|coursework|revision|revise|dissertation|thesis|problem set|project|homework|draft|write[- ]?up|portfolio|presentation prep)\b/i;
+
 const HARD_WORDS = /\bdue\b|\bdeadline\b|\bexam\b|\bhand ?in\b|\bsubmit\b|\bshift\b|\bappointment\b/i;
 const SELF_WORDS = /\bshould\b|\bwant to\b|\bmaybe\b|\btry to\b|\bif i can\b|\bat some point\b/i;
 
@@ -105,6 +108,7 @@ export function parse(text: string, today: string): ParsedDraft {
     date,
     dateLabel: date ? formatShort(date) : null,
     unknown,
+    prep: PREP_WORDS.test(text),
   };
 }
 

@@ -7,10 +7,11 @@
  */
 import { useMemo } from 'react';
 import { logItems } from '@/lib/logs';
-import { overallPercent, percentByBucket } from '@/lib/load';
+import { overallOf, percentByBucket } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
 import type { BucketKey, Item } from '@/lib/types';
 import { itemsInWeek, useStore } from './store';
+import { countedOnce } from '@/lib/prep';
 
 export interface Reading {
   /** The week's items with today's logs folded in. */
@@ -23,9 +24,9 @@ export interface Reading {
 
 /** Build a reading from an explicit item list - used for what-if previews. */
 export function readingFrom(items: Item[], anchor: string, ceilings: Record<BucketKey, number>): Reading {
-  const week = itemsInWeek(items, anchor);
+  const week = itemsInWeek(countedOnce(items), anchor);
   const percents = percentByBucket(week, ceilings);
-  const overall = overallPercent(percents);
+  const overall = overallOf(week, ceilings);
   return { items, week, percents, overall, charge: chargeOf(overall) };
 }
 

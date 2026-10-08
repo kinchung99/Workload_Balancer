@@ -156,6 +156,35 @@ export const friendships = pgTable('friendships', {
   index('friendships_friend_idx').on(t.friendId),
 ]);
 
+/* ------------------------------------------------------------------ groups */
+
+/**
+ * A group is shared, so it lives here rather than in anyone's own documents.
+ *
+ * Joining is two-sided the way a friendship is: the person adding you writes an
+ * `invited` row, and only you can turn it into `member`. Until then you are not
+ * in it - you see the invitation, nobody sees you listed as a member.
+ */
+export const groups = pgTable('groups', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 32 }).notNull(),
+  emoji: varchar('emoji', { length: 16 }).notNull().default('👥'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const groupMembers = pgTable('group_members', {
+  groupId: text('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  /** invited · member */
+  status: varchar('status', { length: 12 }).notNull().default('invited'),
+  invitedBy: text('invited_by').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.groupId, t.userId] }),
+  index('group_members_user_idx').on(t.userId),
+]);
+
 /* --------------------------------------------------------------- gatherings */
 
 export const invites = pgTable('invites', {
@@ -195,6 +224,6 @@ export const inviteGuestRelations = relations(inviteGuests, ({ one }) => ({
 }));
 
 /** Every table, for the test harness to create in one pass. */
-export const ALL_TABLES = { profiles, documents, presence, freeWindows, friendships, invites, inviteGuests };
+export const ALL_TABLES = { profiles, documents, presence, freeWindows, friendships, groups, groupMembers, invites, inviteGuests };
 
 export { sql };

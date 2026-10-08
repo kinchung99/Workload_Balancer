@@ -11,7 +11,7 @@
  * asserted in `npm run behaviour:check` rather than trusted.
  */
 import { formatShort } from './dates';
-import { loadOf } from './load';
+import { capacityOf, loadOf } from './load';
 import { DAY_END, DAY_START, dayHours, daySchedule, endHour, formatHour, freeSlots, slotHours } from './schedule';
 import { STUDY_WINDOW, loadOnDay, sessionItems, workDays, type Session } from './prep';
 import type { Item } from './types';
@@ -99,15 +99,16 @@ export function dayFacts(item: Item, base: Item[], today: string, drafts: Draft[
 /**
  * Why this day, in three facts: how it ranks, what it weighs, how full it is.
  *
- * No sentences. "Lightest day · 19 load · 10h booked" is the reason; a
- * paragraph explaining it would be the thing nobody reads.
+ * No sentences. "Lightest day · 🔋 −5% · 10h booked" is the reason; a
+ * paragraph explaining it would be the thing nobody reads. The day's weight is
+ * said as battery, out of the week's capacity, like everywhere else.
  */
-export function whyThisDay(fact: DayFact): string[] {
+export function whyThisDay(fact: DayFact, capacity: number = capacityOf()): string[] {
   const out: string[] = [];
   if (fact.isDue) out.push('Due day');
   else if (fact.rank === 1) out.push('Lightest day');
   else if (fact.rank !== null) out.push(`${ordinal(fact.rank)} lightest`);
-  out.push(`${Math.round(fact.load)} load`);
+  out.push(`🔋 −${Math.round((fact.load / capacity) * 100)}%`);
   out.push(`${fact.booked}h booked`);
   return out;
 }
@@ -139,14 +140,14 @@ export interface Change {
  * much; trimming a sitting says how much went back to loose, because that is
  * the part that becomes a late night if nobody mentions it.
  */
-export function describeChange(item: Item, base: Item[], from: Draft, to: Draft): Change[] {
+export function describeChange(item: Item, base: Item[], from: Draft, to: Draft, capacity: number = capacityOf()): Change[] {
   const changes: Change[] = [];
   const due = item.deadline ?? item.date;
 
   if (from.date !== to.date) {
     const before = round(loadOnDay(base, from.date));
     const after = round(loadOnDay(base, to.date));
-    const diff = Math.round(after - before);
+    const diff = Math.round(((after - before) / capacity) * 100);
     changes.push({
       key: 'day',
       label: 'Day',
@@ -154,7 +155,7 @@ export function describeChange(item: Item, base: Item[], from: Draft, to: Draft)
       to: formatShort(to.date),
       note: to.date === due
         ? 'Due day · no buffer'
-        : diff > 0 ? `+${diff} load heavier` : diff < 0 ? `${diff} load lighter` : 'Same load',
+        : diff > 0 ? `A busier day · 🔋 −${diff}%` : diff < 0 ? `A lighter day · 🔋 +${-diff}%` : 'Just as busy',
       tone: to.date === due || diff > 0 ? 'heavy' : diff < 0 ? 'steady' : 'plain',
     });
   }

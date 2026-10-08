@@ -363,6 +363,27 @@ export interface Invite {
   people: string[];
   /** The group it was planned in, when it was. */
   groupId?: string;
+  /** Each guest's answer so far, by circle id. No entry is still waiting. */
+  answers?: Record<string, 'yes' | 'no'>;
+  /** Put in your own week - a plan is only an invitation until you do. */
+  scheduled?: boolean;
+  sentAt?: string;
+}
+
+/** A plan somebody else made and asked you to. Yours to answer. */
+export interface ReceivedInvite {
+  id: string;
+  title: string;
+  date: string;
+  startHour: number;
+  hours: number;
+  /** Who asked. */
+  from: string;
+  /** Everyone else asked, with their answer so far. */
+  others: Array<{ id: string; name: string; answer?: 'yes' | 'no' }>;
+  /** Yours, once given. */
+  answer?: 'yes' | 'no';
+  at?: string;
 }
 
 /**
@@ -376,10 +397,42 @@ export interface Group {
   id: string;
   name: string;
   emoji: string;
-  /** Circle member ids. You are always in it and never listed. */
+  /** Circle member ids who said yes. You are always in it and never listed. */
   members: string[];
+  /** Friends asked to join who have not answered yet, with when they were asked. */
+  invited?: Array<{ id: string; at: string }>;
+  /** You made it: only its maker removes other people or deletes it. */
+  owner?: boolean;
   /** What this group usually does together, so planning starts from it. */
   activities?: PlanActivity[];
+}
+
+/** Somebody asked you into one of their groups. Yours to answer. */
+export interface GroupInvite {
+  id: string;
+  name: string;
+  emoji: string;
+  /** Who asked. */
+  from: string;
+  at: string;
+  /** Who is already in it, as circle ids, when known. */
+  members?: string[];
+}
+
+/**
+ * Something that happened, worth telling you about once: a friend said yes,
+ * somebody joined your group. Things that still need you - a request to
+ * answer, a class to mark - are worked out live instead, so they disappear the
+ * moment they are dealt with.
+ */
+export interface Notice {
+  id: string;
+  at: string;
+  emoji: string;
+  title: string;
+  body?: string;
+  /** Where tapping it goes. */
+  to?: string;
 }
 
 /**
@@ -428,6 +481,8 @@ export interface ParsedDraft {
   dateLabel: string | null;
   /** Fields the parser genuinely could not infer, so it asks instead of guessing. */
   unknown: Array<'hours' | 'date'>;
+  /** Work done before the day - an essay, a report - rather than something you turn up to. */
+  prep: boolean;
 }
 
 // ---------------------------------------------------------------- areas
@@ -524,7 +579,7 @@ export interface SimAction {
   step: number;
   baseline: number;
   unit: 'h' | 'min' | 'step';
-  /** Charge points gained per unit above baseline. Negative costs you charge. */
+  /** Load given back per unit above baseline (four is about one percent of a week). Negative costs it. */
   ptsPerUnit: number;
   /** Shown under the slider once it has moved off baseline. */
   goodNote: string;

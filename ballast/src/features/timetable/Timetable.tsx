@@ -8,15 +8,16 @@ import {
 import { SCREEN } from '@design/screens';
 import { color } from '@design/tokens';
 import {
-  BUILT_IN_FLAGS, FLAG_EMOJI, FLAG_LABEL, MODULE_EMOJIS, attendanceRate, attendanceStatus, classesOn,
-  flagInfo, flagsFor, modulesFrom, parseTimetable, toItems,
+  BUILT_IN_FLAGS, FLAG_EMOJI, FLAG_LABEL, attendanceRate, attendanceStatus, classesOn,
+  flagInfo, flagsFor,
 } from '@/lib/timetable';
 import { ModuleCard } from './ModuleCard';
+import { ClassBuilder } from './ClassBuilder';
 import { clockHour, markStatus, outcomeWord, type MarkStatus } from '@/lib/marking';
 import { FlagMaker } from './FlagMaker';
 import { formatHour, weekDays } from '@/lib/schedule';
 import { DAY_LETTER, addDays, dayIndex, formatShort, startOfWeek } from '@/lib/dates';
-import { loadOf } from '@/lib/load';
+import { costPercent } from '@/lib/load';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import type { CustomFlag, FlagId, Item } from '@/lib/types';
 import { useStore } from '@/state/store';
@@ -24,9 +25,6 @@ import { useItemsWithLogs } from '@/state/selectors';
 
 const KIND_TONE = { lecture: 'busy', lab: 'steady', tutorial: 'recovery', seminar: 'heavy' } as const;
 
-const SAMPLE = `Mon 09:00-11:00 CS2040 Operating Systems Lecture Kilburn LT1
-Tue 14:00-16:00 CS2011 Algorithms Lab in Lab A
-Thu 8-10am CS2035 Networks Lecture Stopford TH2`;
 
 /**
  * The timetable.
@@ -37,35 +35,25 @@ Thu 8-10am CS2035 Networks Lecture Stopford TH2`;
  * hints get given is the one a stressed student skips first and can least afford
  * to.
  */
-const TABS = ['Week', 'Modules', 'Import'];
+const TABS = ['Week', 'Modules', 'Add'];
 
 /** The three pages, as URL segments. `/timetable/modules` opens on the list. */
 export const STEP_SLUGS = ['week', 'modules', 'import'] as const;
 
-const TITLE = ['This week', 'Your modules', 'Import'] as const;
+const TITLE = ['This week', 'Your modules', 'Add classes'] as const;
 
 export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
   const router = useRouter();
-  const { today, modules, toggleClassFlag, importTimetable, customFlags } = useStore();
+  const { today, modules, toggleClassFlag, customFlags } = useStore();
   const items = useItemsWithLogs();
 
   const days = weekDays(today);
   const [selected, setSelected] = useState(today);
   const [openModule, setOpenModule] = useState<string | null>(null);
   const [step, setStep] = useState(initialStep);
-  const [paste, setPaste] = useState('');
   /** The class a new flag is being made on, if any. */
   const [making, setMaking] = useState<string | null>(null);
-  /** Pictures picked for the modules about to be imported, by module id. */
-  const [pictures, setPictures] = useState<Record<string, string>>({});
-  /** How many weeks each imported module runs, and which teaching week it is now. */
-  const [lengths, setLengths] = useState<Record<string, number>>({});
-  const [weekNow, setWeekNow] = useState(1);
 
-  const preview = useMemo(() => (paste.trim() ? parseTimetable(paste) : null), [paste]);
-  const importing = useMemo(() => (preview?.classes.length ? toItems(preview.classes, today, 2) : []), [preview, today]);
-  const termStart = addDays(startOfWeek(today), -(weekNow - 1) * 7);
-  const found = useMemo(() => modulesFrom(importing, pictures, lengths, termStart), [importing, pictures, lengths, termStart]);
   const classesToday = classesOn(items, selected);
   const weekHours = days.reduce((total, date) => total + classesOn(items, date).reduce((h, c) => h + c.hours, 0), 0);
   const atRisk = modules.filter((m) => ['below', 'close'].includes(attendanceStatus(m)));
@@ -76,7 +64,7 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
       backLabel="You"
       footer={
         <Button
-          label={step === 2 ? 'Back to the week' : 'Import from your portal'}
+          label={step === 2 ? 'Back to the week' : 'Add classes'}
           kind={step === 2 ? 'secondary' : 'primary'}
           onPress={() => { tapFeedback(); setStep(step === 2 ? 0 : 2); }}
         />
@@ -107,110 +95,8 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
           </Card>
         ) : null}
 
-        {/* Import. A paste, not a scan. */}
-        {step === 2 ? (
-          <Card gap={4}>
-            <Stack gap={2}>
-              <Text variant="heading">Paste it from your portal</Text>
-              <Text variant="footnote" tone="muted">
-                One class per line.
-              </Text>
-            </Stack>
-            <TextInput
-              value={paste}
-              onChangeText={setPaste}
-              multiline
-              placeholder={SAMPLE}
-              placeholderTextColor={color.ink.subtle}
-              accessibilityLabel="Paste your timetable"
-              className="min-h-row rounded-md border border-line-strong bg-page px-4 py-3 text-footnote text-ink-default"
-              style={{ minHeight: 120 }}
-            />
-
-            {preview ? (
-              <Stack gap={3}>
-                <Text variant="micro" tone="subtle">
-                  READ {preview.classes.length} CLASS{preview.classes.length === 1 ? '' : 'ES'}
-                  {preview.skipped.length ? ` · ${preview.skipped.length} NOT UNDERSTOOD` : ''}
-                </Text>
-                {preview.classes.slice(0, 6).map((entry, index) => (
-                  <Text key={index} variant="footnote" tone="muted">
-                    {DAY_LETTER[entry.day]} · {formatHour(entry.startHour)}–{formatHour(entry.startHour + entry.hours)} ·{' '}
-                    {entry.name} {entry.kind}{entry.room ? ` · ${entry.room}` : ''}
-                  </Text>
-                ))}
-                {/* Nothing disappears silently. */}
-                {preview.skipped.map((line) => (
-                  <Text key={line} variant="micro" tone="heavy">Could not read: {line}</Text>
-                ))}
-                {/* Each module gets its picture here, once, while the list is in front of you. */}
-                {found.length ? (
-                  <Stack gap={3}>
-                    <Text variant="micro" tone="subtle">{found.length} MODULE{found.length === 1 ? '' : 'S'}</Text>
-                    {/* Which teaching week it is now, so "week 3 of 12" is right from the start. */}
-                    <Stack direction="row" gap={3} align="center" className="rounded-md bg-sunken px-3 py-2">
-                      <Text variant="callout" weight="semibold" className="flex-1">Teaching week now</Text>
-                      <Stepper value={weekNow} onChange={(next) => setWeekNow(Math.max(1, Math.min(20, next)))} />
-                    </Stack>
-                    {found.map((module) => (
-                      <Stack key={module.id} gap={2} className="rounded-md border border-line-hairline px-3 py-3">
-                        <Stack direction="row" gap={3} align="center">
-                          <View className="items-center justify-center rounded-pill bg-sunken" style={{ width: 44, height: 44 }}>
-                            <Text variant="heading">{module.emoji}</Text>
-                          </View>
-                          <Stack gap={1} grow>
-                            <Text variant="micro" tone="subtle">{module.code}</Text>
-                            <Text variant="callout" weight="semibold">{module.name}</Text>
-                          </Stack>
-                          <Stack gap={1} align="center">
-                            <Stepper
-                              value={module.weeks ?? 12}
-                              onChange={(next) => setLengths({ ...lengths, [module.id]: Math.max(1, Math.min(30, next)) })}
-                            />
-                            <Text variant="micro" tone="subtle">weeks</Text>
-                          </Stack>
-                        </Stack>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                          {MODULE_EMOJIS.map((emoji) => {
-                            const on = module.emoji === emoji;
-                            return (
-                              <Pressable
-                                key={emoji}
-                                accessibilityRole="radio"
-                                accessibilityState={{ selected: on }}
-                                accessibilityLabel={`${module.code} picture ${emoji}`}
-                                onPress={() => { tapFeedback(); setPictures({ ...pictures, [module.id]: emoji }); }}
-                                className="items-center justify-center rounded-md active:opacity-60"
-                                style={{
-                                  width: 38, height: 38,
-                                  backgroundColor: on ? color.decor.lemon : color.surface.sunken,
-                                  borderWidth: on ? 2 : 0, borderColor: color.ink.default,
-                                }}
-                              >
-                                <Text variant="callout">{emoji}</Text>
-                              </Pressable>
-                            );
-                          })}
-                        </ScrollView>
-                      </Stack>
-                    ))}
-                  </Stack>
-                ) : null}
-                <Button
-                  label={`Replace my timetable with these ${preview.classes.length}`}
-                  onPress={() => {
-                    importTimetable(importing, found);
-                    successFeedback();
-                    setStep(0);
-                    setPaste('');
-                    setPictures({});
-                    setLengths({});
-                  }}
-                />
-              </Stack>
-            ) : null}
-          </Card>
-        ) : null}
+        {/* Adding: modules and their classes, by tapping. */}
+        {step === 2 ? <ClassBuilder /> : null}
 
         {/* The week, day by day. */}
         {step === 0 ? (
@@ -323,6 +209,7 @@ function ClassRow({
   /** Signed in, missed, or waiting to be - the same badge the day's blocks wear. */
   status: MarkStatus;
 }) {
+  const ceilings = useStore((state) => state.ceilings);
   const flags = session.flags ?? [];
   const all: FlagId[] = [...BUILT_IN_FLAGS, ...customFlags.map((flag) => flag.id)];
   return (
@@ -332,7 +219,7 @@ function ClassRow({
           <Text variant="body" weight="semibold">{session.title}</Text>
           <Text variant="micro" tone="subtle">
             {formatHour(session.startHour ?? 0)}–{formatHour((session.startHour ?? 0) + session.hours)}
-            {session.room ? ` · ${session.room}` : ''} · {loadOf(session)} load
+            {session.room ? ` · ${session.room}` : ''} · 🔋 −{Math.max(1, Math.round(costPercent(session, ceilings)))}%
           </Text>
           {status !== 'later' ? <MarkBadge status={status} word={outcomeWord(session)} auto={session.autoMarked} /> : null}
         </Stack>
@@ -370,33 +257,6 @@ function ClassRow({
       {flags.includes('coursework') ? (
         <Chip label="Anything set in this one?" tone="steady" onPress={onCapture} />
       ) : null}
-    </Stack>
-  );
-}
-
-/** − 12 + : a number nudged one at a time. */
-function Stepper({ value, onChange }: { value: number; onChange: (next: number) => void }) {
-  return (
-    <Stack direction="row" gap={2} align="center">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="One fewer"
-        onPress={() => { tapFeedback(); onChange(value - 1); }}
-        className="items-center justify-center rounded-pill border border-line-strong bg-raised active:opacity-60"
-        style={{ width: 30, height: 30 }}
-      >
-        <Text variant="callout" weight="bold">−</Text>
-      </Pressable>
-      <Text variant="callout" weight="bold" className="text-center" style={{ minWidth: 24 }}>{value}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="One more"
-        onPress={() => { tapFeedback(); onChange(value + 1); }}
-        className="items-center justify-center rounded-pill border border-line-strong bg-raised active:opacity-60"
-        style={{ width: 30, height: 30 }}
-      >
-        <Text variant="callout" weight="bold">+</Text>
-      </Pressable>
     </Stack>
   );
 }

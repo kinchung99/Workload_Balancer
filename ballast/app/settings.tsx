@@ -72,7 +72,7 @@ export default function Settings() {
       family: 'week',
       rows: [
         { sticker: 'class', label: 'Timetable', value: 'Classes and flags', to: '/timetable' },
-        { sticker: 'sun', label: 'Check in', value: 'Mood, sleep, food', to: '/checkin' },
+        { sticker: 'sun', label: 'Check in', value: 'Note, mood, sleep', to: '/checkin' },
       ],
     },
   ];

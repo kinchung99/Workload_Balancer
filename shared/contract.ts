@@ -180,6 +180,46 @@ export interface PendingRequestDTO {
   at: string;
 }
 
+/* ---------------------------------------------------------------- groups */
+
+/**
+ * Groups are shared and joined by invitation.
+ *
+ * Adding someone writes an invitation, never a membership: they see it, they
+ * say yes, and only then are they in. Only friends can be invited, and only the
+ * person who made a group can remove anyone but themselves.
+ */
+const groupName = z.string().trim().min(1).max(32);
+const groupEmoji = z.string().min(1).max(16);
+const userIds = z.array(z.string().min(1).max(100)).max(50);
+
+export const groupCreateSchema = z.object({ name: groupName, emoji: groupEmoji, invite: userIds.default([]) });
+export const groupInviteSchema = z.object({ userIds: userIds.min(1) });
+export const groupRespondSchema = z.object({ action: z.enum(['accept', 'decline']) });
+export const groupRemoveSchema = z.object({ userId: z.string().min(1).max(100) });
+export const groupUpdateSchema = z.object({ name: groupName.optional(), emoji: groupEmoji.optional() });
+
+export interface GroupMemberDTO {
+  id: string;
+  name: string;
+  initials: string;
+  /** In it, or asked and not answered yet. */
+  status: 'member' | 'invited';
+}
+
+export interface GroupDTO {
+  id: string;
+  name: string;
+  emoji: string;
+  ownerId: string;
+  /** Where you stand: in it, or invited to it. */
+  you: 'member' | 'invited';
+  /** Who asked you, when you are only invited. */
+  invitedBy?: string;
+  /** Everyone else, members and invitations alike. */
+  people: GroupMemberDTO[];
+}
+
 /* --------------------------------------------------------------- invites */
 
 export const inviteSchema = z.object({
@@ -325,6 +365,66 @@ export interface RestIdea {
 }
 
 export interface RestIdeasResponse { ideas: RestIdea[] }
+
+/* ------------------------------------------------------------------- coach */
+
+/**
+ * The coach: a model reading a list the phone already made, and saying which to
+ * pick and why.
+ *
+ * It only ever chooses among the ids it was handed - the ranked tasks, the
+ * trades already priced, the free windows already found - and never invents an
+ * action. So whatever it suggests is something the app can already do with one
+ * tap, and an answer naming anything else is dropped on the server.
+ */
+const coachText = z.string().trim().min(1).max(80);
+const coachId = z.string().min(1).max(120);
+
+/** "What to do first": the top of the ranked list, as the phone scored it. */
+export const priorityContextSchema = z.object({
+  /** "Tue 3pm" - when the student is asking. */
+  now: z.string().max(30),
+  charge: z.number().int().min(0).max(100),
+  restOwed: z.number().min(0).max(200).default(0),
+  tasks: z.array(z.object({
+    id: coachId,
+    title: coachText,
+    kind: z.enum(['owing', 'fixed', 'loose']),
+    /** "today", "tomorrow", "Thu 13 Nov". */
+    due: z.string().max(30).optional(),
+    hoursLeft: z.number().min(0).max(300),
+    percentLeft: z.number().int().min(0).max(100).optional(),
+    dread: z.number().int().min(1).max(5),
+    hardness: z.enum(['hard', 'soft', 'self']),
+  })).min(1).max(12),
+});
+export type PriorityContext = z.infer<typeof priorityContextSchema>;
+export const priorityAdviceSchema = z.object({ context: priorityContextSchema });
+
+/** "Rebalance next week": the trades already priced, locked ones included so it can say why not. */
+export const rebalanceContextSchema = z.object({
+  charge: z.number().int().min(0).max(100),
+  options: z.array(z.object({
+    id: coachId,
+    title: coachText,
+    detail: z.string().max(140),
+    /** Load it gives back. */
+    saves: z.number().min(0).max(500),
+    day: z.string().max(30),
+    locked: z.boolean().default(false),
+    protected: z.boolean().default(false),
+  })).min(1).max(16),
+  /** The one keep-this-drop-that the app found, if any. */
+  swap: z.object({ keep: coachText, drop: coachText, day: z.string().max(30) }).optional(),
+});
+export type RebalanceContext = z.infer<typeof rebalanceContextSchema>;
+export const rebalanceAdviceSchema = z.object({ context: rebalanceContextSchema });
+
+/** A reason in a line for one item; for a trade, also whether to take it. */
+export interface CoachPick { id: string; why: string; take?: boolean }
+/** A headline for the whole answer, then a reason per item; for rebalancing, a line on the swap. */
+export interface CoachAdviceResponse { headline: string; picks: CoachPick[]; swap?: string }
+
 
 /* ----------------------------------------------------------------- profile */
 

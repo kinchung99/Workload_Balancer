@@ -11,7 +11,6 @@
  */
 import type { Href } from 'expo-router';
 import { Battery, Button, Screen, Stack, Text } from '@/components';
-import { threshold } from '@design/tokens';
 import { bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { dayName } from '@/lib/dates';
@@ -41,12 +40,7 @@ export function CalmMode({ percent, today, focus, onHide, onShowEverything, back
         <>
           <Button label="Hide the rest until Friday" onPress={onHide} />
           <Button label="Show me everything anyway" kind="secondary" onPress={onShowEverything} />
-          <Text variant="footnote" tone="subtle" className="text-center">
-            Hiding keeps today's hard deadlines and puts everything else away.
-          </Text>
-          <Text variant="footnote" tone="subtle" className="pt-2 text-center">
-            Full view comes back on its own when you drop below {threshold.calmMode}%.
-          </Text>
+
         </>
       }
     >

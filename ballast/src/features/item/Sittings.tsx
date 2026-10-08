@@ -13,6 +13,7 @@ import {
 } from '@/lib/sittings';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
+import { capacityOf } from '@/lib/load';
 import { MarkSheet } from '@/features/marking/MarkSheet';
 import type { Item } from '@/lib/types';
 import { Cheer } from './Cheer';
@@ -45,7 +46,7 @@ const CHART_MAX = 64;
  */
 export function Sittings({ item, items, autoSuggest = false }: { item: Item; items: Item[]; autoSuggest?: boolean }) {
   const router = useRouter();
-  const { today, scheduleSessions, unscheduleSession, updateSession, pushSittings } = useStore();
+  const { today, scheduleSessions, unscheduleSession, updateSession, pushSittings, ceilings } = useStore();
   const [marking, setMarking] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Proposal[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -184,7 +185,7 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
                     <Text variant="footnote" tone={session.sessionDone ? 'steady' : 'muted'}>
                       {session.sessionDone
                         ? `Done · ${durationLabel(session.hours)} on the bar`
-                        : `${durationLabel(session.hours)} · ${Math.round(sittingLoad(item, session.hours))} load`}
+                        : `${durationLabel(session.hours)} · 🔋 −${Math.max(1, Math.round((sittingLoad(item, session.hours) / capacityOf(ceilings)) * 100))}%`}
                     </Text>
                   </Stack>
                 </Stack>
@@ -251,7 +252,7 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
               <Chip label="Cancel" onPress={() => { tapFeedback(); setDrafts(null); setOpen(null); setNotice(null); }} />
             </Stack>
 
-            <DayChart facts={facts} />
+            <DayChart facts={facts} capacity={capacityOf(ceilings)} />
 
             {drafts.map((draft) => {
               const fact = factOf(draft.date);
@@ -278,7 +279,7 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
                         </Stack>
                         {fact ? (
                           <Stack direction="row" gap={1} wrap>
-                            {whyThisDay(fact).map((reason, index) => (
+                            {whyThisDay(fact, capacityOf(ceilings)).map((reason, index) => (
                               <Reason key={reason} label={reason} lead={index === 0} due={fact.isDue} />
                             ))}
                           </Stack>
@@ -417,10 +418,11 @@ function Reason({ label, lead, due }: { label: string; lead: boolean; due: boole
  * heaviest one painted a chosen day red, which read as "the app picked a bad
  * day" when it had picked the second-lightest.
  */
-function DayChart({ facts }: { facts: DayFact[] }) {
+function DayChart({ facts, capacity }: { facts: DayFact[]; capacity: number }) {
+  const pct = (load: number) => Math.round((load / capacity) * 100);
   const peak = Math.max(...facts.map((f) => f.load + f.adding), 1);
   const spoken = facts
-    .map((f) => `${formatShort(f.date)}, ${Math.round(f.load)} load${f.adding ? `, plus ${Math.round(f.adding)} from this plan` : ''}${f.isDue ? ', due' : ''}`)
+    .map((f) => `${formatShort(f.date)}, uses ${pct(f.load)} percent${f.adding ? `, plus ${pct(f.adding)} from this plan` : ''}${f.isDue ? ', due' : ''}`)
     .join('. ');
 
   const columns = (
@@ -430,7 +432,7 @@ function DayChart({ facts }: { facts: DayFact[] }) {
         return (
           <Stack key={fact.date} gap={1} align="center" style={{ flexGrow: 1, minWidth: 40 }}>
             <Text variant="micro" tone={fact.adding ? 'recovery' : 'subtle'}>
-              {fact.adding ? `+${Math.round(fact.adding)}` : Math.round(fact.load)}
+              {fact.adding ? `+${pct(fact.adding)}%` : `${pct(fact.load)}%`}
             </Text>
             <View className="w-full items-center justify-end" style={{ height: CHART_MAX }}>
               <View style={{ width: 22, borderRadius: radius.sm, overflow: 'hidden' }}>

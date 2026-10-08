@@ -1,5 +1,5 @@
 /**
- * Writing with Claude: messages, and what might help.
+ * Writing with a model: messages, and what might help.
  *
  * The drafter used to be three templates with the blanks filled in, which reads
  * as a template the moment anyone receives two of them. Saying no, asking for an
@@ -15,7 +15,8 @@
  * Three rules hold:
  *
  *  - **The key never leaves the server.** The app talks to this route; only this
- *    route talks to Anthropic.
+ *    route talks to the model - Gemini when `GEMINI_API_KEY` is set, Claude when
+ *    `ANTHROPIC_API_KEY` is, neither otherwise.
  *  - **Nothing is stored.** The request is the words on the screen, answered and
  *    forgotten. There is no table for it.
  *  - **No invented excuses.** The prompt forbids illnesses, emergencies and
@@ -30,11 +31,13 @@
  * an open proxy to a paid model is a bill somebody else writes.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { ApiError as GeminiApiError, FinishReason, GoogleGenAI } from '@google/genai';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
-  REST_AREAS, composeDraftSchema, composeIdeasSchema, restIdeasSchema,
-  type ComposeContext, type ComposeDraftRequest, type ComposeIdea, type RestContext, type RestIdea,
+  REST_AREAS, composeDraftSchema, composeIdeasSchema, priorityAdviceSchema, rebalanceAdviceSchema, restIdeasSchema,
+  type CoachAdviceResponse, type ComposeContext, type ComposeDraftRequest, type ComposeIdea, type PriorityContext,
+  type RebalanceContext, type RestContext, type RestIdea,
 } from '../../../shared/contract.js';
 import type { Env } from '../types.js';
 
@@ -44,12 +47,22 @@ export interface Writer {
   draft(request: ComposeDraftRequest): Promise<string>;
   /** Five things that might help, for the recovery screen. */
   rest(context: RestContext): Promise<RestIdea[]>;
+  /** A short reason for each ranked task, in the order the phone ranked them. */
+  priority(context: PriorityContext): Promise<CoachAdviceResponse>;
+  /** A short reason for every priced trade, and which to take. */
+  rebalance(context: RebalanceContext): Promise<CoachAdviceResponse>;
 }
 
 /** The model declined. Answered as 422 so the app falls back to its own drafts. */
 export class DeclinedError extends Error {}
 
 const MODEL = 'claude-opus-5-5';
+
+/**
+ * Flash-Lite: the free tier's most generous daily allowance, and plenty for a
+ * two-line text message. `GEMINI_MODEL` swaps it without a code change.
+ */
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 const SYSTEM = `You help a stressed university student write short messages that they will read, edit and send themselves from their own phone, under their own name.
 
@@ -69,6 +82,14 @@ Rules:
 - Respect what they said they are in the mood for.
 - Not medical or clinical advice. No therapy language, no "self-care" cliches, nothing involving alcohol or anything risky.
 - Varied: five genuinely different ideas, not five versions of a walk.`;
+
+const COACH_SYSTEM = `You coach a stressed university student through their week. The app has already listed and scored their options from what the student entered; you explain them in plain words.
+
+Rules:
+- Only use the ids you are given. Never invent a task, an option or an action.
+- Each reason is short and precise: under 60 characters, second person, no full stop, specific to that item - the deadline, the hours left, how much they dread it, whether it can move, what it gives back.
+- The headline is one encouraging, concrete line under 60 characters - a game plan, not a pep talk.
+- Kind and honest. No guilt, no therapy language, no "self-care" cliches. Never mention scores, percentages of load or this app.`;
 
 const fmt = (hour: number): string => {
   const whole = Math.floor(hour);
@@ -124,6 +145,42 @@ function describe(context: ComposeContext): string {
     lines.push(`How the friend seems to be doing: ${context.theirCharge <= 15 ? 'running on empty' : context.theirCharge <= 40 ? 'stretched' : 'fine'}`);
   }
   return lines.join('\n');
+}
+
+const HARDNESS = { hard: 'hard deadline', soft: 'soft deadline', self: 'self-imposed' } as const;
+
+/** The ranked tasks, one line each. */
+function describePriority(context: PriorityContext): string {
+  const lines = [
+    `It is ${context.now}. Battery: ${context.charge}% left.${context.restOwed ? ` Rest owed: ${context.restOwed} hours.` : ''}`,
+    'Tasks, in the order the app scored them:',
+    ...context.tasks.map((task) => [
+      `- [${task.id}] ${task.title}`,
+      { owing: 'work to prepare', fixed: 'fixed in the calendar', loose: 'needs a time' }[task.kind],
+      task.due ? `due ${task.due}` : null,
+      `${task.hoursLeft}h left`,
+      task.percentLeft !== undefined ? `${task.percentLeft}% still to do` : null,
+      `dread ${task.dread}/5`,
+      HARDNESS[task.hardness],
+    ].filter(Boolean).join(' · ')),
+  ];
+  return lines.join('\n');
+}
+
+/** Next week's trades, one line each, with what each gives back. */
+function describeRebalance(context: RebalanceContext): string {
+  return [
+    `Next week reads ${context.charge}% battery - too full. Options the app found to lighten it:`,
+    ...context.options.map((option) => [
+      `- [${option.id}] ${option.title}`,
+      option.day,
+      option.detail,
+      `gives back ${option.saves}`,
+      option.locked ? 'LOCKED: cannot be taken' : null,
+      option.protected ? 'protected rest: only as a last resort' : null,
+    ].filter(Boolean).join(' · ')),
+    context.swap ? `A swap the app found on ${context.swap.day}: keep "${context.swap.keep}", drop "${context.swap.drop}".` : '',
+  ].filter(Boolean).join('\n');
 }
 
 const LENGTH_RULE = {
@@ -203,6 +260,75 @@ const restFormat = {
   },
 };
 
+const coachFormat = {
+  type: 'json_schema' as const,
+  schema: {
+    type: 'object',
+    properties: {
+      headline: { type: 'string', description: 'One concrete line, under 70 characters.' },
+      picks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'An id from the list, exactly as given.' },
+            why: { type: 'string', description: 'Short and precise, under 60 characters.' },
+          },
+          required: ['id', 'why'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['headline', 'picks'],
+    additionalProperties: false,
+  },
+};
+
+const tradeFormat = {
+  type: 'json_schema' as const,
+  schema: {
+    type: 'object',
+    properties: {
+      headline: { type: 'string', description: 'One concrete line, under 60 characters.' },
+      picks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'An id from the list, exactly as given.' },
+            why: { type: 'string', description: 'Short and precise, under 60 characters.' },
+            take: { type: 'boolean', description: 'True to recommend taking this option.' },
+          },
+          required: ['id', 'why', 'take'],
+          additionalProperties: false,
+        },
+      },
+      swap: { type: 'string', description: 'Why the swap makes sense, under 60 characters. Empty when there is no swap.' },
+    },
+    required: ['headline', 'picks', 'swap'],
+    additionalProperties: false,
+  },
+};
+
+const coachShape = z.object({
+  headline: z.string().min(1),
+  picks: z.array(z.object({ id: z.string(), why: z.string(), take: z.boolean().optional() })),
+  swap: z.string().optional(),
+});
+
+/** Keep the picks that name something on the list, once each, in order. */
+export function keepKnown(picks: Array<{ id: string; why: string; take?: boolean }>, known: Set<string>, limit = 3) {
+  const seen = new Set<string>();
+  return picks
+    .filter((pick) => known.has(pick.id) && !seen.has(pick.id) && seen.add(pick.id))
+    .slice(0, limit)
+    .map((pick) => ({
+      id: pick.id,
+      why: pick.why.trim().replace(/\.$/, '').slice(0, 90),
+      ...(pick.take === undefined ? {} : { take: pick.take }),
+    }));
+}
+
 const restShape = z.object({
   ideas: z.array(z.object({
     title: z.string().min(1),
@@ -227,8 +353,13 @@ const ideasShape = z.object({
 });
 const draftShape = z.object({ message: z.string().min(1) });
 
+type Format = typeof ideasFormat | typeof draftFormat | typeof restFormat | typeof coachFormat | typeof tradeFormat;
+
+/** One question to a model: a prompt, the JSON shape wanted back, the rules. */
+type Ask = (prompt: string, format: Format, system?: string) => Promise<unknown>;
+
 /**
- * The real writer.
+ * Claude.
  *
  * Effort is `low`: these are short, latency-sensitive drafts a student is
  * waiting on with the screen open, which is the workload low effort is for.
@@ -236,11 +367,7 @@ const draftShape = z.object({ message: z.string().min(1) });
  * on Anthropic's recommended model inside the same call instead of failing.
  */
 export function claudeWriter(client = new Anthropic({ timeout: 20_000, maxRetries: 1 })): Writer {
-  const ask = async (
-    prompt: string,
-    format: typeof ideasFormat | typeof draftFormat | typeof restFormat,
-    system = SYSTEM,
-  ): Promise<unknown> => {
+  return writerFrom(async (prompt, format, system = SYSTEM) => {
     const response = await client.beta.messages.create({
       model: MODEL,
       max_tokens: 4000,
@@ -254,8 +381,58 @@ export function claudeWriter(client = new Anthropic({ timeout: 20_000, maxRetrie
     const text = response.content.find((block) => block.type === 'text');
     if (!text || text.type !== 'text') throw new DeclinedError('empty');
     return JSON.parse(text.text);
-  };
+  });
+}
 
+/** The same JSON Schema, minus the one keyword Gemini's subset does not promise to accept. */
+function forGemini(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(forGemini);
+  if (!schema || typeof schema !== 'object') return schema;
+  return Object.fromEntries(
+    Object.entries(schema).filter(([key]) => key !== 'additionalProperties').map(([key, value]) => [key, forGemini(value)]),
+  );
+}
+
+/** Why Gemini stopped, when the reason is that it would not answer. */
+const BLOCKED = new Set<FinishReason | undefined>([
+  FinishReason.SAFETY, FinishReason.PROHIBITED_CONTENT, FinishReason.BLOCKLIST, FinishReason.SPII, FinishReason.RECITATION,
+]);
+
+/**
+ * Gemini, through Google AI Studio.
+ *
+ * The same prompts and the same JSON shapes as Claude; the zod checks after
+ * each call are what make the two interchangeable. A blocked answer is a
+ * decline, so the app falls back to writing the message itself.
+ */
+export function geminiWriter(
+  client = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY?.trim(),
+    httpOptions: { timeout: 20_000, retryOptions: { attempts: 2 } },
+  }),
+  model = process.env.GEMINI_MODEL?.trim() || GEMINI_MODEL,
+): Writer {
+  return writerFrom(async (prompt, format, system = SYSTEM) => {
+    const response = await client.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        systemInstruction: system,
+        responseMimeType: 'application/json',
+        responseJsonSchema: forGemini(format.schema),
+        maxOutputTokens: 2000,
+      },
+    });
+    if (response.promptFeedback?.blockReason) throw new DeclinedError('declined');
+    if (BLOCKED.has(response.candidates?.[0]?.finishReason)) throw new DeclinedError('declined');
+    const text = response.text;
+    if (!text) throw new DeclinedError('empty');
+    return JSON.parse(text);
+  });
+}
+
+/** Ideas, drafts and rest ideas, from whichever model answers `ask`. */
+function writerFrom(ask: Ask): Writer {
   return {
     async ideas(context) {
       const raw = await ask(
@@ -313,12 +490,44 @@ export function claudeWriter(client = new Anthropic({ timeout: 20_000, maxRetrie
           };
         });
     },
+
+    async priority(context) {
+      const raw = coachShape.parse(await ask(
+        `${describePriority(context)}\n\nThe order is fixed - it comes from what the student entered; do not change it. For every task, give the reason it sits where it does. Then a headline on how to approach today.`,
+        coachFormat,
+        COACH_SYSTEM,
+      ));
+      const order = context.tasks.map((t) => t.id);
+      const picks = keepKnown(raw.picks, new Set(order), order.length)
+        .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+      return { headline: raw.headline.trim().slice(0, 80), picks };
+    },
+
+    async rebalance(context) {
+      const raw = coachShape.parse(await ask(
+        `${describeRebalance(context)}\n\nFor every option, give the reason - what dropping it buys back, or why it should stay - and whether to take it. Take at most three, the best value for the least harm. Never a locked one; protected rest only if nothing else would do.${context.swap ? ' Then say why the swap makes sense.' : ''}`,
+        tradeFormat,
+        COACH_SYSTEM,
+      ));
+      const locked = new Set(context.options.filter((o) => o.locked).map((o) => o.id));
+      let taken = 0;
+      const picks = keepKnown(raw.picks, new Set(context.options.map((o) => o.id)), context.options.length)
+        .map((pick) => {
+          const take = !!pick.take && !locked.has(pick.id) && taken < 3;
+          if (take) taken += 1;
+          return { ...pick, take };
+        });
+      const swap = context.swap && raw.swap?.trim() ? { swap: raw.swap.trim().replace(/\.$/, '').slice(0, 90) } : {};
+      return { headline: raw.headline.trim().slice(0, 80), picks, ...swap };
+    },
   };
 }
 
-/** The real writer when a key is configured, nothing otherwise. */
+/** Gemini when its key is set, else Claude when that key is, else nothing. */
 export const defaultWriter = (): Writer | null =>
-  process.env.ANTHROPIC_API_KEY?.trim() ? claudeWriter() : null;
+  process.env.GEMINI_API_KEY?.trim() ? geminiWriter()
+    : process.env.ANTHROPIC_API_KEY?.trim() ? claudeWriter()
+      : null;
 
 /* ------------------------------------------------------------------ limits */
 
@@ -386,7 +595,7 @@ export function composeRoutes(writer: Writer | null) {
   return routes;
 }
 
-/** `/api/suggest/recovery` — what might help, five at a time. */
+/** `/api/suggest/*` — what might help, what to do first, what to put down, when to rest. */
 export function suggestRoutes(writer: Writer | null) {
   const routes = gated(writer);
 
@@ -401,6 +610,22 @@ export function suggestRoutes(writer: Writer | null) {
     }
   });
 
+  /** One shape for the three coach routes: parse, ask, answer or fail softly. */
+  const coach = <T extends z.ZodType<{ context: unknown }>>(path: string, schema: T, run: (context: z.infer<T>['context']) => Promise<unknown>) =>
+    routes.post(path, async (c) => {
+      const parsed = schema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) return c.json({ error: 'bad_request', detail: parsed.error.issues[0]?.message }, 400);
+      try {
+        return c.json(await run((parsed.data as { context: unknown }).context as z.infer<T>['context']));
+      } catch (err) {
+        const { status, error } = failure(err);
+        return c.json({ error }, status);
+      }
+    });
+
+  coach('/priority', priorityAdviceSchema, (context) => writer!.priority(context));
+  coach('/rebalance', rebalanceAdviceSchema, (context) => writer!.rebalance(context));
+
   return routes;
 }
 
@@ -413,6 +638,12 @@ function failure(err: unknown): { status: 422 | 502 | 503; error: string } {
     return { status: 422, error: 'declined' };
   }
   if (err instanceof Anthropic.RateLimitError) return { status: 503, error: 'busy' };
+  // Gemini's free tier runs out by the minute and by the day: both are "busy".
+  if (err instanceof GeminiApiError && err.status === 429) return { status: 503, error: 'busy' };
+  if (err instanceof GeminiApiError) {
+    console.error('[compose:gemini]', err.status, err.message);
+    return { status: 502, error: 'ai_unavailable' };
+  }
   if (err instanceof Anthropic.APIError) {
     console.error('[compose]', err.status, err.message);
     return { status: 502, error: 'ai_unavailable' };

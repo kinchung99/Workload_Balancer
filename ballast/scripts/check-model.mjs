@@ -44,7 +44,7 @@ for (const [from, to] of [
 }
 
 const { seedItems, CEILINGS, TODAY } = await import(join(tmp, 'seed.ts'));
-const { percentByBucket, overallPercent, loadByBucket, BUCKETS, sumLoad, loadOf } = await import(join(tmp, 'load.ts'));
+const { percentByBucket, overallOf, loadByBucket, BUCKETS, sumLoad, loadOf, capacityOf } = await import(join(tmp, 'load.ts'));
 const { isSameWeek, addDays } = await import(join(tmp, 'dates.ts'));
 
 const week = (anchor) => seedItems.filter((i) => isSameWeek(i.date, anchor));
@@ -74,10 +74,13 @@ console.log('\nWeek 10 against her ceilings (calibrated, was 104/82/74/58/31)');
 const calibrated = { mental: 65, time: 43, errands: 57, social: 42, physical: 17 };
 for (const b of BUCKETS) check(b, p10[b], calibrated[b], 'now ');
 
+// The headline is a plain sum: the week's load over its capacity, the five
+// limits added together - so every cost on screen adds up to it.
 console.log('\nHeadline percentages (deck read 87 and 96 on the old ceilings)');
-check('week 10 overall (page 1)', overallPercent(p10), 53, 'now ');
-check('week 11 overall (page 5)', overallPercent(p11), 59, 'now ');
-check('week 10 charge, what Home shows', 100 - overallPercent(p10), 47, 'now ');
+check('capacity, her five limits added', capacityOf(CEILINGS), 396, 'now ');
+check('week 10 overall (page 1)', overallOf(W10, CEILINGS), 52, 'now ');
+check('week 11 overall (page 5)', overallOf(W11, CEILINGS), 58, 'now ');
+check('week 10 charge, what Home shows', 100 - overallOf(W10, CEILINGS), 48, 'now ');
 
 console.log('\nWeek 11 trade prices (page 6)');
 const byId = Object.fromEntries(seedItems.map((i) => [i.id, i]));
@@ -96,13 +99,16 @@ check('four errands in town, batched saves', sumLoad(town) - 3, 5);
 const SELECTED = ['w11-ch9', 'w11-amin', 'w11-birthday'];
 const kept = W11.filter((i) => !SELECTED.includes(i.id) && i.place !== 'in town');
 const batched = [{ ...byId['w11-pharmacy'], id: 'batched', hours: 1.5, dread: 2 }];
-const after = overallPercent(percentByBucket([...kept, ...batched], CEILINGS));
+const after = overallOf([...kept, ...batched], CEILINGS);
 const saved = SELECTED.reduce((t, id) => t + loadOf(byId[id]), 0) + 5;
 
 console.log('\nRebalance, four changes applied (page 6)');
 console.log(`  ..    load returned                     got ${String(saved).padStart(4)}   deck 46  (deck's own rows sum to 34)`);
 console.log(`  ..    week 11 after                     got ${String(after).padStart(4)}%  deck 71% (illustrative)`);
-check('rebalancing is worth nine points of battery', (100 - after) - (100 - overallPercent(p11)), 9, 'aim ');
+// Additive, so what the trades save is exactly what the battery gains.
+const gained = (100 - after) - (100 - overallOf(W11, CEILINGS));
+check('rebalancing gains what it saves', Math.abs(gained - (saved / capacityOf(CEILINGS)) * 100) < 1 ? 'yes' : 'no', 'yes', 'aim ');
+check('which is about nine points', Math.round((saved / capacityOf(CEILINGS)) * 100), 9, 'aim ');
 
 console.log('\nRaw week 10 load by bucket');
 console.log(' ', JSON.stringify(loadByBucket(W10)));

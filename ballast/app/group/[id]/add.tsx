@@ -8,6 +8,7 @@ import { useStore } from '@/state/store';
 import { frequentFriends } from '@/lib/circle';
 import { PeopleList } from '@/features/social/PeopleList';
 import { groupWash } from '@/features/social/groupArt';
+import { inviteToGroup } from '@/lib/social';
 
 /** The seeded groups, so `/group/.../add` renders in the static export. */
 export async function generateStaticParams() {
@@ -25,7 +26,7 @@ export async function generateStaticParams() {
 export default function AddMembers() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { groups, circle, toggleGroupMember } = useStore();
+  const { groups, circle } = useStore();
   const group = groups.find((g) => g.id === id);
   const [picked, setPicked] = useState<string[]>([]);
 
@@ -40,7 +41,8 @@ export default function AddMembers() {
     );
   }
 
-  const outside = circle.filter((person) => !person.isYou && !group.members.includes(person.id));
+  const invited = new Set((group.invited ?? []).map((i) => i.id));
+  const outside = circle.filter((person) => !person.isYou && !group.members.includes(person.id) && !invited.has(person.id));
 
   return (
     <Screen
@@ -49,13 +51,14 @@ export default function AddMembers() {
       footer={
         outside.length ? (
           <Button
-            label={picked.length ? `Add ${picked.length} to ${group.name}` : 'Pick who to add'}
+            label={picked.length ? `Invite ${picked.length} to ${group.name}` : 'Pick who to invite'}
             kind={picked.length ? 'primary' : 'secondary'}
             disabled={!picked.length}
-            onPress={() => {
-              picked.forEach((friend) => toggleGroupMember(group.id, friend));
+            onPress={async () => {
+              // An invitation each: they join when they say yes.
+              await inviteToGroup(group.id, picked);
               successFeedback();
-              router.back();
+              if (router.canGoBack()) router.back(); else router.replace(`/group/${group.id}` as Href);
             }}
           />
         ) : (
@@ -68,7 +71,7 @@ export default function AddMembers() {
           sticker="people"
           wash={groupWash(group.id)}
           eyebrow={`${group.emoji} ${group.name}`}
-          title="Add members"
+          title="Invite friends"
         />
 
         {outside.length ? (
@@ -80,8 +83,7 @@ export default function AddMembers() {
           />
         ) : (
           <Card tone="sunken" gap={2}>
-            <Text variant="callout" weight="semibold">Everyone in your circle is already in it.</Text>
-            <Text variant="footnote" tone="muted">Find more friends first, then add them here.</Text>
+            <Text variant="callout" weight="semibold">Everyone in your circle is in it or invited.</Text>
           </Card>
         )}
       </Stack>

@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { color } from '@design/tokens';
 import { useSync } from '@/hooks/useSync';
 import { useGate, useSession, useWaitingForSession } from '@/hooks/useGate';
+import { useDemoFriends } from '@/hooks/useDemoFriends';
+import { usePopups } from '@/hooks/usePopups';
 import { View } from 'react-native';
 import { Mascot } from '@/components';
 
@@ -22,6 +24,8 @@ export default function RootLayout() {
   useSession();
   useGate();
   useSync();
+  useDemoFriends();
+  usePopups();
   const waiting = useWaitingForSession();
 
   return (

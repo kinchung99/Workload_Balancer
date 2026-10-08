@@ -8,7 +8,7 @@ import { Composer } from '@/features/compose/Composer';
 import { recipientOf } from '@/lib/compose';
 import { daysBetween, formatShort } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
-import { isMovable, loadOf } from '@/lib/load';
+import { costPercent, isMovable, loadOf } from '@/lib/load';
 import { formatHour } from '@/lib/schedule';
 import { useStore, weekReading } from '@/state/store';
 import type { ComposeContext } from '@shared/contract';
@@ -185,7 +185,7 @@ export default function Decline() {
                 {item.title}{item.when ? `, ${item.when}` : ''}
               </Text>
               <Text variant="footnote" tone="muted">
-                {loadOf(item)} load · that week you are at {weekPercent}%
+                🔋 −{Math.max(1, Math.round(costPercent(item, ceilings)))}% of that week · you are at {100 - weekPercent}% left
               </Text>
             </Stack>
             <Chip label={isMovable(item) ? 'Movable' : 'Hard'} tone={isMovable(item) ? 'heavy' : 'plain'} readOnly />

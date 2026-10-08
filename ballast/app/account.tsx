@@ -55,7 +55,8 @@ export default function Account() {
       // Whoever was signed in last time still is: the session is a cookie the
       // device kept. Restoring it is what stops a reload looking like a sign-out.
       const me = await api.me();
-      if (live && me.ok) setAccount(me.data);
+      // A preview guest's AI pass is not an account; their sample week stays theirs.
+      if (live && me.ok && !(me.data.isGuest && useStore.getState().guest)) setAccount(me.data);
     })();
     return () => { live = false; };
   }, [setAccount]);

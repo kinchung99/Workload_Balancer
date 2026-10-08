@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Avatar, Button, Card, Chip, Section, Stack, Text } from '@/components';
-import { color } from '@design/tokens';
-import { addDays, formatShort } from '@/lib/dates';
+import { color, radius } from '@design/tokens';
+import { addDays, dayIndex, formatShort } from '@/lib/dates';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { formatHour } from '@/lib/schedule';
-import { PLAN_MESSAGE, whatsapp } from '@/lib/sharing';
-import { everyoneFree, fitsWindow, heatmap, type HeatCell } from '@/lib/together';
+import { PLAN_FROM, PLAN_TO, planBlocks, type PlanBlock } from '@/lib/together';
+import { sendPlan } from '@/lib/social';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
-import type { CircleMember, Group, Invite, PlanActivity } from '@/lib/types';
-import { Heatmap } from './Heatmap';
+import type { CircleMember, Group, PlanActivity } from '@/lib/types';
 import { FriendPicker } from './FriendPicker';
 import { frequentFriends } from '@/lib/circle';
 
@@ -60,7 +59,7 @@ export function Planner({
   initialPlan?: string;
 }) {
   const router = useRouter();
-  const { today, invites, sendInvite, planActivities, addActivity, removeActivity } = useStore();
+  const { today, planActivities, addActivity, removeActivity } = useStore();
   const items = useItemsWithLogs();
 
   const [picked, setPicked] = useState<string[] | null>(initial ?? null);
@@ -76,29 +75,22 @@ export function Planner({
   const custom = usual.some((a) => a.id === plan.id);
   const [making, setMaking] = useState(false);
 
-  const [choice, setChoice] = useState<{ date: string; start: number } | null>(null);
-  const [focus, setFocus] = useState<HeatCell | null>(null);
+  const [choice, setChoice] = useState<PlanBlock | null>(null);
   const [week, setWeek] = useState(0);
+  const [sent, setSent] = useState<{ title: string; count: number } | null>(null);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(today, week * 7 + i)), [today, week]);
-  const allDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDays(today, i)), [today]);
-  const cells = useMemo(() => heatmap(items, chosen, days), [items, chosen, days]);
-  const windows = useMemo(() => everyoneFree(items, chosen, allDays, plan.hours), [items, chosen, allDays, plan]);
-  const mine = invites.filter((invite) => (group ? invite.groupId === group.id : !invite.groupId));
+  // The week as blocks the length of the plan: green for everyone, blue for some.
+  const blocks = useMemo(() => planBlocks(items, chosen, days, plan.hours), [items, chosen, days, plan]);
+  const forEveryone = blocks.filter((block) => block.everyone).length;
 
-  const reset = () => { setChoice(null); setFocus(null); };
+  const reset = () => { setChoice(null); setSent(null); };
 
   const toggle = (id: string) => {
     tapFeedback();
     const current = picked ?? pool.map((person) => person.id);
     setPicked(current.includes(id) ? current.filter((p) => p !== id) : [...current, id]);
     reset();
-  };
-
-  const tapCell = (cell: HeatCell) => {
-    tapFeedback();
-    setFocus(cell);
-    if (fitsWindow(windows, cell.date, cell.hour, plan.hours)) setChoice({ date: cell.date, start: cell.hour });
   };
 
   const everyone = chosen.length === pool.length;
@@ -232,118 +224,158 @@ export function Planner({
         ) : null}
       </Section>
 
-      {/* When: who is free, as a picture, and the times that work for everyone. */}
-      <Section family="week" title="When" sticker="clock" meta={`${windows.length} option${windows.length === 1 ? '' : 's'}`}>
+      {/* When: the week as blocks the length of the plan. Tap one to pick it. */}
+      <Section family="week" title="When" sticker="clock" meta={chosen.length ? `${forEveryone} for everyone` : undefined}>
         {chosen.length ? (
           <Card gap={3}>
-            <Stack direction="row" align="center" justify="between">
-              <Text variant="heading">Who’s free when</Text>
-              <Stack direction="row" gap={2}>
-                <Chip label="This week" tone={week === 0 ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setWeek(0); setFocus(null); }} />
-                <Chip label="Next" tone={week === 1 ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setWeek(1); setFocus(null); }} />
-              </Stack>
+            <Stack direction="row" gap={2}>
+              <Chip label="This week" tone={week === 0 ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setWeek(0); setChoice(null); }} />
+              <Chip label="Next week" tone={week === 1 ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setWeek(1); setChoice(null); }} />
             </Stack>
-            <Heatmap cells={cells} hours={plan.hours} selected={choice} focus={focus} onTap={tapCell} />
-          </Card>
-        ) : null}
-
-        <Text variant="micro" tone="subtle">WHEN EVERYONE IS FREE</Text>
-        {windows.length === 0 ? (
-          <Card tone="sunken" gap={1}>
-            <Text variant="callout" weight="semibold">
-              {chosen.length === 0 ? 'Pick someone first.' : `No ${hoursLabel(plan.hours)} window works for all ${chosen.length + 1}.`}
-            </Text>
-            <Text variant="footnote" tone="muted">Try something shorter, or fewer people.</Text>
+            <WeekBlocks days={days} blocks={blocks} choice={choice} onPick={(block) => { tapFeedback(); setChoice(block); setSent(null); }} />
           </Card>
         ) : (
-          <Stack gap={2}>
-            {windows.slice(0, 4).map((window) => {
-              const on = choice?.date === window.date && choice?.start === window.start;
-              return (
-                <Pressable
-                  key={`${window.date}-${window.start}`}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={`${formatShort(window.date)} at ${formatHour(window.start)}`}
-                  onPress={() => { tapFeedback(); setChoice({ date: window.date, start: window.start }); }}
-                  className={`min-h-row justify-center rounded-md border-2 px-4 py-3 ${
-                    on ? 'border-steady-fill bg-steady-wash' : 'border-line-hairline bg-raised'
-                  }`}
-                >
-                  <Stack direction="row" justify="between" align="center" gap={3}>
-                    <Stack gap={1}>
-                      <Text variant="body" weight="semibold">{formatShort(window.date)}</Text>
-                      <Text variant="footnote" tone="subtle">
-                        {formatHour(window.start)} – {formatHour(window.start + plan.hours)}
-                      </Text>
-                    </Stack>
-                    <Chip label={`${chosen.length + 1} free`} tone={on ? 'steady' : 'plain'} readOnly />
-                  </Stack>
-                </Pressable>
-              );
-            })}
-          </Stack>
+          <Card tone="sunken" gap={1}>
+            <Text variant="callout" weight="semibold">Pick who’s coming first.</Text>
+          </Card>
         )}
+
+        {choice ? (
+          <Stack direction="row" gap={3} align="center" className="rounded-lg px-4 py-3" style={{ backgroundColor: choice.everyone ? color.band.steady.wash : color.band.recovery.wash }}>
+            <Text variant="title">{plan.emoji}</Text>
+            <Stack gap={0} grow>
+              <Text variant="body" weight="semibold">{formatShort(choice.date)} · {formatHour(choice.start)}–{formatHour(choice.end)}</Text>
+              <Text variant="micro" tone={choice.everyone ? 'steady' : 'recovery'}>
+                {choice.everyone ? `Everyone’s free · ${chosen.length + 1} of ${chosen.length + 1}` : `${choice.who.join(', ')} free · ${choice.who.length + 1} of ${chosen.length + 1}`}
+              </Text>
+            </Stack>
+          </Stack>
+        ) : null}
       </Section>
 
-      <Button
-        label={choice ? `${plan.emoji} Invite ${chosen.length} to ${plan.label.toLowerCase()}` : 'Pick a time'}
-        kind={choice ? 'steady' : 'secondary'}
-        onPress={() => {
-          if (!choice || !chosen.length) return;
-          sendInvite({
-            title: group
+      {sent ? (
+        // Sent: it waits for their answers; it goes in your week when you say.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${sent.title} sent to ${sent.count}. See your plans`}
+          onPress={() => { tapFeedback(); router.push('/plans?tab=sent' as Href); }}
+          className="flex-row items-center gap-3 rounded-lg px-4 py-4 active:opacity-70"
+          style={{ backgroundColor: color.band.steady.wash, borderWidth: 2, borderColor: color.band.steady.fill }}
+        >
+          <Text variant="title">✉️</Text>
+          <Stack gap={0} grow>
+            <Text variant="body" weight="semibold">Sent to {sent.count} · waiting for answers</Text>
+            <Text variant="micro" tone="steady">See it in Plans ›</Text>
+          </Stack>
+        </Pressable>
+      ) : (
+        <Button
+          label={choice ? `${plan.emoji} Invite ${chosen.length} to ${plan.label.toLowerCase()}` : 'Pick a time'}
+          kind={choice ? 'steady' : 'secondary'}
+          onPress={async () => {
+            if (!choice || !chosen.length) return;
+            const title = group
               ? `${plan.label} · ${group.name}${chosen.length < pool.length ? ` (${chosen.length} of ${pool.length})` : ''}`
-              : `${plan.label} with ${chosen.map((f) => f.name).join(' and ')}`,
-            date: choice.date,
-            startHour: choice.start,
-            hours: plan.hours,
-            people: chosen.map((f) => f.id),
-            groupId: group?.id,
-          });
-          successFeedback();
-          reset();
-        }}
-      />
-
-      {/*
-        An invite that only exists in this app is not an invite. It lands in your
-        week at once, but the people in it do not know yet - so the last step is
-        a message, written for you.
-      */}
-      {mine.length ? <InvitedList invites={mine} /> : null}
+              : `${plan.label} with ${listNames(chosen.map((f) => f.name))}`;
+            const ok = await sendPlan({
+              title, date: choice.date, startHour: choice.start, hours: plan.hours,
+              people: chosen.map((f) => f.id), groupId: group?.id,
+            });
+            if (!ok) return;
+            successFeedback();
+            setChoice(null);
+            setSent({ title, count: chosen.length });
+          }}
+        />
+      )}
     </Stack>
   );
 }
 
-/** Invites already made, each one message away from the people in it. */
-export function InvitedList({ invites }: { invites: Invite[] }) {
-  const router = useRouter();
+/** "Amin", "Amin and Jo", "Amin, Jo and Ravi". */
+const listNames = (names: string[]): string =>
+  names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
+const LABEL_WIDTH = 46;
+const TICKS = [9, 12, 15, 18, 21];
+
+/** As much of the start time as the block has room for: "7:30pm", "7½", "7". */
+function blockLabel(start: number, hours: number): string {
+  if (hours >= 3) return formatHour(start);
+  const h12 = ((Math.floor(start) + 11) % 12) + 1;
+  const half = start % 1 ? '½' : '';
+  if (hours >= 2) return half ? `${h12}${half}` : `${h12}${start >= 12 ? 'pm' : 'am'}`;
+  return `${h12}${half}`;
+}
+
+/**
+ * One row per day, nine in the morning to eleven at night. Green blocks are
+ * the plan's length with everyone free; blue, the same length with some free;
+ * grey is everything else. Each block is a time you can pick.
+ */
+function WeekBlocks({
+  days, blocks, choice, onPick,
+}: { days: string[]; blocks: PlanBlock[]; choice: PlanBlock | null; onPick: (block: PlanBlock) => void }) {
+  const span = PLAN_TO - PLAN_FROM;
+  const at = (hour: number) => `${((hour - PLAN_FROM) / span) * 100}%` as `${number}%`;
   return (
-    <Section family="people" title="Invited" sticker="chat" meta={`${invites.length}`}>
-      {invites.map((invite) => (
-        <Stack key={invite.id} gap={3} className="rounded-md bg-raised px-4 py-3">
-          <Stack gap={1}>
-            <Text variant="callout" weight="semibold">{invite.title}</Text>
-            <Text variant="micro" tone="muted">{formatShort(invite.date)}, {formatHour(invite.startHour)} · in your week</Text>
+    <Stack gap={2}>
+      <View style={{ marginLeft: LABEL_WIDTH + 8, height: 14 }}>
+        {TICKS.map((hour) => (
+          <Text key={hour} variant="micro" tone="subtle" style={{ position: 'absolute', left: at(hour), transform: [{ translateX: -10 }] }}>
+            {formatHour(hour).replace(':00', '')}
+          </Text>
+        ))}
+      </View>
+      {days.map((date) => {
+        const row = blocks.filter((block) => block.date === date);
+        return (
+          <Stack key={date} direction="row" gap={2} align="center">
+            <Stack gap={0} style={{ width: LABEL_WIDTH }}>
+              <Text variant="caption" weight="bold">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dayIndex(date)]}</Text>
+              <Text variant="micro" tone="subtle">{formatShort(date).slice(4)}</Text>
+            </Stack>
+            <View className="flex-1" style={{ height: 36, borderRadius: radius.sm, backgroundColor: color.surface.sunken }}>
+              {row.map((block) => {
+                const on = choice?.date === block.date && choice.start === block.start;
+                return (
+                  <Pressable
+                    key={block.start}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={`${formatShort(date)} ${formatHour(block.start)} to ${formatHour(block.end)}, ${block.everyone ? 'everyone free' : `${block.who.join(', ')} free`}`}
+                    onPress={() => onPick(block)}
+                    className="items-center justify-center active:opacity-70"
+                    style={{
+                      position: 'absolute', left: at(block.start), width: at(PLAN_FROM + block.end - block.start), top: 3, bottom: 3,
+                      marginHorizontal: 1, borderRadius: radius.sm,
+                      backgroundColor: block.everyone ? color.band.steady.fill : color.band.recovery.fill,
+                      borderWidth: on ? 3 : 0, borderColor: color.ink.default,
+                    }}
+                  >
+                    <Text variant="micro" tone="inverse" numberOfLines={1}>{blockLabel(block.start, block.end - block.start)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </Stack>
-          <Stack direction="row" gap={2} wrap>
-            <Chip
-              label="✨ Write the invite"
-              tone="selected"
-              onPress={() => { tapFeedback(); router.push(`/message?kind=invite&invite=${encodeURIComponent(invite.id)}` as Href); }}
-            />
-            <Chip
-              label="Send it as is"
-              onPress={() => {
-                Linking.openURL(whatsapp(PLAN_MESSAGE(`${formatShort(invite.date)} at ${formatHour(invite.startHour)}`, invite.people)));
-                successFeedback();
-              }}
-            />
-          </Stack>
-        </Stack>
-      ))}
-    </Section>
+        );
+      })}
+      <Stack direction="row" gap={4} style={{ marginLeft: LABEL_WIDTH + 8 }}>
+        <Key fill={color.band.steady.fill} word="Everyone" />
+        <Key fill={color.band.recovery.fill} word="Some" />
+        <Key fill={color.surface.sunken} word="Nobody" />
+      </Stack>
+    </Stack>
+  );
+}
+
+function Key({ fill, word }: { fill: string; word: string }) {
+  return (
+    <Stack direction="row" gap={1} align="center">
+      <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: fill, borderWidth: 1, borderColor: color.line.hairline }} />
+      <Text variant="micro" tone="muted">{word}</Text>
+    </Stack>
   );
 }
 

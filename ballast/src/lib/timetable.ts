@@ -291,3 +291,53 @@ export function toItems(parsed: ParsedClass[], anchor: string, dread: 1 | 2 | 3 
     flags: [],
   }));
 }
+
+// ---------------------------------------------------------------- building by hand
+
+/** One weekly class, as picked with buttons rather than parsed from a paste. */
+export interface ClassSlot {
+  /** 0 is Monday. */
+  day: number;
+  startHour: number;
+  hours: number;
+  kind: SessionKind;
+  room?: string;
+}
+
+/** How many weeks of a class go into the calendar: this one and the next, like an import. */
+export const CLASS_WEEKS = 2;
+
+/**
+ * A weekly class, as the items it becomes - one per week, this week and the
+ * next. Ids say which module, day and hour, so adding the same class twice
+ * cannot double it and taking it away finds every copy.
+ */
+export function classItems(module: Module, slot: ClassSlot, anchor: string): Item[] {
+  const monday = addDays(anchor, -dayIndex(anchor));
+  return Array.from({ length: CLASS_WEEKS }, (_, week) => ({
+    id: `${week ? `w${week + 1}-` : ''}class-${module.id}-${slot.day}-${slot.startHour}`,
+    title: `${module.name} ${slot.kind}`,
+    bucket: 'time' as const,
+    hours: slot.hours,
+    dread: module.dread,
+    commitment: 'hard' as const,
+    date: addDays(monday, week * 7 + slot.day),
+    startHour: slot.startHour,
+    repeats: true,
+    moduleId: module.id,
+    sessionKind: slot.kind,
+    room: slot.room?.trim() || undefined,
+    flags: [],
+    want: 2 as const,
+  }));
+}
+
+/** The weekly classes a module has, as slots - read off this week's copies. */
+export function slotsOf(items: Item[], moduleId: string, anchor: string): ClassSlot[] {
+  const monday = addDays(anchor, -dayIndex(anchor));
+  const week = new Set(Array.from({ length: 7 }, (_, i) => addDays(monday, i)));
+  return items
+    .filter((item) => item.moduleId === moduleId && week.has(item.date) && item.startHour !== undefined)
+    .map((item) => ({ day: dayIndex(item.date), startHour: item.startHour!, hours: item.hours, kind: item.sessionKind ?? 'lecture', room: item.room }))
+    .sort((a, b) => a.day - b.day || a.startHour - b.startHour);
+}

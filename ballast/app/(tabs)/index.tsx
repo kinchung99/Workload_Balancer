@@ -8,6 +8,9 @@ import {
 import { MarkNotice } from '@/features/marking/MarkNotice';
 import { MarkSheet } from '@/features/marking/MarkSheet';
 import { KIND, autoMarkedIn, clockHour, markKind, toMark } from '@/lib/marking';
+import { breakdown } from '@/lib/breakdown';
+import { useBells } from '@/features/notify/useBells';
+import { BatterySplit } from '@/features/battery/BatterySplit';
 import { addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import { CalmMode } from '@/features/home/CalmMode';
@@ -34,7 +37,7 @@ const greeting = (hour: number) => (hour < 12 ? 'Good morning' : hour < 18 ? 'Go
 const timeSticker = (hour: number): StickerName => (hour < 18 ? 'sun' : 'moon');
 
 /**
- * Home — one reading, one next thing, and four doors.
+ * Home — one reading, one next thing, and three ways to recharge.
  *
  * It used to carry the battery, five area tiles, the week strip, the collision
  * warning, the drains, the whole of today hour by hour, the owing list and a
@@ -48,9 +51,10 @@ export default function Home() {
   const router = useRouter();
   const { items, today, onboarded, recovery, overallCeiling, minimumViableWeek,
     showEverythingAnyway, setShowEverything, setMinimumViableWeek, dayReports, circle,
-    reportDay, markItem } = useStore();
+    reportDay, markItem, ceilings, moods, sleepHours } = useStore();
   const [marking, setMarking] = useState<string | null>(null);
-  const { items: withLogs, percents, overall } = useReading();
+  const { items: withLogs, percents, overall, week } = useReading();
+  const { update, unseen: bellCount } = useBells();
   const charge = chargeOf(overall);
   const band = bandFor(overall);
 
@@ -74,6 +78,7 @@ export default function Home() {
   // Over, and nobody has said how it went - and what the app marked for you.
   const hour = clockHour(today);
   const due = toMark(items, today, hour);
+  const split = breakdown(week, ceilings, today, hour);
   const auto = autoMarkedIn(items);
 
   if (isCalm(overall) && !showEverythingAnyway && !minimumViableWeek) {
@@ -88,13 +93,14 @@ export default function Home() {
     );
   }
 
-  // One door per family, each in its family's colour and drawing - the same
-  // colour the page behind it is built from.
-  const doors: Array<{ family: Family; title: string; sub: string; to: Href }> = [
-    { family: 'week', title: 'My week', sub: `${todayItems.length} today`, to: '/plan' },
-    { family: 'people', title: 'Friends', sub: `${active} checked in`, to: '/friends' },
-    { family: 'focus', title: 'What first', sub: `${first.length} ranked`, to: '/priority' },
-    { family: 'rest', title: 'Recovery', sub: `${owed}h owed`, to: '/recover' },
+  // The tabs already reach the week and friends, and "do this next" reaches the
+  // list - so the doors here are the three ways to charge back up.
+  const checkedIn = moods.some((mood) => mood.date === today) || sleepHours !== null;
+  const doors: Array<{ family: Family; sticker: StickerName; title: string; sub: string; to: Href; count?: number }> = [
+    { family: 'week', sticker: 'clock', title: 'Quick update', sub: update.count ? 'Waiting on you' : '✓ All caught up', to: '/update' as Href, count: update.count },
+    { family: 'you', sticker: 'sun', title: 'Check in', sub: checkedIn ? '✓ Today' : 'Not yet today', to: '/checkin' },
+    { family: 'rest', sticker: 'moon', title: 'Tonight', sub: 'Plan an evening', to: '/tonight/night' as Href },
+    { family: 'rest', sticker: 'battery', title: 'Recovery', sub: `${owed}h owed`, to: '/recover' },
   ];
 
   return (
@@ -103,23 +109,45 @@ export default function Home() {
       overlay={<MarkNotice due={due} onOpen={(item) => setMarking(item.id)} />}
     >
       <Stack gap={5} className="pt-2">
-        <PageHeader
-          sticker={timeSticker(hour)}
-          wash={color.decor.lemon}
-          eyebrow={`Week ${WEEK_NUMBER}`}
-          title={greeting(hour)}
-        />
+        <Stack direction="row" align="center" gap={3}>
+          <View className="flex-1">
+            <PageHeader
+              sticker={timeSticker(hour)}
+              wash={color.decor.lemon}
+              eyebrow={`Week ${WEEK_NUMBER}`}
+              title={greeting(hour)}
+            />
+          </View>
+          {/* The bell: everything worth telling you, with how much is new. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={bellCount ? `Notifications, ${bellCount} new` : 'Notifications'}
+            onPress={() => { tapFeedback(); router.push('/notifications' as Href); }}
+            className="items-center justify-center rounded-pill bg-sunken active:opacity-70"
+            style={{ width: 48, height: 48 }}
+          >
+            <Text variant="title">🔔</Text>
+            {bellCount ? <Count value={bellCount} /> : null}
+          </Pressable>
+        </Stack>
 
-        {/* How you are. Nothing else on the card. */}
-        <Card tone={band} gap={4} align="center">
-          <Mascot charge={charge} loadPercent={overall} size={124} />
-          <Stack gap={1} align="center">
-            <Text variant="hero" tone={TONE[band]} accessibilityLabel={`${charge} percent of your week left. ${MOOD_WORD[moodFor(charge)]}.`}>
-              {charge}%
-            </Text>
-            <Text variant="heading">{MOOD_WORD[moodFor(charge)]}</Text>
-          </Stack>
-        </Card>
+        {/* How you are, and where it went: one bar, three numbers, one tap for the rest. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${charge} percent of your week left. ${MOOD_WORD[moodFor(charge)]}. ${split.spent} percent used, ${split.ahead} percent still to come. Open your battery.`}
+          onPress={() => router.push('/battery' as Href)}
+          className="active:opacity-80"
+        >
+          <Card tone={band} gap={4} align="center">
+            <Mascot charge={charge} loadPercent={overall} size={124} />
+            <Stack gap={1} align="center">
+              <Text variant="hero" tone={TONE[band]}>{charge}%</Text>
+              <Text variant="heading">{MOOD_WORD[moodFor(charge)]}</Text>
+            </Stack>
+            <BatterySplit spent={split.spent} ahead={split.ahead} left={split.left} back={split.back} />
+            <Text variant="caption" weight="bold" className="underline">Where it goes ›</Text>
+          </Card>
+        </Pressable>
 
         {/* One next thing. Not a list — Plan is the list. */}
         {next ? (
@@ -148,65 +176,6 @@ export default function Home() {
         ) : null}
 
         {/* Over, and not marked yet: one tap each, or open one to say more. */}
-        {due.length ? (
-          <Section family="week" title="To mark" sticker="clock" meta={`${due.length}`}>
-            {due.map((item) => {
-              const info = KIND[markKind(item)];
-              return (
-                <Stack key={item.id} direction="row" gap={2} align="center" className="rounded-lg bg-raised py-2 pl-3 pr-2">
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${item.title}. ${info.question}`}
-                    onPress={() => { tapFeedback(); setMarking(item.id); }}
-                    className="min-h-min flex-1 flex-row items-center gap-3 active:opacity-70"
-                  >
-                    <Text variant="heading">{info.emoji}</Text>
-                    <Stack gap={1} grow>
-                      <Text variant="body" weight="semibold" numberOfLines={1}>{item.title}</Text>
-                      <Text variant="micro" tone="busy">
-                        ⏳ {formatHour(item.startHour ?? 0)}–{formatHour((item.startHour ?? 0) + item.hours)}
-                      </Text>
-                    </Stack>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${info.yes}: ${item.title}`}
-                    onPress={() => { markItem(item.id, 'done'); tapFeedback(); }}
-                    className="items-center justify-center rounded-pill bg-steady-fill active:opacity-70"
-                    style={{ width: 40, height: 40 }}
-                  >
-                    <Text variant="callout" weight="bold" tone="inverse">✓</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${info.answer === 'errand' ? 'Move to tomorrow' : info.no}: ${item.title}`}
-                    onPress={() => {
-                      if (info.answer === 'errand') useStore.getState().moveItem(item.id, addDays(today, 1));
-                      else markItem(item.id, 'missed');
-                      tapFeedback();
-                    }}
-                    className="items-center justify-center rounded-pill border-2 border-line-hairline bg-sunken active:opacity-70"
-                    style={{ width: 40, height: 40 }}
-                  >
-                    <Text variant="callout" weight="bold" tone="muted">{info.answer === 'errand' ? '↪' : '✕'}</Text>
-                  </Pressable>
-                </Stack>
-              );
-            })}
-          </Section>
-        ) : null}
-
-        {/* What the app marked by itself the morning after - one door to check it. */}
-        {auto.length ? (
-          <Door
-            family="week"
-            sticker="star"
-            title={`${auto.length} marked for you`}
-            sub={auto.every((item) => item.date === addDays(today, -1)) ? 'From yesterday · keep or change' : 'Keep or change'}
-            onPress={() => router.push('/marked' as Href)}
-          />
-        ) : null}
-
         {/* Once a day at most, late, and only when it has earned the interruption. */}
         {askTonight ? (
           <EveningReview
@@ -221,7 +190,7 @@ export default function Home() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${collision.headline} ${leadLabel(collision.leadDays)}`}
-            onPress={() => router.push('/plan')}
+            onPress={() => router.push('/rebalance')}
             className="active:opacity-70"
           >
             <Card tone="heavy" gap={3}>
@@ -230,13 +199,16 @@ export default function Home() {
                 <Text variant="callout" weight="semibold" tone="heavy" className="flex-1">
                   {collision.headline}
                 </Text>
-                <Text variant="micro" tone="heavy">{leadLabel(collision.leadDays)}</Text>
+                <Stack gap={0} align="end">
+                  <Text variant="micro" tone="heavy">{leadLabel(collision.leadDays)}</Text>
+                  <Text variant="caption" weight="bold" tone="heavy">Lighten ›</Text>
+                </Stack>
               </Stack>
             </Card>
           </Pressable>
         ) : null}
 
-        {/* Four doors. Everything else in the app is behind one of them. */}
+        {/* Four doors, two by two: what is waiting on you, and three ways to recharge. */}
         <Stack direction="row" gap={3} wrap>
           {doors.map((door) => (
             <Pressable
@@ -245,11 +217,12 @@ export default function Home() {
               accessibilityLabel={`${door.title}. ${door.sub}`}
               onPress={() => { tapFeedback(); router.push(door.to); }}
               className="min-h-row grow items-center gap-2 overflow-hidden rounded-lg border-2 border-line-hairline bg-raised p-4 active:opacity-70"
-              style={{ flexBasis: '44%' }}
+              style={{ flexBasis: '44%', borderColor: door.count ? color.band.busy.fill : undefined }}
             >
               <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: FAMILY[door.family].wash, opacity: 0.3 }]} />
               <View className="items-center justify-center rounded-pill" style={{ width: 52, height: 52, backgroundColor: FAMILY[door.family].wash }}>
-                <Sticker name={FAMILY[door.family].sticker} size={32} />
+                <Sticker name={door.sticker} size={32} />
+                {door.count ? <Count value={door.count} /> : null}
               </View>
               <Stack gap={1} align="center">
                 <Text variant="body" weight="semibold">{door.title}</Text>
@@ -273,5 +246,17 @@ export default function Home() {
       </Stack>
       <MarkSheet itemId={marking} onClose={() => setMarking(null)} />
     </Screen>
+  );
+}
+
+/** A red number on a corner: how many things are waiting. */
+function Count({ value }: { value: number }) {
+  return (
+    <View
+      className="absolute items-center justify-center rounded-pill"
+      style={{ top: -4, right: -6, minWidth: 22, height: 22, paddingHorizontal: 5, backgroundColor: color.band.heavy.fill, borderWidth: 2, borderColor: color.surface.page }}
+    >
+      <Text variant="micro" tone="inverse">{value > 9 ? '9+' : value}</Text>
+    </View>
   );
 }
