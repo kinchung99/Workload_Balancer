@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   Battery, Burst, Button, Card, Chip, DatePicker, DrainPicker,
   Screen, Stack, StepDots, Sticker, Text, type StickerName,
@@ -19,6 +19,7 @@ import { useStore } from '@/state/store';
 import { WANT_CHOICES } from '@/lib/swap';
 import { drainCosts, withDrain } from '@/lib/drain';
 import { readingFrom, useItemsWithLogs, useReading } from '@/state/selectors';
+import { useCalendar } from '@/features/calendar/useCalendar';
 
 const HOUR_OPTIONS = [0.5, 1, 2, 3, 4, 6, 8];
 const PREP_OPTIONS = [2, 4, 6, 9, 12, 16, 20, 30];
@@ -83,6 +84,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const { today, ceilings, addItem } = useStore();
   const scheduleItems = useItemsWithLogs();
   const reading = useReading();
+  const calendarFresh = useCalendar().picture.fresh.length;
 
   const [step, setStep] = useState(initialStep);
   const [text, setText] = useState('');
@@ -307,6 +309,25 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                 })}
               </Stack>
             </Stack>
+
+            {/* Or bring it in from Google Calendar, details filled in. */}
+            {!ready ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={calendarFresh ? `From Google Calendar, ${calendarFresh} new` : 'From Google Calendar'}
+                onPress={() => { tapFeedback(); router.push('/calendar' as Href); }}
+                className="flex-row items-center gap-3 rounded-lg border-2 border-line-hairline bg-raised px-4 py-3 active:opacity-70"
+              >
+                <Sticker name="calendar" size={30} />
+                <Text variant="body" weight="semibold" className="flex-1">From Google Calendar</Text>
+                {calendarFresh ? (
+                  <View className="rounded-pill px-2 py-1" style={{ backgroundColor: color.decor.sky }}>
+                    <Text variant="micro" weight="bold">{calendarFresh} new</Text>
+                  </View>
+                ) : null}
+                <Text variant="heading" tone="subtle">›</Text>
+              </Pressable>
+            ) : null}
 
             {ready ? (
               <Card tone="sunken" gap={2}>

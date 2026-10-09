@@ -1,3 +1,6 @@
-# This host is the Ballast API, not the app. Nothing here to index.
+# This host is the Ballast API, not the app. Only the homepage and the privacy
+# policy are meant to be read; Google's OAuth review needs to reach both.
 User-agent: *
+Allow: /home.html
+Allow: /privacy.html
 Disallow: /

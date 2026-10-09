@@ -14,7 +14,15 @@ import { join } from 'node:path';
 
 const out = mkdtempSync(join(tmpdir(), 'ballast-render-'));
 console.log('  exporting...');
-execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', out], { stdio: 'pipe' });
+// Its own build, never the deploy's: `npm run deploy` runs this with the
+// production server set and guests switched off, and the page it would check
+// is then a different page from the one these expectations describe. So the
+// three build switches are cleared and the snapshot is always a serverless one.
+const env = { ...process.env };
+delete env.EXPO_PUBLIC_API_URL;
+delete env.EXPO_PUBLIC_GUEST;
+delete env.EXPO_PUBLIC_DEMO;
+execFileSync('npx', ['expo', 'export', '--platform', 'web', '--clear', '--output-dir', out], { stdio: 'pipe', env });
 
 /** Strip tags and React's SSR comment separators, collapse whitespace. */
 const textOf = (route) =>
@@ -36,9 +44,10 @@ const EXPECTATIONS = [
     'used', 'to come', 'left', 'Where it goes',  // and where it went, as one bar
     'DO THIS NEXT', 'Operating systems, part 2',   // one next thing, not a list
     'Tuesday to Thursday next week is a wall',     // the one warning worth interrupting for
-    'Quick update', 'Waiting on you',          // what needs you, with a count on it
-    'Check in', 'Not yet today', 'Tonight', 'Recovery', '11h owed',  // and three ways to recharge
+    'Quick update', 'to mark', 'to confirm', 'check in',   // what needs you, in one strip
+    'left today', 'Next ', 'asking you', 'rest owed', '11h', 'Not checked in',  // a glance at Plan, Friends and You
     'Lighten',                                // the wall, with the way out of it
+    'Bring in Google Calendar', 'Connect',    // and the calendar, one tap from connected
     'Good afternoon',                         // by the same clock the day is marked against
     'BALLAST \u00b7 NOW', 'Did you sign in?', 'Signed in', 'Later', // the notification, one tap each
     'Add anything',
@@ -110,19 +119,19 @@ const EXPECTATIONS = [
     'NOT ON THE CLOCK', 'This day', '1 \u00b7 no time yet', 'Owing', '3 \u00b7 13h to go',   // folded, This day first
     'Tuesday to Thursday next week is a wall.', 'In 8 days',   // one line, not a chart
     'Rebalance next week',
+    'Plan it', 'What to do first', 'ranked', 'Timetable', 'Google Calendar', 'Bring your events in',  // the week's tools, only here
   ]],
   ['rebalance.html', 'Rebalance', [
     'Lighten next week',
-    'NOW', 'AFTER', '42%', '50%', '+8%',        // next week's battery before and after the picks
+    'BEFORE', 'NOW', '42%', '±0%',             // next week's battery before, and now as you decide
     // The one piece of advice here a calendar could not have produced: which of
     // two things to go to, decided from a rating only the student can give.
     'A SWAP · ', 'WEDNESDAY', 'KEEP', 'Distributed Systems seminar', 'vs',
     'DROP', 'Caf\u00e9 shift, covering Amin', 'Make the swap',
-    'Put down', '4 of 5',                     // a card each, tap to put it down
-    'Self-imposed, push to Sunday', 'Ask Jo to take it', 'Send your apologies', 'Batch into one trip Tuesday',
-    'Recovery. Protected, override if you must',
+    'Put down?', '1 of 5',                    // one at a time, never in bulk
+    'Chapter 9 reading', 'back', 'Push it back', 'Keep it',   // what it is, what it gives, two answers
     '2 can\u2019t move',                      // hard deadlines, folded away
-    'Apply 4', 'Not this week',
+    'Not this week',
   ]],
   ['add.html', 'Add · what', [
     'STEP 1 OF 4 \u00b7 WHAT',                  // four short pages, and it says so
@@ -257,9 +266,9 @@ const EXPECTATIONS = [
   ]],
   ['notifications.html', 'Notifications', [
     'Notifications',
-    'Needs an answer', 'Nadia Rahman wants to be friends', 'Jo invited you to Badminton club', 'Ravi invited you to Noodles after the lab',
-    'Join', 'Accept', 'Decline',               // answered right here
-    'Today', 'things to update', 'is a wall', 'h of rest owed',
+    'Nadia Rahman wants to be friends', 'Jo invited you to Badminton club', 'Ravi invited you to Noodles after the lab',
+    'Join', 'Accept', 'Decline',               // answered right here, under the sentence
+    'things to update', 'is a wall', 'h of rest owed',   // then the rest, one list
   ]],
   ['update.html', 'Quick update', [
     'Quick update', 'TO UPDATE',
@@ -269,10 +278,19 @@ const EXPECTATIONS = [
     'Keep all',
   ]],
   ['plans.html', 'Plans', [
-    'Plans', 'Received', 'Sent',
+    'Plans', 'Received', 'Sent', 'Confirmed',
     'Noodles after the lab', 'From Ravi', 'already',   // who asked, and how full that day is
     'Amin', 'Jo', 'Accept', 'Decline', 'See Wed',
     'Plan something',
+  ]],
+  ['calendar.html', 'Google Calendar', [
+    'GOOGLE CALENDAR', 'Bring it in',
+    'Mandarin class', 'Essay due', 'Café shift',            // a few events, fanned
+    'Read-only', 'Details filled in', 'Weekly classes set up once',
+    'Connect Google Calendar', 'The demo connects a sample calendar',
+  ]],
+  ['calendar/setup.html', 'Calendar setup', [
+    'Already set up', 'Back to your calendar',   // with nothing picked, it says so instead of a blank form
   ]],
   ['everyone.html', 'All friends', [
     'All friends', '36 CHECKED IN TODAY',
@@ -340,14 +358,14 @@ const EXPECTATIONS = [
     'Your contacts never leave your phone.',
   ]],
   ['friend/ravi.html', 'A friend\u2019s week', [
-    'Ravi', '71%', 'doing fine', '2h ago',
+    'Ravi', '71%', 'doing fine', '2h', 'battery', 'free this week', 'last update',
     // The avatar: the same circle the profile draws, so one language covers both.
     'R',
     'Free most of this week',                   // a line they wrote themselves
-    'THIS WEEK, AS THEY SHARE IT',
+    'When Ravi’s free',
     'Wednesday, free 5pm to 11pm',              // published windows, spoken
     'Saturday, free 12pm to 10pm',
-    'Ask about Saturday',                       // the longest window, as one tap
+    'Text something',                           // one way to reach them, at the bottom
   ]],
   ['you.html', 'You', [
     'YOUR PROFILE', 'You', '48%',
@@ -355,8 +373,7 @@ const EXPECTATIONS = [
     // app has taught people to read one.
     'battery', 'friends', 'sharing',
     'Edit profile',
-    'Recharge', 'Check in', 'Recovery', 'Tonight',     // looking after yourself
-    'Your week', 'Timetable', 'What to do first',       // organising the week
+    'Recharge', 'Check in', 'Recovery', 'Tonight',     // looking after yourself - the week's tools are on Plan
   ]],
   ['profile.html', 'Edit profile', [
     'EDIT PROFILE', 'How you appear',
@@ -390,7 +407,7 @@ const EXPECTATIONS = [
   ['item/algo-set/sittings.html', 'Sittings', [
     'DUE THU 13 NOV', 'Sittings', 'Algorithms problem set',
     '3h still loose', '2 sittings fit before Thu 13 Nov',
-    'Suggest 2 sittings', 'Plan my own',
+    'Suggest 2 sittings', 'Pick days myself',
   ]],
   ['checkin.html', 'Check in', [
     'How are you?',                           // the whole daily ask, one screen

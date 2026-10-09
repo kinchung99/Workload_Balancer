@@ -51,11 +51,13 @@ export default function Friends() {
   const { circle, phoneContacts, sharing, markContacted, logMoment, groups, pic, status, account, moods, vibe, invites, received } = useStore();
   const newPlans = received.filter((invite) => !invite.answer).length;
   const waitingOn = invites.filter((invite) => invite.people.some((id) => !invite.answers?.[id])).length;
+  const everyoneIn = invites.filter((invite) => invite.people.every((id) => invite.answers?.[id] === 'yes'));
+  const readyToAdd = everyoneIn.filter((invite) => !invite.scheduled).length;
+  const addedPlans = everyoneIn.filter((invite) => invite.scheduled).length;
   const goingTo = received.filter((invite) => invite.answer === 'yes').length + invites.filter((invite) => invite.scheduled).length;
   const myMood = shownMood(vibe, moods);
   const reading = useReading();
   const [sentTo, setSentTo] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
 
   const others = circleOrder(circle);
   const frequent = frequentFriends(circle, 5);
@@ -201,24 +203,23 @@ export default function Friends() {
 
         {/* Plans: what you were asked to, and what you asked. */}
         <Section family="people" title="Plans" sticker="calendar" meta={goingTo ? `${goingTo} on` : undefined} action={{ label: 'All ›', onPress: () => router.push('/plans' as Href) }}>
-          <Stack direction="row" gap={3}>
+          <Stack direction="row" gap={2}>
             {([
-              { tab: 'received', emoji: '📥', title: 'Received', sub: newPlans ? `${newPlans} new` : `${received.length} total`, hot: newPlans },
-              { tab: 'sent', emoji: '📤', title: 'Sent', sub: waitingOn ? `${waitingOn} waiting` : `${invites.length} total`, hot: 0 },
+              { tab: 'received', emoji: '📥', title: 'Received', sub: newPlans ? `${newPlans} new` : `${received.length}`, hot: newPlans },
+              { tab: 'sent', emoji: '📤', title: 'Sent', sub: waitingOn ? `${waitingOn} waiting` : `${invites.length - readyToAdd - addedPlans}`, hot: 0 },
+              { tab: 'confirmed', emoji: '✅', title: 'Confirmed', sub: readyToAdd ? `${readyToAdd} to add` : `${addedPlans}`, hot: readyToAdd },
             ] as const).map((tile) => (
               <Pressable
                 key={tile.tab}
                 accessibilityRole="button"
                 accessibilityLabel={`${tile.title}, ${tile.sub}`}
                 onPress={() => { tapFeedback(); router.push(`/plans?tab=${tile.tab}` as Href); }}
-                className="flex-1 flex-row items-center gap-3 rounded-lg bg-raised px-4 py-3 active:opacity-70"
+                className="flex-1 items-center gap-1 rounded-lg bg-raised px-2 py-3 active:opacity-70"
                 style={{ borderWidth: 2, borderColor: tile.hot ? color.band.heavy.fill : color.line.hairline }}
               >
                 <Text variant="title">{tile.emoji}</Text>
-                <Stack gap={0} grow>
-                  <Text variant="body" weight="semibold">{tile.title}</Text>
-                  <Text variant="micro" tone={tile.hot ? 'heavy' : 'subtle'}>{tile.sub}</Text>
-                </Stack>
+                <Text variant="callout" weight="semibold">{tile.title}</Text>
+                <Text variant="micro" tone={tile.hot ? 'heavy' : 'subtle'}>{tile.sub}</Text>
               </Pressable>
             ))}
           </Stack>
@@ -276,12 +277,7 @@ export default function Friends() {
             <FriendRow
               key={person.id}
               person={person}
-              open={open === person.id}
-              sent={sentTo === person.id}
-              onToggle={() => { tapFeedback(); setOpen(open === person.id ? null : person.id); }}
-              onSend={() => send(person)}
-              onWrite={() => { tapFeedback(); router.push(`/message?kind=checkin&to=${person.id}` as Href); }}
-              onCalendar={() => { tapFeedback(); router.push(`/friend/${person.id}`); }}
+              onOpen={() => { tapFeedback(); router.push(`/friend/${person.id}`); }}
             />
           ))}
           <Door
@@ -306,70 +302,39 @@ export default function Friends() {
 }
 
 /**
- * One person. Closed it is a reading; open it is the two things you can do.
+ * One person: their reading, and a tap to their own page.
  *
  * The stale case matters most: a number nobody has confirmed for three days is
  * shown greyed with the age next to it, because the alternative is the app
  * quietly inventing news.
  */
-function FriendRow({
-  person, open, sent, onToggle, onSend, onWrite, onCalendar,
-}: {
-  person: CircleMember;
-  open: boolean;
-  sent: boolean;
-  onToggle: () => void;
-  onSend: () => void;
-  onWrite: () => void;
-  onCalendar: () => void;
-}) {
+function FriendRow({ person, onOpen }: { person: CircleMember; onOpen: () => void }) {
   const stale = isStale(person);
   const charge = person.charge ?? 0;
-
   return (
-    <Stack gap={3} className={`rounded-xl border-2 bg-raised px-4 py-4 ${open ? 'border-inverse' : 'border-line-hairline'}`}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${person.name}, ${BAND_WORD[person.band]}, ${charge} percent, updated ${lastSeen(person)}${person.status ? `. “${person.status}”` : ''}`}
-        onPress={onToggle}
-        className="active:opacity-70"
-      >
-        <Stack direction="row" gap={2} align="start">
-          <View className="flex-1">
-            <PersonRow
-              name={person.name}
-              initials={person.initials}
-              band={person.band}
-              charge={charge}
-              pic={person.pic}
-              mood={person.mood}
-              status={person.status}
-              stale={stale}
-              active={(person.updatedMinsAgo ?? Infinity) < 60}
-              line={stale ? `${lastSeen(person)} · may be out of date` : `${BAND_WORD[person.band]} · ${lastSeen(person)}`}
-            />
-          </View>
-          <Text variant="heading" tone="subtle" className="pt-4">{open ? '⌃' : '⌄'}</Text>
-        </Stack>
-      </Pressable>
-
-      {open ? (
-        <Stack direction="row" gap={2} wrap>
-          <Chip
-            label={person.free?.length ? `See when they're free` : 'Calendar is private'}
-            tone={person.free?.length ? 'selected' : 'plain'}
-            onPress={person.free?.length ? onCalendar : undefined}
-            readOnly={!person.free?.length}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${person.name}, ${BAND_WORD[person.band]}, ${charge} percent, updated ${lastSeen(person)}${person.status ? `. “${person.status}”` : ''}. Open their page`}
+      onPress={onOpen}
+      className="rounded-xl border-2 border-line-hairline bg-raised px-4 py-4 active:opacity-70"
+    >
+      <Stack direction="row" gap={2} align="center">
+        <View className="flex-1">
+          <PersonRow
+            name={person.name}
+            initials={person.initials}
+            band={person.band}
+            charge={charge}
+            pic={person.pic}
+            mood={person.mood}
+            status={person.status}
+            stale={stale}
+            active={(person.updatedMinsAgo ?? Infinity) < 60}
+            line={stale ? `${lastSeen(person)} · may be out of date` : `${BAND_WORD[person.band]} · ${lastSeen(person)}`}
           />
-          {sent ? (
-            <Chip label="Opened in WhatsApp" tone="steady" readOnly />
-          ) : (
-            <Chip label="Say hi" onPress={onSend} />
-          )}
-          <Chip label="✏️ Write a message" onPress={onWrite} />
-        </Stack>
-      ) : null}
-    </Stack>
+        </View>
+        <Text variant="heading" tone="subtle">›</Text>
+      </Stack>
+    </Pressable>
   );
 }

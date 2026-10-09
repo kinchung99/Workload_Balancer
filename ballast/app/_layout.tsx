@@ -7,6 +7,7 @@ import { useSync } from '@/hooks/useSync';
 import { useGate, useSession, useWaitingForSession } from '@/hooks/useGate';
 import { useDemoFriends } from '@/hooks/useDemoFriends';
 import { usePopups } from '@/hooks/usePopups';
+import { useCalendarSync } from '@/hooks/useCalendarSync';
 import { View } from 'react-native';
 import { Mascot } from '@/components';
 
@@ -26,6 +27,7 @@ export default function RootLayout() {
   useSync();
   useDemoFriends();
   usePopups();
+  useCalendarSync();
   const waiting = useWaitingForSession();
 
   return (

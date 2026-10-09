@@ -14,6 +14,7 @@ import { dayName } from './dates';
 import { isProtectedClass } from './timetable';
 import { loadOf, sumLoad } from './load';
 import type { Item, Trade } from './types';
+import { recipientOf } from './compose';
 
 /** Batching four errands into one trip costs one trip's worth of time. */
 const BATCHED_TRIP_HOURS = 1.5;
@@ -177,3 +178,36 @@ export function applySelection(week: Item[], trades: Trade[], selected: Record<s
 
 export const totalSaved = (trades: Trade[], selected: Record<string, boolean>): number =>
   Math.round(trades.filter((t) => selected[t.id] && !t.locked).reduce((sum, t) => sum + t.saves, 0) * 10) / 10;
+
+/**
+ * What taking one trade actually involves, before it is taken.
+ *
+ * Putting something down is rarely only a deletion. A dinner has a friend on
+ * the other end, a shift needs somebody to cover it, coursework has a lecturer.
+ * This names who should hear first, so the screen can offer to write to them
+ * before anything leaves the week - not after.
+ */
+export interface TradeAsk {
+  /** What it is, in two words. */
+  kind: string;
+  /** The button that takes it: "Put it down", "Batch into one trip"... */
+  verb: string;
+  /** Somebody to tell first, or null when nobody is waiting on it. */
+  tell: string | null;
+}
+
+export function askFor(trade: Trade, item?: Item): TradeAsk {
+  if (trade.id.startsWith('batch-')) return { kind: 'Errands', verb: 'Batch into one trip', tell: null };
+  if (trade.protected) return { kind: 'Rest', verb: 'Put it down anyway', tell: null };
+  if (trade.id.startsWith('hand-')) {
+    return { kind: 'Shift', verb: 'Hand it over', tell: trade.detail.match(/Ask (\w+)/)?.[1] ?? 'your manager' };
+  }
+  if (trade.id.startsWith('decline-')) {
+    return { kind: 'Plan with people', verb: 'Put it down', tell: recipientOf(trade.title) ?? 'them' };
+  }
+  const coursework = !!item?.deadline || !!item?.moduleId;
+  if (trade.id.startsWith('push-')) {
+    return { kind: coursework ? 'Coursework' : 'Self-imposed', verb: 'Push it back', tell: coursework ? 'your lecturer' : null };
+  }
+  return { kind: coursework ? 'Coursework' : 'Plan', verb: 'Put it down', tell: coursework ? 'your lecturer' : null };
+}

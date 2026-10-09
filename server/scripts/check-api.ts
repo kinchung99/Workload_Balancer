@@ -24,7 +24,9 @@ import { ApiError as GeminiApiError, FinishReason, type GoogleGenAI } from '@goo
 import { makeAuth } from '../src/lib/auth.js';
 import * as schema from '../src/db/schema.js';
 import type { Database } from '../src/db/client.js';
-import type { GroupDTO } from '../../shared/contract.js';
+import type { CalendarEventsResponse, CalendarStatusDTO, GroupDTO } from '../../shared/contract.js';
+import { GoogleGone, type GoogleCalendarClient } from '../src/lib/google.js';
+import { eq } from 'drizzle-orm';
 
 process.env.NODE_ENV = 'test';
 process.env.AUTH_SECRET = 'test-secret-at-least-32-characters-long!!';
@@ -552,6 +554,112 @@ section('Leaving');
     ((await (await call('/api/circle', {}, amira.cookie)).json()) as { circle: unknown[] }).circle.length, 0);
 }
 
+section('Google Calendar, read-only');
+{
+  const off = (await (await call('/api/calendar', {}, amira.cookie)).json()) as CalendarStatusDTO;
+  check('without Google keys the app is told there is nothing to connect', off.available, false);
+  check('and asking to connect says so', (await post('/api/calendar/connect', { returnTo: 'http://localhost:8081/calendar' }, amira.cookie)).status, 503);
+
+  let gone = false;
+  let exchanged = 0;
+  const revoked: string[] = [];
+  const timed = (day: number, hour: number) => `2026-11-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00+08:00`;
+  const fakeGoogle: GoogleCalendarClient = {
+    authUrl: (state, redirect) => `https://accounts.example/auth?state=${encodeURIComponent(state)}&redirect=${encodeURIComponent(redirect)}`,
+    exchange: async (code) => {
+      exchanged += 1;
+      return code === 'good' ? { refreshToken: 'rt-amira', email: 'amira@gmail.com' } : { refreshToken: null, email: null };
+    },
+    access: async (token) => {
+      if (gone) throw new GoogleGone();
+      if (token !== 'rt-amira') throw new Error('wrong token');
+      return 'at-1';
+    },
+    calendars: async () => [
+      { id: 'primary-id', name: 'amira@gmail.com', color: '#4285f4', primary: true, selected: true },
+      { id: 'uni-timetable', name: 'Uni timetable', color: '#0b8043', primary: false, selected: true },
+      { id: 'en.malaysia#holiday@group.v.calendar.google.com', name: 'Holidays', color: null, primary: false, selected: true },
+      { id: 'old-club', name: 'Old club', color: null, primary: false, selected: false },
+    ],
+    events: async (_access, calendarId) => {
+      if (calendarId === 'uni-timetable') {
+        return [
+          { id: 'os_1', summary: 'CS2040 Lecture', start: { dateTime: timed(9, 9) }, end: { dateTime: timed(9, 11) }, recurringEventId: 'os', location: 'LT7' },
+          { id: 'os_2', summary: 'CS2040 Lecture', start: { dateTime: timed(16, 9) }, end: { dateTime: timed(16, 11) }, recurringEventId: 'os', location: 'LT7' },
+        ];
+      }
+      if (calendarId === 'primary-id') {
+        return [
+          { id: 'essay', summary: 'Ethics essay due', start: { date: '2026-11-12' }, end: { date: '2026-11-13' } },
+          { id: 'trip', summary: 'Reading week trip', start: { date: '2026-11-14' }, end: { date: '2026-11-18' } },
+          { id: 'gone', status: 'cancelled', summary: 'Called off', start: { dateTime: timed(10, 19) }, end: { dateTime: timed(10, 21) } },
+          { id: 'no', summary: 'Party', start: { dateTime: timed(11, 20) }, end: { dateTime: timed(11, 23) }, attendees: [{ self: true, responseStatus: 'declined' }] },
+          { id: 'ooo', summary: 'Out of office', eventType: 'outOfOffice', start: { dateTime: timed(13, 9) }, end: { dateTime: timed(13, 17) } },
+        ];
+      }
+      return [{ id: 'hol', summary: 'Deepavali', start: { date: '2026-11-08' }, end: { date: '2026-11-09' } }];
+    },
+    revoke: async (token) => { revoked.push(token); },
+  };
+  const withGoogle = createApp(db, auth, null, fakeGoogle);
+  const gcall = (path: string, init: RequestInit = {}, cookie?: string) =>
+    withGoogle.request(`http://localhost${path}`, { ...init, headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } });
+  const gpost = (path: string, body: unknown, cookie?: string) => gcall(path, { method: 'POST', body: JSON.stringify(body) }, cookie);
+  const home = 'http://localhost:8081/calendar';
+  const stateOf = (url: string) => encodeURIComponent(new URL(url).searchParams.get('state') ?? '');
+
+  check('connecting needs you signed in', (await gpost('/api/calendar/connect', { returnTo: home })).status, 401);
+  check('it will not send you on to somebody else\'s site', (await gpost('/api/calendar/connect', { returnTo: 'https://evil.example/calendar' }, amira.cookie)).status, 400);
+  const link = (await (await gpost('/api/calendar/connect', { returnTo: home }, amira.cookie)).json()) as { url: string };
+  check('Google is told to come back to the API', new URL(link.url).searchParams.get('redirect'), 'http://localhost/api/calendar/callback');
+
+  const state = new URL(link.url).searchParams.get('state') ?? '';
+  const forged = `${state.slice(0, -3)}${state.endsWith('AAA') ? 'BBB' : 'AAA'}`;
+  check('a forged state is refused', (await gcall(`/api/calendar/callback?code=good&state=${encodeURIComponent(forged)}`)).status, 400);
+  check('and nothing is exchanged for it', exchanged, 0);
+
+  const denied = await gcall(`/api/calendar/callback?error=access_denied&state=${stateOf(link.url)}`);
+  check('saying no on Google comes back as cancelled', denied.headers.get('location'), `${home}?calendar=cancelled`);
+
+  const back = await gcall(`/api/calendar/callback?code=good&state=${stateOf(link.url)}`);
+  check('saying yes comes back into the app', [back.status, back.headers.get('location')], [302, `${home}?calendar=connected`]);
+  const [stored] = await db.select().from(schema.calendarLinks).where(eq(schema.calendarLinks.userId, amira.id));
+  check('the refresh token is sealed at rest', [stored?.refreshToken.includes('rt-amira'), stored?.refreshToken.startsWith('v1.')], [false, true]);
+
+  const status = (await (await gcall('/api/calendar', {}, amira.cookie)).json()) as CalendarStatusDTO;
+  check('connected, as her Google account', [status.connected, status.email], [true, 'amira@gmail.com']);
+  check('nobody else sees her connection', ((await (await gcall('/api/calendar', {}, jo.cookie)).json()) as CalendarStatusDTO).connected, false);
+  check('and nobody else can read her events', (await gcall('/api/calendar/events', {}, jo.cookie)).status, 404);
+
+  const read = (await (await gcall('/api/calendar/events', {}, amira.cookie)).json()) as CalendarEventsResponse;
+  check('her main calendar and timetable are read; holidays and hidden ones are not',
+    read.calendars.filter((cal) => cal.on).map((cal) => cal.name), ['Main calendar', 'Uni timetable']);
+  check('cancelled, declined, out-of-office and multi-day events stay out',
+    read.events.map((e) => e.title), ['CS2040 Lecture', 'Ethics essay due', 'CS2040 Lecture']);
+  check('every week of a class shares one series', new Set(read.events.map((e) => e.seriesId).filter(Boolean)).size, 1);
+  check('an all-day event says so', read.events.find((e) => e.title === 'Ethics essay due')?.allDay, true);
+  check('and the room comes along', read.events[0]?.location, 'LT7');
+  check('the sync time is kept', typeof ((await (await gcall('/api/calendar', {}, amira.cookie)).json()) as CalendarStatusDTO).lastSyncedAt, 'string');
+
+  await gpost('/api/calendar/calendars', { on: ['uni-timetable'] }, amira.cookie);
+  const fewer = (await (await gcall('/api/calendar/events', {}, amira.cookie)).json()) as CalendarEventsResponse;
+  check('switching a calendar off stops reading it', fewer.events.map((e) => e.title), ['CS2040 Lecture', 'CS2040 Lecture']);
+
+  gone = true;
+  check('a connection Google dropped asks for a reconnect', (await gcall('/api/calendar/events', {}, amira.cookie)).status, 409);
+  check('and the status says so', ((await (await gcall('/api/calendar', {}, amira.cookie)).json()) as CalendarStatusDTO).status, 'expired');
+
+  gone = false;
+  const again = (await (await gpost('/api/calendar/connect', { returnTo: home }, amira.cookie)).json()) as { url: string };
+  await gcall(`/api/calendar/callback?code=good&state=${stateOf(again.url)}`);
+  const restored = (await (await gcall('/api/calendar/events', {}, amira.cookie)).json()) as CalendarEventsResponse;
+  check('connecting again brings it back, with her choice of calendars', restored.events.length, 2);
+
+  const dropped = await gcall('/api/calendar', { method: 'DELETE' }, amira.cookie);
+  check('disconnecting tells Google to forget the token', [dropped.status, revoked], [200, ['rt-amira']]);
+  check('and forgets it here', (await db.select().from(schema.calendarLinks).where(eq(schema.calendarLinks.userId, amira.id))).length, 0);
+}
+
 section('The deployment routes every path to the function');
 {
   /*
@@ -574,7 +682,7 @@ section('The deployment routes every path to the function');
     '/', '/health',
     '/api/auth/sign-up/email', '/api/auth/sign-in/anonymous', '/api/auth/sign-out',
     '/api/me', '/api/sync', '/api/circle', '/api/circle/request',
-    '/api/sharing/presence', '/api/invites', '/api/compose/ideas', '/api/compose/draft', '/api/suggest/recovery',
+    '/api/sharing/presence', '/api/invites', '/api/compose/ideas', '/api/compose/draft', '/api/calendar/callback', '/api/suggest/recovery',
   ]) {
     check(`${path} reaches the function`, reaches(path), true);
   }

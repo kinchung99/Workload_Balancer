@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, View } from 'react-native';
 import { Stack, Text } from '@/components';
 import { color, radius } from '@design/tokens';
-import { formatShort, parseISO } from '@/lib/dates';
-import { bestStart, loadOnDay, sittingStarts, workDays } from '@/lib/prep';
+import { DAY_LETTER, dayIndex, formatShort, parseISO, startOfWeek } from '@/lib/dates';
+import { bestStart, bookingDays, loadOnDay, sittingStarts } from '@/lib/prep';
 import { DAY_END, DAY_START, formatHour, freeSlots } from '@/lib/schedule';
 import {
   dayRibbon, describeChange, durationLabel, hourAt, nearestStart, ribbonAt, sittingLoad, spanLabel,
@@ -15,9 +15,7 @@ import { useStore } from '@/state/store';
 import type { Item } from '@/lib/types';
 
 const LENGTHS = [0.5, 1, 1.5, 2, 2.5, 3];
-const BAR_MAX = 34;
 const RIBBON_TICKS = [7, 11, 15, 19, 23];
-const TONE = { heavy: 'heavy', steady: 'steady', plain: 'muted' } as const;
 
 /**
  * One sitting, adjustable three ways: which day, what time, how long.
@@ -54,14 +52,15 @@ export function SittingEditor({
   onChange: (next: Draft) => void;
 }) {
   const capacity = capacityOf(useStore((state) => state.ceilings));
-  const days = workDays(item, today);
+  const days = bookingDays(today);
+  const due = item.deadline ?? item.date;
+  const nextMonday = startOfWeek(days[days.length - 1]);
+  const weeks = [days.filter((d) => d < nextMonday), days.filter((d) => d >= nextMonday)].filter((w) => w.length);
   const notBefore = (date: string) => (date === today ? nowHour : undefined);
   const startsFor = (date: string, hours: number) => sittingStarts(busy, date, hours, notBefore(date));
   const options = startsFor(value.date, value.hours);
   const index = value.startHour === undefined ? -1 : options.indexOf(value.startHour);
 
-  const loads = days.map((date) => loadOnDay(base, date));
-  const peak = Math.max(...loads, 1);
   const adds = sittingLoad(item, value.hours);
   const gap = value.startHour === undefined
     ? undefined
@@ -94,50 +93,44 @@ export function SittingEditor({
 
   return (
     <Stack gap={4} className="rounded-md border border-line-hairline bg-page p-4">
-      {/* Which day. Bars are what each day already carries; the due day says so. */}
+      {/* Which day: this week and next, one row each. Late days are marked, full days greyed. */}
       <Stack gap={2}>
-        <Text variant="micro" tone="subtle">DAY · BARS ARE LOAD ALREADY ON IT</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-          <Stack direction="row" gap={2} className="w-full">
-            {days.map((date, i) => {
-              const selected = date === value.date;
-              const full = startsFor(date, value.hours).length === 0;
-              const isDue = date === (item.deadline ?? item.date);
-              return (
-                <Pressable
-                  key={date}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected, disabled: full }}
-                  accessibilityLabel={`${formatShort(date)}, uses ${Math.round((loads[i] / capacity) * 100)} percent${isDue ? ', due day' : ''}${full ? ', no gap long enough' : ''}`}
-                  disabled={full}
-                  onPress={() => pickDay(date)}
-                  className={`min-h-min items-center gap-1 rounded-md px-2 py-2 ${
-                    selected ? 'bg-inverse' : full ? 'bg-sunken opacity-50' : 'bg-sunken active:opacity-70'
-                  }`}
-                  style={{ flexGrow: 1, minWidth: 52 }}
-                >
-                  <Text variant="micro" tone={selected ? 'inverse' : isDue ? 'heavy' : 'subtle'}>
-                    {isDue ? 'DUE' : date === today ? 'TODAY' : formatShort(date).slice(0, 3).toUpperCase()}
-                  </Text>
-                  <View className="w-full justify-end items-center" style={{ height: BAR_MAX }}>
-                    <View
-                      style={{
-                        width: 14,
-                        height: Math.max(4, (loads[i] / peak) * BAR_MAX),
-                        borderRadius: radius.sm,
-                        backgroundColor: selected ? color.ink.inverse : color.line.strong,
-                      }}
-                    />
-                  </View>
-                  <Text variant="footnote" weight="semibold" tone={selected ? 'inverse' : 'default'}>
-                    {parseISO(date).getUTCDate()}
-                  </Text>
-                  <Text variant="micro" tone={selected ? 'inverse' : 'subtle'}>{full ? 'Full' : `${Math.round((loads[i] / capacity) * 100)}%`}</Text>
-                </Pressable>
-              );
-            })}
+        <Text variant="micro" tone="subtle">DAY · DUE {formatShort(due).toUpperCase()}</Text>
+        {weeks.map((week, w) => (
+          <Stack key={week[0]} gap={1}>
+            <Text variant="micro" tone="subtle">{w === 0 && week[0] < nextMonday ? 'THIS WEEK' : 'NEXT WEEK'}</Text>
+            <Stack direction="row" gap={1}>
+              {week.map((date) => {
+                const selected = date === value.date;
+                const full = startsFor(date, value.hours).length === 0;
+                const isDue = date === due;
+                const late = date > due;
+                const load = Math.round((loadOnDay(base, date) / capacity) * 100);
+                return (
+                  <Pressable
+                    key={date}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: full }}
+                    accessibilityLabel={`${formatShort(date)}, uses ${load} percent${isDue ? ', due day' : late ? ', after it is due' : ''}${full ? ', no gap long enough' : ''}`}
+                    disabled={full}
+                    onPress={() => pickDay(date)}
+                    className={`min-h-min flex-1 items-center gap-0 rounded-md py-2 ${selected ? 'bg-inverse' : full ? 'bg-sunken opacity-40' : 'bg-sunken active:opacity-70'}`}
+                    style={{ borderWidth: isDue || late ? 1.5 : 0, borderColor: color.band.heavy.fill, borderStyle: late ? 'dashed' : 'solid' }}
+                  >
+                    <Text variant="micro" tone={selected ? 'inverse' : isDue || late ? 'heavy' : 'subtle'}>
+                      {isDue ? 'DUE' : date === today ? 'NOW' : DAY_LETTER[dayIndex(date)]}
+                    </Text>
+                    <Text variant="callout" weight="bold" tone={selected ? 'inverse' : 'default'}>{parseISO(date).getUTCDate()}</Text>
+                    <Text variant="micro" tone={selected ? 'inverse' : 'subtle'}>{full ? '–' : `${load}%`}</Text>
+                  </Pressable>
+                );
+              })}
+              {/* Keep the columns lined up when this week started mid-week. */}
+              {Array.from({ length: 7 - week.length }, (_, i) => <View key={`pad-${i}`} className="flex-1" />)}
+            </Stack>
           </Stack>
-        </ScrollView>
+        ))}
+        {value.date > due ? <Text variant="micro" tone="heavy">After it’s due · {formatShort(due)}</Text> : null}
       </Stack>
 
       {/* What time. Drag the block, or step through the starts that fit. */}
@@ -200,30 +193,14 @@ export function SittingEditor({
       </Stack>
 
       {changes.length ? (
-        <Stack gap={2}>
-          <Text variant="micro" tone="subtle">WHAT CHANGED</Text>
-          {changes.map((change) => (
-            <Stack key={change.key} direction="row" gap={3} align="center" wrap>
-              <Text variant="micro" tone="subtle" style={{ width: 60 }}>{change.label.toUpperCase()}</Text>
-              <Text variant="footnote" tone="subtle" className="line-through">{change.from}</Text>
-              <Text variant="footnote" tone="subtle">→</Text>
-              <Text variant="footnote" weight="semibold">{change.to}</Text>
-              {change.note ? (
-                <View className={`rounded-pill px-2 py-1 ${change.tone === 'heavy' ? 'bg-heavy-wash' : change.tone === 'steady' ? 'bg-steady-wash' : 'bg-sunken'}`}>
-                  <Text variant="micro" tone={TONE[change.tone]}>{change.note}</Text>
-                </View>
-              ) : null}
-            </Stack>
-          ))}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Undo changes"
-            onPress={() => { tapFeedback(); onChange({ ...origin! }); }}
-            className="min-h-min justify-center self-start active:opacity-60"
-          >
-            <Text variant="caption" tone="muted" className="underline">Undo changes</Text>
-          </Pressable>
-        </Stack>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Undo changes"
+          onPress={() => { tapFeedback(); onChange({ ...origin! }); }}
+          className="min-h-min justify-center self-start active:opacity-60"
+        >
+          <Text variant="caption" tone="muted" className="underline">↺ Back to the suggestion</Text>
+        </Pressable>
       ) : null}
     </Stack>
   );

@@ -27,12 +27,16 @@ import { invites } from './routes/invites.js';
 import { sharing } from './routes/sharing.js';
 import { sync } from './routes/sync.js';
 import { composeRoutes, defaultWriter, suggestRoutes, type Writer } from './routes/compose.js';
+import { calendarRoutes } from './routes/calendar.js';
+import { googleFromEnv, type GoogleCalendarClient } from './lib/google.js';
 
 export function createApp(
   db: Database,
   auth: Auth = makeAuth(db),
   /** Who writes messages. Null when no key is configured; the app then drafts on the phone. */
   writer: Writer | null = defaultWriter(),
+  /** Google Calendar. Null when no Google keys are set; connecting is then not offered. */
+  google: GoogleCalendarClient | null = googleFromEnv(),
 ) {
   const app = new Hono<Env>();
 
@@ -98,6 +102,9 @@ export function createApp(
   app.use('/api/invites/*', requireUser);
   app.use('/api/compose/*', requireUser);
   app.use('/api/suggest/*', requireUser);
+  app.use('/api/calendar', requireUser);
+  // Google's way back in carries signed state instead of a session.
+  app.use('/api/calendar/*', (c, next) => (c.req.path === '/api/calendar/callback' ? next() : requireUser(c, next)));
 
   /**
    * Who am I, and what am I sharing.
@@ -178,6 +185,7 @@ export function createApp(
   app.route('/api/invites', invites);
   app.route('/api/compose', composeRoutes(writer));
   app.route('/api/suggest', suggestRoutes(writer));
+  app.route('/api/calendar', calendarRoutes(google));
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

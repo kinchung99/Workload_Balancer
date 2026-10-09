@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { Mascot, PageHeader, Screen, Section, Stack, Text } from '@/components';
+import { Mascot, PageHeader, Screen, Stack, Sticker, Text, type StickerName } from '@/components';
 import { color, radius } from '@design/tokens';
 import { whenWord, type Bell } from '@/lib/notify';
 import { answerFriend, answerGroup, answerPlan } from '@/lib/social';
@@ -12,12 +12,13 @@ import { noticeApi, popDue } from '@/hooks/usePopups';
 import { useHydrated } from '@/hooks/useHydrated';
 
 /**
- * Notifications - what needs an answer, what matters today, what happened.
+ * Notifications - one list, read like a feed.
  *
- * Questions first, answered right here: a friend request, a group invitation.
- * Then today's things worth knowing, each a tap from where it is dealt with.
- * Then the activity - who said yes, who joined. What was new when you opened
- * the page keeps its dot until you leave.
+ * Each one is a picture for what kind of thing it is (a friend, a group, a
+ * plan, the calendar, a deadline) and a sentence for what happened. The three
+ * that ask something - a friend request, a group, a plan - carry their two
+ * answers right under the sentence; the rest open where they are dealt with.
+ * What was new when the page opened stays tinted until you leave.
  */
 export default function Notifications() {
   const router = useRouter();
@@ -38,14 +39,15 @@ export default function Notifications() {
   const fresh = { has: (id: string) => !!seenBefore && !seenBefore.has(id) };
 
   const asks = (bell: Bell) => bell.kind === 'friend' || bell.kind === 'group' || bell.kind === 'plan';
-  const questions = list.filter(asks);
-  const today = list.filter((bell) => !asks(bell) && bell.kind !== 'event');
-  const history = list.filter((bell) => bell.kind === 'event');
   const open = (bell: Bell) => { if (bell.to) { tapFeedback(); router.push(bell.to as Href); } };
+  const answer = (bell: Bell, yes: boolean) => {
+    void (bell.kind === 'group' ? answerGroup(bell.ref!, yes) : bell.kind === 'plan' ? answerPlan(bell.ref!, yes) : answerFriend(bell.ref!, yes));
+    if (yes) successFeedback(); else tapFeedback();
+  };
 
   return (
     <Screen back="/" backLabel="Home">
-      <Stack gap={5} className="pt-2">
+      <Stack gap={4} className="pt-2">
         <PageHeader sticker="bell" wash={color.decor.lemon} title="Notifications" />
 
         <PopupSwitch />
@@ -55,61 +57,57 @@ export default function Notifications() {
             <Mascot charge={88} loadPercent={12} size={92} />
             <Text variant="heading">You’re all caught up</Text>
           </View>
-        ) : null}
-
-        {questions.length ? (
-          <Section family="people" title="Needs an answer" sticker="wave" meta={`${questions.length}`}>
-            {questions.map((bell) => (
-              <Stack key={bell.id} gap={3} className="rounded-lg bg-raised px-4 py-3">
-                <Row bell={bell} fresh={fresh.has(bell.id)} />
-                <Stack direction="row" gap={2}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${bell.kind === 'group' ? 'Join' : 'Accept'}: ${bell.title}`}
-                    onPress={() => {
-                      void (bell.kind === 'group' ? answerGroup(bell.ref!, true) : bell.kind === 'plan' ? answerPlan(bell.ref!, true) : answerFriend(bell.ref!, true));
-                      successFeedback();
-                    }}
-                    className="min-h-min flex-1 items-center justify-center rounded-pill bg-steady-fill py-2 active:opacity-70"
-                  >
-                    <Text variant="caption" weight="bold" tone="inverse">{bell.kind === 'group' ? '✓ Join' : '✓ Accept'}</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Decline: ${bell.title}`}
-                    onPress={() => {
-                      void (bell.kind === 'group' ? answerGroup(bell.ref!, false) : bell.kind === 'plan' ? answerPlan(bell.ref!, false) : answerFriend(bell.ref!, false));
-                      tapFeedback();
-                    }}
-                    className="min-h-min flex-1 items-center justify-center rounded-pill border-2 border-line-hairline bg-sunken py-2 active:opacity-70"
-                  >
-                    <Text variant="caption" weight="bold">Decline</Text>
-                  </Pressable>
+        ) : (
+          // One list, newest questions first: a picture for what it is, a sentence for what happened.
+          <View className="overflow-hidden rounded-xl bg-raised" style={{ borderWidth: 1, borderColor: color.line.hairline }}>
+            {list.map((bell, index) => (
+              <Pressable
+                key={bell.id}
+                accessibilityRole={bell.to ? 'button' : undefined}
+                accessibilityLabel={[bell.title, bell.body].filter(Boolean).join('. ')}
+                disabled={!bell.to || asks(bell)}
+                onPress={() => open(bell)}
+                className="active:opacity-70"
+                style={{
+                  borderTopWidth: index ? 1 : 0, borderColor: color.line.hairline,
+                  backgroundColor: fresh.has(bell.id) ? color.band.recovery.wash : 'transparent',
+                }}
+              >
+                <Stack direction="row" gap={3} align="start" className="px-4 py-3">
+                  <Picture bell={bell} />
+                  <Stack gap={2} grow>
+                    <Text variant="callout">
+                      <Text variant="callout" weight="semibold">{bell.title}</Text>
+                      {bell.body ? <Text variant="callout" tone="muted">{` · ${bell.body}`}</Text> : null}
+                      {bell.kind !== 'plan' && whenWord(bell.at) ? <Text variant="callout" tone="subtle">{`  ${whenWord(bell.at)}`}</Text> : null}
+                    </Text>
+                    {asks(bell) ? (
+                      <Stack direction="row" gap={2}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`${bell.kind === 'group' ? 'Join' : 'Accept'}: ${bell.title}`}
+                          onPress={() => answer(bell, true)}
+                          className="min-h-min items-center justify-center rounded-pill bg-steady-fill px-5 active:opacity-70"
+                        >
+                          <Text variant="caption" weight="bold" tone="inverse">{bell.kind === 'group' ? 'Join' : 'Accept'}</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Decline: ${bell.title}`}
+                          onPress={() => answer(bell, false)}
+                          className="min-h-min items-center justify-center rounded-pill border border-line-hairline bg-sunken px-5 active:opacity-70"
+                        >
+                          <Text variant="caption" weight="bold">Decline</Text>
+                        </Pressable>
+                      </Stack>
+                    ) : null}
+                  </Stack>
+                  {fresh.has(bell.id) ? <View style={{ width: 9, height: 9, marginTop: 6, borderRadius: radius.pill, backgroundColor: color.band.heavy.fill }} /> : null}
                 </Stack>
-              </Stack>
-            ))}
-          </Section>
-        ) : null}
-
-        {today.length ? (
-          <Section family="focus" title="Today" sticker="clock">
-            {today.map((bell) => (
-              <Pressable key={bell.id} accessibilityRole="button" accessibilityLabel={bell.title} onPress={() => open(bell)} className="rounded-lg bg-raised px-4 py-3 active:opacity-70">
-                <Row bell={bell} fresh={fresh.has(bell.id)} chevron />
               </Pressable>
             ))}
-          </Section>
-        ) : null}
-
-        {history.length ? (
-          <Section family="week" title="Activity" sticker="calendar">
-            {history.map((bell) => (
-              <Pressable key={bell.id} accessibilityRole="button" accessibilityLabel={bell.title} onPress={() => open(bell)} className="rounded-lg bg-raised px-4 py-3 active:opacity-70">
-                <Row bell={bell} fresh={fresh.has(bell.id)} chevron={!!bell.to} />
-              </Pressable>
-            ))}
-          </Section>
-        ) : null}
+          </View>
+        )}
 
         <View className="h-2" />
       </Stack>
@@ -117,23 +115,36 @@ export default function Notifications() {
   );
 }
 
-function Row({ bell, fresh, chevron = false }: { bell: Bell; fresh: boolean; chevron?: boolean }) {
-  // A plan already says when it is; when it was sent would be a second date.
-  const when = bell.kind === 'plan' ? '' : whenWord(bell.at);
+/** One picture per kind of thing, so the list can be read by shape before words. */
+const PICTURE: Record<Bell['kind'], { sticker: StickerName; wash: string }> = {
+  friend:   { sticker: 'wave',       wash: color.decor.candy },
+  group:    { sticker: 'people',     wash: color.decor.lilac },
+  plan:     { sticker: 'heart',      wash: color.decor.blush },
+  update:   { sticker: 'clock',      wash: color.decor.sky },
+  calendar: { sticker: 'calendar',   wash: color.decor.sky },
+  due:      { sticker: 'assignment', wash: color.decor.lemon },
+  wall:     { sticker: 'wall',       wash: color.band.heavy.wash },
+  nudge:    { sticker: 'chat',       wash: color.decor.lilac },
+  rest:     { sticker: 'leaf',       wash: color.decor.mint },
+  low:      { sticker: 'battery',    wash: color.band.heavy.wash },
+  event:    { sticker: 'sparkle',    wash: color.decor.cream },
+};
+
+/** What happened, by what the app stamped on it. */
+function eventPicture(bell: Bell): { sticker: StickerName; wash: string } {
+  if (bell.emoji === '📅') return PICTURE.calendar;
+  if (bell.emoji === '✅' || bell.emoji === '❌') return PICTURE.plan;
+  if (bell.emoji === '🎉') return PICTURE.friend;
+  if (bell.to?.startsWith('/group')) return PICTURE.group;
+  return PICTURE.event;
+}
+
+function Picture({ bell }: { bell: Bell }) {
+  const { sticker, wash } = bell.kind === 'event' ? eventPicture(bell) : PICTURE[bell.kind];
   return (
-    <Stack direction="row" gap={3} align="center">
-      <View className="items-center justify-center rounded-pill bg-sunken" style={{ width: 42, height: 42 }}>
-        <Text variant="heading">{bell.emoji}</Text>
-      </View>
-      <Stack gap={0} grow>
-        <Text variant="body" weight="semibold" numberOfLines={2}>{bell.title}</Text>
-        {bell.body || when ? (
-          <Text variant="micro" tone="subtle" numberOfLines={1}>{[bell.body, when].filter(Boolean).join(' · ')}</Text>
-        ) : null}
-      </Stack>
-      {fresh ? <View style={{ width: 10, height: 10, borderRadius: radius.pill, backgroundColor: color.band.heavy.fill }} /> : null}
-      {chevron ? <Text variant="heading" tone="subtle">›</Text> : null}
-    </Stack>
+    <View className="items-center justify-center rounded-pill" style={{ width: 44, height: 44, backgroundColor: wash }}>
+      <Sticker name={sticker} size={28} />
+    </View>
   );
 }
 

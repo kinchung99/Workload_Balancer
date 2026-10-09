@@ -452,6 +452,62 @@ export interface MeDTO {
 /** Initials from a name, the same way on both sides of the wire. */
 export { initialsFrom } from './initials.js';
 
+/* --------------------------------------------------------- google calendar */
+
+/**
+ * Google Calendar, read-only.
+ *
+ * The server holds the connection (a sealed refresh token) and reads events on
+ * request; it never stores them. What the student keeps becomes ordinary items
+ * on the phone, set up there, so the week's model stays on the device.
+ */
+export const calendarConnectSchema = z.object({
+  /** Where Google should send the student back to: the app's own calendar page. */
+  returnTo: z.string().min(1).max(400),
+});
+export const calendarChooseSchema = z.object({ on: z.array(z.string().min(1).max(300)).max(50) });
+
+export interface CalendarDTO {
+  id: string;
+  name: string;
+  color: string | null;
+  /** Read from it. Your main calendar and the ones you show in Google are on to begin with. */
+  on: boolean;
+}
+
+export interface CalendarStatusDTO {
+  /** The server has Google keys. Without them there is nothing to connect to. */
+  available: boolean;
+  connected: boolean;
+  email: string | null;
+  /** expired: Google stopped honouring the connection, and it needs a reconnect. */
+  status: 'ok' | 'expired' | null;
+  lastSyncedAt: string | null;
+  calendars: CalendarDTO[];
+}
+
+export interface CalendarEventDTO {
+  /** `calendarId|eventId` - unique across calendars. */
+  id: string;
+  /** Shared by every week of a repeating event, so a class is set up once. */
+  seriesId: string | null;
+  title: string;
+  /** An ISO date-time with its offset, or yyyy-mm-dd for an all-day event. */
+  start: string;
+  end: string;
+  allDay: boolean;
+  location: string | null;
+  calendar: string;
+  color: string | null;
+  updated: string;
+}
+
+export interface CalendarEventsResponse {
+  events: CalendarEventDTO[];
+  calendars: CalendarDTO[];
+  syncedAt: string;
+}
+
 /* -------------------------------------------------------------------- misc */
 
 export interface ApiError {

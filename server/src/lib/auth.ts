@@ -66,6 +66,22 @@ const origins = isProduction
     'exp://*',
   ];
 
+/**
+ * Whether a link points back into the app - checked before sending anybody
+ * there after a Google round trip, so the API cannot be used to bounce people
+ * to a site of somebody else's choosing. The same list, and the same
+ * wildcards, as sign-in.
+ */
+export function trustedReturn(raw: string): boolean {
+  let url: URL;
+  try { url = new URL(raw); } catch { return false; }
+  const base = `${url.protocol}//${url.host}`;
+  return origins.some((pattern) => {
+    const regex = new RegExp(`^${pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')}$`);
+    return regex.test(base);
+  });
+}
+
 export function makeAuth(db: Database) {
   const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
     ? { google: { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET } }

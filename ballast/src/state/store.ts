@@ -13,6 +13,7 @@ import type {
   MoodQuadrant, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
   RecoveryEntry, SimAction, Trade, Mix, CustomFlag, FlagId, Group, PlanActivity, ShareRules, ShareWindow, Outcome,
   GroupInvite, Notice, ReceivedInvite,
+  CalDecision, CalendarEvent, CalendarLink, CalTemplate,
 } from '@/lib/types';
 import { DEFAULT_SHARE_RULES, type PhoneContact, type ShareMode } from '@/lib/sharing';
 import type { Collection, GroupDTO, InviteDTO, MeDTO, PendingRequestDTO } from '@shared/contract';
@@ -23,11 +24,13 @@ import { REST_LOAD_PER_HOUR, loadOf, percentByBucket, overallOf, isMovable, reca
 import { applySelection } from '@/lib/rebalance';
 import { completionCredit } from '@/lib/errands';
 import { classItems, customFlagId, type ClassSlot } from '@/lib/timetable';
-import { applyMark, applyRegister, autoMark } from '@/lib/marking';
+import { applyMark, applyRegister, autoMark, clockHour } from '@/lib/marking';
+import { followCalendar, itemFrom } from '@/lib/gcal';
+import { sampleCalendar, sampleLink } from '@/data/sampleCalendar';
 import { countedOnce } from '@/lib/prep';
 import { upsertMeal } from '@/lib/checkin';
 import { SLEEP_TARGET } from '@/lib/logs';
-import { isSameWeek, addDays } from '@/lib/dates';
+import { isSameWeek, addDays, formatShort } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import { planItem } from '@/lib/simulate';
 import {
@@ -146,6 +149,16 @@ interface State {
   notices: Notice[];
   /** Notification ids already seen, so the bell counts only what is new. */
   seenNotices: string[];
+  /** Google Calendar, once connected. Null until then. */
+  calendar: CalendarLink | null;
+  /** The server has Google keys (live) - without them there is nothing to connect. */
+  calendarAvailable: boolean;
+  /** What is coming up on it, in the phone's own time. */
+  calendarEvents: CalendarEvent[];
+  /** Your answer per event, or per repeating series: set up how, or skipped. */
+  calendarHandled: Record<string, CalDecision>;
+  /** "Later" on Home's calendar card: the day it was put off. */
+  calendarLater: string | null;
   /**
    * Your picture: a photo (an image URI) or an emoji you chose instead.
    * Null shows your initials on your ring. A fact about you, so it survives a reload.
@@ -216,6 +229,18 @@ interface State {
   answerReceived: (id: string, yes: boolean) => void;
   /** Plans as the server holds them, sent and received, in a signed-in week. */
   setInvitesFromServer: (invites: InviteDTO[], me: string) => void;
+  setCalendarLink: (link: CalendarLink | null, available?: boolean) => void;
+  /** What Google has coming up. Also adds the next weeks of set-up series and follows moved times. */
+  setCalendarEvents: (events: CalendarEvent[]) => void;
+  /** Set up an event - or every week of a repeating one - the way the student said. */
+  setUpCalendar: (key: string, template: CalTemplate, events: CalendarEvent[]) => void;
+  skipCalendar: (keys: string[]) => void;
+  unskipCalendar: (key: string) => void;
+  calendarLaterToday: () => void;
+  /** Demo only: a sample Google Calendar, so the whole flow can be tried. */
+  connectSampleCalendar: () => void;
+  setSampleCalendarsOn: (ids: string[]) => void;
+  forgetCalendar: () => void;
   goDemo: () => void;
   hydrate: (upserts: Map<Collection, Array<{ id: string; data: unknown }>>, deletes: Map<Collection, string[]>) => void;
   setShowEverything: (value: boolean) => void;
@@ -316,7 +341,7 @@ const notice = (emoji: string, title: string, to?: string, body?: string): Notic
 
 export const useStore = create<State>()(
   persist(
-    (set) => ({
+    (set, get) => ({
   today: TODAY,
   onboarded: false,
   items: SEEDED.items,
@@ -353,6 +378,11 @@ export const useStore = create<State>()(
   received: seedReceived,
   notices: [],
   seenNotices: [],
+  calendar: null,
+  calendarAvailable: true,
+  calendarEvents: [],
+  calendarHandled: {},
+  calendarLater: null,
   status: null,
   vibe: null,
   pic: null,
@@ -477,6 +507,8 @@ export const useStore = create<State>()(
       items: [], errands: [], modules: [], moods: [], meals: [], moments: [],
       recovery: [], contacts: [], dayReports: [], booked: [], invites: [],
       circle: [], phoneContacts: [], customActions: [], requests: [], groupInvites: [], received: [], notices: [],
+      // A calendar belongs to an account: the same one comes back as it was.
+      ...(state.lastAccountId === account.id ? {} : { calendar: null, calendarEvents: [], calendarHandled: {}, calendarLater: null }),
       sleepHours: null, showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: DEFAULT_CEILINGS, overallCeiling: DEFAULT_OVERALL_CEILING,
       sharing: 'evenings', offHour: 17,
@@ -599,6 +631,69 @@ export const useStore = create<State>()(
       };
     }),
 
+  setCalendarLink: (link, available) =>
+    set((state) => ({ calendar: link, calendarAvailable: available ?? state.calendarAvailable })),
+
+  setCalendarEvents: (events) =>
+    set((state) => {
+      const { add, moved } = followCalendar(events, state.items, state.calendarHandled, state.today, clockHour(state.today));
+      const items = moved.length
+        ? state.items.map((item) => {
+          const change = moved.find((m) => m.id === item.id);
+          return change ? { ...item, ...change.patch } : item;
+        })
+        : state.items;
+      // Google moved it: so did we, and you hear about it once.
+      const fresh = moved.map((m) => {
+        const now = items.find((item) => item.id === m.id)!;
+        const when = now.deadline ? `Now due ${formatShort(now.deadline)}` : `Now ${formatShort(now.date)}${now.startHour === undefined ? '' : ` · ${formatHour(now.startHour)}`}`;
+        return notice('📅', `${m.title} moved`, `/item/${m.id}`, when);
+      });
+      return {
+        calendarEvents: events,
+        items: add.length ? [...items, ...add] : items,
+        ...(fresh.length ? { notices: [...fresh, ...state.notices].slice(0, 40) } : {}),
+        ...(state.calendar ? { calendar: { ...state.calendar, lastSyncedAt: new Date().toISOString() } } : {}),
+      };
+    }),
+
+  setUpCalendar: (key, template, events) =>
+    set((state) => {
+      const have = new Set(state.items.map((item) => item.id));
+      const add = events.map((event) => itemFrom(event, template)).filter((item) => !have.has(item.id));
+      return {
+        items: [...state.items, ...add],
+        calendarHandled: { ...state.calendarHandled, [key]: { as: 'added', template } },
+      };
+    }),
+
+  skipCalendar: (keys) =>
+    set((state) => ({
+      calendarHandled: { ...state.calendarHandled, ...Object.fromEntries(keys.map((key) => [key, { as: 'skipped' as const }])) },
+    })),
+
+  unskipCalendar: (key) =>
+    set((state) => {
+      const { [key]: _gone, ...rest } = state.calendarHandled;
+      return { calendarHandled: rest };
+    }),
+
+  calendarLaterToday: () => set((state) => ({ calendarLater: state.today })),
+
+  connectSampleCalendar: () => {
+    set({ calendar: sampleLink(new Date().toISOString()), calendarAvailable: true });
+    get().setCalendarEvents(sampleCalendar(get().today));
+  },
+
+  setSampleCalendarsOn: (ids) => {
+    const link = get().calendar;
+    if (!link) return;
+    set({ calendar: { ...link, calendars: link.calendars.map((cal) => ({ ...cal, on: ids.includes(cal.id) })) } });
+    get().setCalendarEvents(sampleCalendar(get().today).filter((event) => ids.includes(event.calendar)));
+  },
+
+  forgetCalendar: () => set({ calendar: null, calendarEvents: [], calendarLater: null }),
+
   setGroupsFromServer: (dtos, me) =>
     set((state) => ({
       groups: dtos.filter((g) => g.you === 'member').map((g) => ({
@@ -624,6 +719,7 @@ export const useStore = create<State>()(
       contacts: seedContacts, recovery: recoveryLedger, modules: SEEDED.modules,
       circle: seedCircle, phoneContacts: seedPhoneContacts, customActions: seedCustomActions,
       requests: seedRequests, groupInvites: seedGroupInvites, received: seedReceived, notices: [],
+      calendar: null, calendarAvailable: true, calendarEvents: [], calendarHandled: {}, calendarLater: null,
       booked: [], dayReports: [], invites: seedSent, moments: [], sleepHours: null, status: null, vibe: null,
       showEverythingAnyway: false, minimumViableWeek: false,
       ceilings: CEILINGS, overallCeiling: OVERALL_CEILING, sharing: 'evenings', offHour: 17,
@@ -1171,6 +1267,8 @@ export const useStore = create<State>()(
     set((state) => {
       const invite = state.invites.find((i) => i.id === id);
       if (!invite || state.items.some((item) => item.id === id)) return {};
+      // Only a plan everyone said yes to is a plan; until then it is still a question.
+      if (!invite.people.every((person) => invite.answers?.[person] === 'yes')) return {};
       return {
         invites: state.invites.map((i) => (i.id === id ? { ...i, scheduled: true } : i)),
         items: [...state.items, planAsItem(invite)],
@@ -1313,6 +1411,7 @@ export const useStore = create<State>()(
       circle: seedCircle, phoneContacts: seedPhoneContacts, sharing: 'evenings',
       shareRules: DEFAULT_SHARE_RULES, customFlags: [], groups: seedGroups, planActivities: [],
       requests: seedRequests, groupInvites: seedGroupInvites, received: seedReceived, notices: [],
+      calendar: null, calendarEvents: [], calendarHandled: {}, calendarLater: null,
       // Ceilings too. They move when you report a hard day below your line, and
       // reset clears the day reports that moved them - leaving the lowered line
       // in place with the evidence for it gone made every later reading read
@@ -1336,6 +1435,8 @@ export const useStore = create<State>()(
       partialize: (state) => ({
         onboarded: state.onboarded, pic: state.pic, guest: state.guest, lastAccountId: state.lastAccountId,
         status: state.status, vibe: state.vibe, seenNotices: state.seenNotices,
+        calendar: state.calendar, calendarAvailable: state.calendarAvailable, calendarEvents: state.calendarEvents,
+        calendarHandled: state.calendarHandled, calendarLater: state.calendarLater,
         ...(state.guest ? {
           items: state.items, errands: state.errands, modules: state.modules, moods: state.moods,
           meals: state.meals, moments: state.moments, recovery: state.recovery, contacts: state.contacts,

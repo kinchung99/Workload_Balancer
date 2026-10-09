@@ -97,7 +97,10 @@ function Action({ label, kind = 'plain', onPress }: { label: string; kind?: 'str
   );
 }
 
-/** A plan you sent: who is in, and putting it in your week - or calling it off. */
+/** Everyone you asked has said yes: a plan, not a question any more. */
+export const allIn = (invite: Invite): boolean => invite.people.every((id) => invite.answers?.[id] === 'yes');
+
+/** A plan you sent: who is in, and - once everyone is - putting it in your week. Or calling it off. */
 export function SentPlanCard({ invite }: { invite: Invite }) {
   const circle = useStore((state) => state.circle);
   const [ending, setEnding] = useState(false);
@@ -109,6 +112,11 @@ export function SentPlanCard({ invite }: { invite: Invite }) {
   return (
     <Stack gap={3} className="rounded-xl bg-raised px-4 py-4" style={{ borderWidth: 2, borderColor: invite.scheduled ? color.band.steady.fill : color.line.hairline }}>
       <Head title={invite.title} when={planWhen(invite)} tint={color.decor.mint} />
+      {yes === invite.people.length && !invite.scheduled ? (
+        <View className="self-start rounded-pill px-3 py-1" style={{ backgroundColor: color.band.steady.wash }}>
+          <Text variant="micro" weight="bold" tone="steady">🎉 Everyone’s in</Text>
+        </View>
+      ) : null}
       <Stack direction="row" gap={1} wrap>
         {invite.people.map((id) => {
           const person = circle.find((p) => p.id === id);
@@ -132,7 +140,10 @@ export function SentPlanCard({ invite }: { invite: Invite }) {
         <Stack direction="row" gap={2}>
           {invite.scheduled
             ? <Action label="✓ In your week" kind="done" />
-            : <Action label="📅 Add to week" kind="strong" onPress={() => { schedulePlan(invite.id); successFeedback(); }} />}
+            : yes === invite.people.length
+              ? <Action label="📅 Add to week" kind="strong" onPress={() => { schedulePlan(invite.id); successFeedback(); }} />
+              // Into your week only once everyone is in.
+              : <Action label={no ? `✕ ${no} can’t make it` : `⏳ Waiting on ${waiting}`} />}
           <Action label="Cancel" onPress={() => { tapFeedback(); setEnding(true); }} />
         </Stack>
       )}

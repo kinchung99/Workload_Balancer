@@ -55,6 +55,8 @@ for (const [from, to] of [
   ['src/lib/checkin.ts', 'checkin.ts'],
   ['src/lib/coach.ts', 'coach.ts'],
   ['src/lib/breakdown.ts', 'breakdown.ts'],
+  ['src/lib/gcal.ts', 'gcal.ts'],
+  ['src/data/sampleCalendar.ts', 'sampleCalendar.ts'],
   ['src/data/seed.ts', 'seed.ts'],
   ['src/state/store.ts', 'store.ts'],
 ]) {
@@ -127,6 +129,7 @@ const { offlineIdeas, offlineDraft, offlineTweak, recipientOf, whatIsSent, TONES
 const { heatmap, everyoneFree, fitsWindow, planBlocks: freeBlocks } = await import(join(tmp, 'together.ts'));
 const { quickUpdate, bells, unseen } = await import(join(tmp, 'notify.ts'));
 const { DEMO_ANSWER_MS } = await import(join(tmp, 'people.ts'));
+const { fromGoogle, kindOf, guessFor, calendarPicture, itemFrom, itemIdFor, sameName } = await import(join(tmp, 'gcal.ts'));
 const { flagInfo, flagsFor, modulesFrom } = await import(join(tmp, 'timetable.ts'));
 const { CATALOGUE, rankRest, fromSeed, fromIdea, hoursFor } = await import(join(tmp, 'rest.ts'));
 const { wireVisibility, DEFAULT_SHARE_RULES } = await import(join(tmp, 'sharing.ts'));
@@ -2279,6 +2282,13 @@ console.log('\nInviting people');
   check('counted as social load, not hidden', s().items.at(-1).bucket, 'social');
   s().scheduleInvite(sent.id);
   check('and only once', s().items.length, before + 1);
+  s().sendInvite({ title: 'Film with Aisyah', date: s().today, startHour: 20, hours: 3, people: ['aisyah', 'amin'] });
+  const split = s().invites.at(-1);
+  s().scheduleInvite(split.id);
+  check('a plan nobody has answered cannot go in your week', s().items.some((i) => i.id === split.id), false);
+  s().demoTick(Date.parse(split.sentAt) + DEMO_ANSWER_MS + 1);
+  s().scheduleInvite(split.id);
+  check('nor one somebody said no to', [s().invites.at(-1).answers.aisyah, s().items.some((i) => i.id === split.id)], ['no', false]);
   s().cancelInvite(sent.id);
   check('calling it off takes it out of your week too', [s().items.length, s().invites.some((i) => i.id === sent.id)], [before, false]);
 
@@ -2356,6 +2366,110 @@ console.log('\nWhen to meet, in blocks the length of the plan');
   check('green means everyone picked is free', blocks.filter((b) => b.everyone).every((b) => b.who.length === people.length), true);
   check('blue means somebody, not nobody', blocks.filter((b) => !b.everyone).every((b) => b.who.length > 0), true);
   check('nobody picked, nothing offered', freeBlocks(s().items, [], days, 3).length, 0);
+}
+
+console.log('\nGoogle Calendar, set up in a tap');
+{
+  s().reset();
+  check('a lecture is a class', kindOf('CS2040 Lecture'), 'class');
+  check('a quiz is an exam before it is a class', kindOf('CS2040 Quiz'), 'exam');
+  check('anything due is a deadline', kindOf('Ethics essay due'), 'assignment');
+  check('a shift is a shift', kindOf('Café shift'), 'shift');
+  check('a birthday dinner is seeing people', kindOf('Mum’s birthday dinner'), 'people');
+  check('a module code on its own is a class', kindOf('MA1101R'), 'class');
+  check('and anything else is other', kindOf('Career fair'), 'other');
+
+  const os = guessFor({ title: 'Operating Systems tutorial' }, s().modules);
+  check('a class finds its module by name', os.moduleId, 'os');
+  check('and takes that module\'s drain', os.dread, s().modules.find((m) => m.id === 'os').dread);
+  check('a tutorial is a tutorial', os.sessionKind, 'tutorial');
+  const essay = guessFor({ title: 'Ethics essay due' });
+  check('a deadline asks for hours of work, not an hour on the day', [!!essay.prep, essay.prep?.hours], [true, 6]);
+  check('a dentist appointment cannot move', guessFor({ title: 'Dentist appointment' }).commitment, 'hard');
+  check('the guessed drain is the loudest part of the mix', Math.max(...Object.values(essay.mix)), essay.dread);
+
+  const dto = {
+    id: 'c|e', seriesId: null, title: 'X', allDay: false, location: null, calendar: 'Main', color: null, updated: '',
+    start: new Date(2025, 10, 12, 18, 30).toISOString(), end: new Date(2025, 10, 12, 20, 0).toISOString(),
+  };
+  const local = fromGoogle(dto);
+  check('a timed event lands on its own day and hour', [local.date, local.startHour, local.hours], ['2025-11-12', 18.5, 1.5]);
+  check('an all-day event has no hour', fromGoogle({ ...dto, start: '2025-11-21', end: '2025-11-22', allDay: true }).startHour, undefined);
+
+  const today = s().today;
+  const ev = (id, title, offset, startHour, hours, seriesId = null) => ({
+    id, seriesId, title, date: addDaysISO(today, offset), startHour, hours, allDay: false, location: 'Room 1', calendar: 'Main', color: '#4285F4',
+  });
+  const mandarin = [1, 8, 15].map((o) => ev(`m_${o}`, 'Mandarin class', o, 18.5, 1.5, 'm'));
+  const events = [
+    ...mandarin, ev('ds', 'Distributed Systems seminar', 2, 15, 2), ev('fair', 'Career fair', 9, 12, 3),
+    ev('dinner', 'Mum’s birthday dinner', 6, 19, 2), ev('past', 'Gone', -1, 9, 1),
+  ];
+  let picture = calendarPicture(events, s().items, {}, today, 12);
+  const series = picture.fresh.find((d) => d.key === 'm');
+  check('every week of a class is one thing to set up', series?.events.length, 3);
+  check('and it says how often', series?.repeat?.count, 3);
+  check('what the timetable already has is not offered again', picture.there.map((d) => d.key), ['ds']);
+  check('a different dinner at the same time is still new', picture.fresh.some((d) => d.key === 'dinner'), true);
+  check('what already happened is not offered at all', [...picture.fresh, ...picture.there].some((d) => d.key === 'past'), false);
+
+  const before = s().items.length;
+  const template = { ...series.guess, dread: 2 };
+  s().setUpCalendar('m', template, series.events);
+  check('setting up a weekly class adds every week of it', s().items.length - before, 3);
+  const added = s().items.filter((i) => i.source?.seriesId === 'm');
+  check('at its own time, with your answer', [added[0].startHour, added[0].hours, added[0].dread, added[0].room], [18.5, 1.5, 2, 'Room 1']);
+  s().setUpCalendar('m', template, series.events);
+  check('setting it up twice is still three', s().items.filter((i) => i.source?.seriesId === 'm').length, 3);
+  picture = calendarPicture(events, s().items, s().calendarHandled, today, 12);
+  check('and it moves from new to in your week', [picture.fresh.some((d) => d.key === 'm'), picture.added.some((d) => d.key === 'm')], [false, true]);
+
+  const more = [...events, ev('m_22', 'Mandarin class', 22, 18.5, 1.5, 'm')];
+  s().setCalendarEvents(more);
+  check('the next week of a set-up class is added by itself', s().items.filter((i) => i.source?.seriesId === 'm').length, 4);
+
+  const moved = more.map((e) => (e.id === 'm_8' ? { ...e, startHour: 19 } : e));
+  const noticesBefore = s().notices.length;
+  s().setCalendarEvents(moved);
+  check('moved in Google, moved here', s().items.find((i) => i.source?.eventId === 'm_8').startHour, 19);
+  check('with one note saying so', s().notices.length - noticesBefore, 1);
+  s().setCalendarEvents(moved);
+  check('and only one', s().notices.length - noticesBefore, 1);
+
+  s().skipCalendar(['fair']);
+  picture = calendarPicture(moved, s().items, s().calendarHandled, today, 12);
+  check('skipped is not new', [picture.fresh.some((d) => d.key === 'fair'), picture.skipped.some((d) => d.key === 'fair')], [false, true]);
+  s().unskipCalendar('fair');
+  check('and can be brought back', calendarPicture(moved, s().items, s().calendarHandled, today, 12).fresh.some((d) => d.key === 'fair'), true);
+
+  const essayEvent = { ...ev('essay', 'Ethics essay due', 11, undefined, 0), allDay: true };
+  const essayItem = itemFrom(essayEvent, { ...guessFor(essayEvent), prep: { hours: 9, importance: 3, daysBefore: 2 } });
+  check('a deadline becomes hours of work, due when you said', [essayItem.prepHours, essayItem.deadline, essayItem.startHour], [9, addDaysISO(today, 9), undefined]);
+
+  check('the same event always gets the same id', itemIdFor('a|b') === itemIdFor('a|b') && itemIdFor('a|b') !== itemIdFor('a|c'), true);
+  check('two dinners are not one because both are dinners', sameName('Mum’s birthday dinner', 'Flatmates, Sunday dinner'), false);
+  check('a name in common is the same thing', sameName('Distributed Systems seminar', 'Distributed systems seminar'), true);
+
+  s().reset();
+  s().connectSampleCalendar();
+  check('the demo connects a sample calendar', [s().calendar?.via, s().calendarEvents.length > 0], ['sample', true]);
+  s().setSampleCalendarsOn(['Main calendar']);
+  check('switching a calendar off drops its events', s().calendarEvents.every((e) => e.calendar === 'Main calendar'), true);
+  s().calendarLaterToday();
+  check('later puts the card away for today', s().calendarLater, s().today);
+  s().forgetCalendar();
+  check('disconnecting forgets the calendar, not what you set up', [s().calendar, s().calendarEvents.length], [null, 0]);
+
+  const ring = bells({
+    items: [], today, requests: [], groupInvites: [], received: [], circle: [], notices: [], restOwed: 0, charge: 80,
+    update: { toMark: [], auto: [], checkIn: false, count: 0 }, calendar: { fresh: 3, expired: false },
+  });
+  check('new calendar events ring the bell', ring.find((b) => b.kind === 'calendar')?.title, '3 new from Google Calendar');
+  const dead = bells({
+    items: [], today, requests: [], groupInvites: [], received: [], circle: [], notices: [], restOwed: 0, charge: 80,
+    update: { toMark: [], auto: [], checkIn: false, count: 0 }, calendar: { fresh: 3, expired: true },
+  });
+  check('and a dropped connection asks for a reconnect instead', dead.filter((b) => b.kind === 'calendar').map((b) => b.title), ['Google Calendar needs reconnecting']);
 }
 
 rmSync(tmp, { recursive: true, force: true });

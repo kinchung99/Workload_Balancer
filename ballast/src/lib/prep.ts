@@ -10,7 +10,7 @@
  */
 import { dayHours, freeSlots, slotHours, startOptions } from './schedule';
 import { sumLoad } from './load';
-import { daysBetween } from './dates';
+import { daysBetween, startOfWeek } from './dates';
 import type { Item } from './types';
 
 /** Hours still to do, whether or not they have a slot yet. */
@@ -204,6 +204,19 @@ export function bestStart(busy: Item[], date: string, hours: number, notBefore?:
 /** The days a piece of work can still be done on, today through the deadline. */
 export const workDays = (item: Item, today: string): string[] =>
   Array.from({ length: daysLeft(item, today) + 1 }, (_, offset) => addDaysLocal(today, offset));
+
+/**
+ * The days a sitting can be booked on by hand: today to the end of next week.
+ *
+ * Wider than the work days on purpose. The planner suggests before the
+ * deadline, but a student who wants a sitting next Thursday - a resit, an
+ * extension, a head start on the next part - should be able to put it there
+ * and see it marked late, not be told the day does not exist.
+ */
+export const bookingDays = (today: string): string[] => {
+  const end = addDaysLocal(startOfWeek(today), 13);
+  return Array.from({ length: daysBetween(today, end) + 1 }, (_, offset) => addDaysLocal(today, offset));
+};
 
 /**
  * Spread the remaining work across the days before it is due.

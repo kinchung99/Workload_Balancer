@@ -1,14 +1,13 @@
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Card, Door, PageHeader, Screen, Section, Stack, Sticker, Text,
+  Avatar, Card, Door, PageHeader, Screen, Section, Stack, Text,
 } from '@/components';
 import { SCREEN } from '@design/screens';
 import { bandFor } from '@/lib/load';
 import { VISIBILITY_SHORT } from '@/lib/sharing';
 import { restOwedFrom, useStore } from '@/state/store';
-import { useItemsWithLogs, useReading } from '@/state/selectors';
-import { prioritise } from '@/lib/priority';
+import { useReading } from '@/state/selectors';
 import { shownMood } from '@/lib/checkin';
 import { tapFeedback } from '@/lib/haptics';
 
@@ -29,15 +28,12 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recove
  */
 export default function You() {
   const router = useRouter();
-  const { recovery, account, circle, requests, sharing, status, pic, moods, vibe } = useStore();
+  const { recovery, account, circle, sharing, status, pic, moods, vibe } = useStore();
   const reading = useReading();
-  const items = useItemsWithLogs();
-  const { first } = prioritise(items, useStore.getState().today);
 
   const band = bandFor(reading.overall);
   const owed = restOwedFrom(recovery);
   const friends = circle.filter((p) => !p.isYou).length;
-  const waiting = requests.filter((r) => r.direction === 'incoming').length;
 
   const name = account?.name ?? 'You';
   const initials = account?.initials ?? 'Y';
@@ -80,21 +76,20 @@ export default function You() {
 
           {/* Three numbers, the way a profile always opens. */}
           <Stack direction="row" gap={3}>
+            {/* Who you are in numbers. Each one is looked after on its own page. */}
             {[
-              { value: `${reading.charge}%`, label: 'battery', to: '/battery' as Href },
-              { value: String(friends), label: friends === 1 ? 'friend' : 'friends', to: '/friends' as Href },
-              { value: VISIBILITY_SHORT[sharing], label: 'sharing', to: '/sharing' as Href },
+              { value: `${reading.charge}%`, label: 'battery' },
+              { value: String(friends), label: friends === 1 ? 'friend' : 'friends' },
+              { value: VISIBILITY_SHORT[sharing], label: 'sharing' },
             ].map((stat) => (
-              <Pressable
+              <View
                 key={stat.label}
-                accessibilityRole="button"
                 accessibilityLabel={`${stat.value} ${stat.label}`}
-                onPress={() => { tapFeedback(); router.push(stat.to); }}
-                className="min-h-min flex-1 items-center gap-1 rounded-md bg-raised px-2 py-3 active:opacity-70"
+                className="min-h-min flex-1 items-center gap-1 rounded-md bg-raised px-2 py-3"
               >
                 <Text variant="callout" weight="bold">{stat.value}</Text>
                 <Text variant="micro" tone="subtle">{stat.label}</Text>
-              </Pressable>
+              </View>
             ))}
           </Stack>
 
@@ -107,50 +102,24 @@ export default function You() {
             >
               <Text variant="caption" weight="bold" tone="inverse">Edit profile</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={account ? 'Your circle' : 'Sign in'}
-              onPress={() => { tapFeedback(); router.push(account ? '/friends' : '/welcome'); }}
-              className="min-h-row flex-1 items-center justify-center rounded-pill border-2 border-line-strong bg-raised active:opacity-70"
-            >
-              <Text variant="caption" weight="bold">{account ? 'Your circle' : 'Sign in'}</Text>
-            </Pressable>
+            {!account ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sign in"
+                onPress={() => { tapFeedback(); router.push('/welcome'); }}
+                className="min-h-row flex-1 items-center justify-center rounded-pill border-2 border-line-strong bg-raised active:opacity-70"
+              >
+                <Text variant="caption" weight="bold">Sign in</Text>
+              </Pressable>
+            ) : null}
           </Stack>
         </Card>
 
-        {/* Somebody is waiting on you. The one thing worth interrupting a profile for. */}
-        {waiting ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${waiting} friend ${waiting === 1 ? 'request' : 'requests'} waiting on you`}
-            onPress={() => { tapFeedback(); router.push('/find-friends'); }}
-            className="active:opacity-70"
-          >
-            <Card tone="recovery" gap={3}>
-              <Stack direction="row" gap={4} align="center">
-                <Sticker name="people" size={38} wiggle />
-                <Stack gap={1} grow>
-                  <Text variant="heading">
-                    {waiting} {waiting === 1 ? 'person wants' : 'people want'} to be in your circle
-                  </Text>
-                </Stack>
-                <Text variant="heading" tone="recovery">›</Text>
-              </Stack>
-            </Card>
-          </Pressable>
-        ) : null}
-
-        {/* Two kinds of place to go, kept apart: looking after yourself, and
-            organising the week. Each door wears its own family's colour. */}
+        {/* Looking after yourself. The week's tools live on Plan, friends on Friends. */}
         <Section family="rest" title="Recharge">
           <Door family="you" sticker="sun" title="Check in" sub="Your note · ⚡ recharge" onPress={() => router.push('/checkin')} />
           <Door family="rest" sticker="battery" title="Recovery" sub={`${owed}h owed`} onPress={() => router.push('/recover')} />
           <Door family="rest" sticker="moon" title="Tonight" sub="Plan an evening" onPress={() => router.push('/tonight/night' as Href)} />
-        </Section>
-
-        <Section family="week" title="Your week">
-          <Door family="week" sticker="class" title="Timetable" sub="Classes and flags" onPress={() => router.push('/timetable')} />
-          <Door family="focus" title="What to do first" sub={`${first.length} ranked`} onPress={() => router.push('/priority')} />
         </Section>
 
         <View className="h-4" />

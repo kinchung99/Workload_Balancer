@@ -207,6 +207,28 @@ export const inviteGuests = pgTable('invite_guests', {
   index('invite_guests_user_idx').on(t.userId),
 ]);
 
+/* ---------------------------------------------------------- google calendar */
+
+/**
+ * A Google Calendar, connected - read-only, one per person.
+ *
+ * The refresh token is the only secret here and it is sealed (AES-GCM, keyed
+ * from AUTH_SECRET) before it is written, so a leaked backup is not a leaked
+ * calendar. Events are never stored: they are read from Google when the app
+ * asks, and what the student keeps becomes ordinary items on their phone.
+ */
+export const calendarLinks = pgTable('calendar_links', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  googleEmail: varchar('google_email', { length: 254 }),
+  refreshToken: text('refresh_token').notNull(),
+  /** Which of their calendars to read: [{ id, name, color, on }]. */
+  calendars: jsonb('calendars').$type<Array<{ id: string; name: string; color: string | null; on: boolean }>>(),
+  /** ok · expired (Google stopped honouring the token; reconnect) */
+  status: varchar('status', { length: 10 }).notNull().default('ok'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* -------------------------------------------------------------------- wiring */
 
 export const profileRelations = relations(profiles, ({ one }) => ({
@@ -224,6 +246,6 @@ export const inviteGuestRelations = relations(inviteGuests, ({ one }) => ({
 }));
 
 /** Every table, for the test harness to create in one pass. */
-export const ALL_TABLES = { profiles, documents, presence, freeWindows, friendships, groups, groupMembers, invites, inviteGuests };
+export const ALL_TABLES = { profiles, documents, presence, freeWindows, friendships, groups, groupMembers, invites, inviteGuests, calendarLinks };
 
 export { sql };

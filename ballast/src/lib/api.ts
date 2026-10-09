@@ -12,6 +12,7 @@
  */
 import Constants from 'expo-constants';
 import type {
+  CalendarDTO, CalendarEventsResponse, CalendarStatusDTO,
   CircleMemberDTO, GroupDTO, ComposeContext, ComposeDraftRequest, ComposeDraftResponse, ComposeIdeasResponse,
   RestContext, RestIdeasResponse, CoachAdviceResponse, PriorityContext, RebalanceContext,
   InviteDTO, InviteRequest, MeDTO, PendingRequestDTO, Presence, PublishRequest, SyncDoc, SyncResponse, Visibility,
@@ -198,6 +199,15 @@ export const api = {
   /** A reason for each of next week's trades, which to take, and a line on the swap. */
   suggestRebalance: (context: Omit<RebalanceContext, 'swap'> & Partial<Pick<RebalanceContext, 'swap'>>) =>
     post<CoachAdviceResponse>('/api/suggest/rebalance', { context }, WRITING_TIMEOUT),
+
+  /* ------------------------------------------------------- google calendar */
+
+  calendarStatus: () => request<CalendarStatusDTO>('/api/calendar'),
+  /** A Google sign-in link that comes back to `returnTo`. */
+  calendarConnect: (returnTo: string) => post<{ url: string }>('/api/calendar/connect', { returnTo }),
+  calendarEvents: () => request<CalendarEventsResponse>('/api/calendar/events', {}, 20_000),
+  calendarChoose: (on: string[]) => post<{ calendars: CalendarDTO[] }>('/api/calendar/calendars', { on }),
+  calendarDisconnect: () => request<{ ok: true }>('/api/calendar', { method: 'DELETE' }),
 };
 
 export type { CircleMemberDTO, InviteDTO, MeDTO, PendingRequestDTO, Visibility };

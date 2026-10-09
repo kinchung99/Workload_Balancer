@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Button, Card, Door, MOOD_WORD, Mascot, PageHeader, Screen, Section, Stack, Sticker, Text, moodFor,
+  Button, Card, MOOD_WORD, Mascot, PageHeader, Screen, Stack, Sticker, Text, moodFor,
   type StickerName,
 } from '@/components';
 import { MarkNotice } from '@/features/marking/MarkNotice';
@@ -10,6 +10,7 @@ import { MarkSheet } from '@/features/marking/MarkSheet';
 import { KIND, autoMarkedIn, clockHour, markKind, toMark } from '@/lib/marking';
 import { breakdown } from '@/lib/breakdown';
 import { useBells } from '@/features/notify/useBells';
+import { CalendarNudge } from '@/features/calendar/CalendarNudge';
 import { BatterySplit } from '@/features/battery/BatterySplit';
 import { addDays } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
@@ -37,7 +38,7 @@ const greeting = (hour: number) => (hour < 12 ? 'Good morning' : hour < 18 ? 'Go
 const timeSticker = (hour: number): StickerName => (hour < 18 ? 'sun' : 'moon');
 
 /**
- * Home — one reading, one next thing, and three ways to recharge.
+ * Home — a summary of everything, and the one place to update.
  *
  * It used to carry the battery, five area tiles, the week strip, the collision
  * warning, the drains, the whole of today hour by hour, the owing list and a
@@ -51,7 +52,7 @@ export default function Home() {
   const router = useRouter();
   const { items, today, onboarded, recovery, overallCeiling, minimumViableWeek,
     showEverythingAnyway, setShowEverything, setMinimumViableWeek, dayReports, circle,
-    reportDay, markItem, ceilings, moods, sleepHours } = useStore();
+    reportDay, markItem, ceilings, moods, sleepHours, requests, groupInvites, received } = useStore();
   const [marking, setMarking] = useState<string | null>(null);
   const { items: withLogs, percents, overall, week } = useReading();
   const { update, unseen: bellCount } = useBells();
@@ -93,14 +94,25 @@ export default function Home() {
     );
   }
 
-  // The tabs already reach the week and friends, and "do this next" reaches the
-  // list - so the doors here are the three ways to charge back up.
+  // A glance at each of the other three pages - the number that matters there,
+  // one tap to the page itself. Their buttons live on their own pages, once.
   const checkedIn = moods.some((mood) => mood.date === today) || sleepHours !== null;
-  const doors: Array<{ family: Family; sticker: StickerName; title: string; sub: string; to: Href; count?: number }> = [
-    { family: 'week', sticker: 'clock', title: 'Quick update', sub: update.count ? 'Waiting on you' : '✓ All caught up', to: '/update' as Href, count: update.count },
-    { family: 'you', sticker: 'sun', title: 'Check in', sub: checkedIn ? '✓ Today' : 'Not yet today', to: '/checkin' },
-    { family: 'rest', sticker: 'moon', title: 'Tonight', sub: 'Plan an evening', to: '/tonight/night' as Href },
-    { family: 'rest', sticker: 'battery', title: 'Recovery', sub: `${owed}h owed`, to: '/recover' },
+  const leftToday = todayItems.filter((item) => !item.isLog && !item.isRecovery && !item.outcome
+    && (item.startHour === undefined || item.startHour + item.hours > hour));
+  const nextTimed = leftToday.filter((item) => item.startHour !== undefined).sort((a, b) => a.startHour! - b.startHour!)[0];
+  const askingYou = requests.filter((r) => r.direction === 'incoming').length + groupInvites.length + received.filter((r) => !r.answer).length;
+  const glance: Array<{ family: Family; sticker: StickerName; value: string; label: string; sub: string; to: Href; alert?: boolean }> = [
+    {
+      family: 'week', sticker: 'calendar', value: String(leftToday.length), label: 'left today',
+      sub: nextTimed ? `Next ${formatHour(nextTimed.startHour!)}` : 'Nothing timed', to: '/plan',
+    },
+    askingYou
+      ? { family: 'people', sticker: 'people', value: String(askingYou), label: 'asking you', sub: 'Friends', to: '/friends', alert: true }
+      : { family: 'people', sticker: 'people', value: String(active), label: 'checked in', sub: 'Friends', to: '/friends' },
+    {
+      family: 'rest', sticker: 'leaf', value: `${owed}h`, label: 'rest owed',
+      sub: checkedIn ? '✓ Checked in' : 'Not checked in', to: '/you', alert: !checkedIn,
+    },
   ];
 
   return (
@@ -147,6 +159,32 @@ export default function Home() {
             <BatterySplit spent={split.spent} ahead={split.ahead} left={split.left} back={split.back} />
             <Text variant="caption" weight="bold" className="underline">Where it goes ›</Text>
           </Card>
+        </Pressable>
+
+        {/* New on Google Calendar: drops in under the battery until it is set up. */}
+        <CalendarNudge />
+
+        {/* Everything waiting on an answer from you, in one place. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={update.count ? `Quick update, ${update.count} to update` : 'Quick update, all caught up'}
+          onPress={() => { tapFeedback(); router.push('/update' as Href); }}
+          className="flex-row items-center gap-3 rounded-xl border-2 px-4 py-3 active:opacity-70"
+          style={{ borderColor: update.count ? color.band.busy.fill : color.line.hairline, backgroundColor: update.count ? color.band.busy.wash : color.surface.raised }}
+        >
+          <View className="items-center justify-center rounded-pill" style={{ width: 44, height: 44, backgroundColor: FAMILY.week.wash }}>
+            <Sticker name="clock" size={28} wiggle={!!update.count} />
+            {update.count ? <Count value={update.count} /> : null}
+          </View>
+          <Stack gap={0} grow>
+            <Text variant="body" weight="semibold">Quick update</Text>
+            <Text variant="micro" tone="subtle">
+              {update.count
+                ? [update.toMark.length ? `${update.toMark.length} to mark` : '', update.auto.length ? `${update.auto.length} to confirm` : '', update.checkIn ? 'check in' : ''].filter(Boolean).join(' · ')
+                : '✓ All caught up'}
+            </Text>
+          </Stack>
+          <Text variant="heading" tone="subtle">›</Text>
         </Pressable>
 
         {/* One next thing. Not a list — Plan is the list. */}
@@ -208,26 +246,22 @@ export default function Home() {
           </Pressable>
         ) : null}
 
-        {/* Four doors, two by two: what is waiting on you, and three ways to recharge. */}
-        <Stack direction="row" gap={3} wrap>
-          {doors.map((door) => (
+        {/* At a glance: the other three pages, one number each. */}
+        <Stack direction="row" gap={3}>
+          {glance.map((tile) => (
             <Pressable
-              key={door.title}
+              key={tile.label}
               accessibilityRole="button"
-              accessibilityLabel={`${door.title}. ${door.sub}`}
-              onPress={() => { tapFeedback(); router.push(door.to); }}
-              className="min-h-row grow items-center gap-2 overflow-hidden rounded-lg border-2 border-line-hairline bg-raised p-4 active:opacity-70"
-              style={{ flexBasis: '44%', borderColor: door.count ? color.band.busy.fill : undefined }}
+              accessibilityLabel={`${tile.value} ${tile.label}. ${tile.sub}`}
+              onPress={() => { tapFeedback(); router.navigate(tile.to); }}
+              className="flex-1 items-center gap-1 overflow-hidden rounded-lg border-2 bg-raised px-2 py-3 active:opacity-70"
+              style={{ borderColor: tile.alert ? color.band.busy.fill : color.line.hairline }}
             >
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: FAMILY[door.family].wash, opacity: 0.3 }]} />
-              <View className="items-center justify-center rounded-pill" style={{ width: 52, height: 52, backgroundColor: FAMILY[door.family].wash }}>
-                <Sticker name={door.sticker} size={32} />
-                {door.count ? <Count value={door.count} /> : null}
-              </View>
-              <Stack gap={1} align="center">
-                <Text variant="body" weight="semibold">{door.title}</Text>
-                <Text variant="micro" tone="subtle">{door.sub}</Text>
-              </Stack>
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: FAMILY[tile.family].wash, opacity: 0.3 }]} />
+              <Sticker name={tile.sticker} size={30} />
+              <Text variant="title" weight="bold">{tile.value}</Text>
+              <Text variant="micro" weight="bold">{tile.label}</Text>
+              <Text variant="micro" tone="subtle" numberOfLines={1}>{tile.sub}</Text>
             </Pressable>
           ))}
         </Stack>

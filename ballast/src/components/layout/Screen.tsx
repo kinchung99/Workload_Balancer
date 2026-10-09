@@ -11,7 +11,7 @@
  */
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useNavigation, useRoute, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { color, space } from '@design/tokens';
@@ -41,9 +41,43 @@ export interface ScreenProps {
   overlay?: ReactNode;
 }
 
+/** What each page is called on a back button that returns to it. */
+const PAGE_NAME: Record<string, string> = {
+  index: 'Home', plan: 'Plan', friends: 'Friends', you: 'You',
+  notifications: 'Notifications', update: 'Quick update', plans: 'Plans', calendar: 'Calendar',
+  'calendar/setup': 'Calendar', battery: 'Battery', priority: 'What first', rebalance: 'Rebalance',
+  recover: 'Recovery', checkin: 'Check in', 'tonight/[step]': 'Tonight', settings: 'Settings',
+  profile: 'Profile', sharing: 'Sharing', 'sharing/hours': 'Your hours', 'sharing/people': 'Who sees',
+  'plan-together': 'Plan', 'find-friends': 'Find friends', everyone: 'All friends', message: 'Message',
+  timetable: 'Timetable', 'timetable/[step]': 'Timetable', 'module/[id]': 'Module', 'group/[id]': 'Group',
+  'group/[id]/add': 'Invite', 'group/[id]/plan': 'Group plan', 'group/new': 'New group', 'friend/[id]': 'Friend',
+  'item/[id]': 'Task', 'item/[id]/sittings': 'Sittings', marked: 'Marked', prescription: 'Recovery',
+  'prescription/[step]': 'Recovery', 'decline/[id]': 'Back', account: 'Account', add: 'Add', 'add/[step]': 'Add',
+};
+
+interface RouteLike { key: string; name: string; state?: { index?: number; routes: Array<{ name: string }> } }
+
+/** The page under this one in the stack, by name - or nothing when this is the first. */
+function usePrevious(): string | null {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const routes = (navigation.getState()?.routes ?? []) as RouteLike[];
+  const at = routes.findIndex((r) => r.key === route.key);
+  const prev = at > 0 ? routes[at - 1] : undefined;
+  if (!prev) return null;
+  // The tabs are one stack entry; the name is whichever tab was showing.
+  if (prev.name === '(tabs)') {
+    const tab = prev.state?.routes[prev.state.index ?? 0]?.name ?? 'index';
+    return PAGE_NAME[tab] ?? 'Back';
+  }
+  return PAGE_NAME[prev.name] ?? 'Back';
+}
+
 export function Screen({ children, footer, surface = 'page', scroll = true, back, backLabel, overlay }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
+  const previous = usePrevious();
   const onNight = surface === 'night';
 
   const body = (
@@ -60,12 +94,13 @@ export function Screen({ children, footer, surface = 'page', scroll = true, back
           <View className="w-full px-5 pb-1 pt-2">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={backLabel ?? 'Back'}
+              accessibilityLabel={previous ?? backLabel ?? 'Back'}
               onPress={() => {
-                // Go where the label says. This used to pop history whenever
-                // there was any, so a button reading "Home" took you to whatever
-                // you happened to look at last - which is not what it promised.
-                router.navigate(back);
+                // Back to the page you came from, and named after it. Only a
+                // page opened straight from a link, with nothing under it,
+                // falls back to its usual parent.
+                if (previous) navigation.goBack();
+                else router.navigate(back);
               }}
               className="min-h-min flex-row items-center gap-2 self-start pr-4 active:opacity-60"
             >
@@ -79,7 +114,7 @@ export function Screen({ children, footer, surface = 'page', scroll = true, back
                   fill="none"
                 />
               </Svg>
-              <Text variant="callout" tone={onNight ? 'inverse' : 'default'}>{backLabel ?? 'Back'}</Text>
+              <Text variant="callout" tone={onNight ? 'inverse' : 'default'}>{previous ?? backLabel ?? 'Back'}</Text>
             </Pressable>
           </View>
         ) : null}

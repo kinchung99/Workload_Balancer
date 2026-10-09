@@ -39,7 +39,7 @@ export function quickUpdate(state: { items: Item[]; today: string; moods: MoodCh
   return { toMark: due, auto, checkIn: !checkedIn, count: due.length + auto.length + (checkedIn ? 0 : 1) };
 }
 
-export type BellKind = 'friend' | 'group' | 'plan' | 'update' | 'due' | 'wall' | 'nudge' | 'rest' | 'low' | 'event';
+export type BellKind = 'friend' | 'group' | 'plan' | 'update' | 'calendar' | 'due' | 'wall' | 'nudge' | 'rest' | 'low' | 'event';
 
 export interface Bell {
   id: string;
@@ -65,6 +65,8 @@ export interface BellState {
   restOwed: number;
   charge: number;
   update: QuickUpdate;
+  /** Google Calendar events waiting to be set up, and whether it needs reconnecting. */
+  calendar?: { fresh: number; expired: boolean };
 }
 
 /** Everything for the bell, questions first, then today, then what happened. */
@@ -95,6 +97,13 @@ export function bells(state: BellState): Bell[] {
       id: `update:${today}:${state.update.count}`, kind: 'update', emoji: '⏳',
       title: `${state.update.count} thing${state.update.count === 1 ? '' : 's'} to update`, body: parts.join(' · '), to: '/update',
     });
+  }
+
+  if (state.calendar?.expired) {
+    out.push({ id: `calendar-expired:${today}`, kind: 'calendar', emoji: '📅', title: 'Google Calendar needs reconnecting', body: 'One tap to connect again', to: '/calendar' });
+  } else if (state.calendar?.fresh) {
+    const n = state.calendar.fresh;
+    out.push({ id: `calendar:${today}:${n}`, kind: 'calendar', emoji: '📅', title: `${n} new from Google Calendar`, body: 'Set them up in a tap', to: '/calendar' });
   }
 
   // Work due today or tomorrow that is not finished.

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { View } from 'react-native';
 import {
-  Button, Card, Chip, DayTimeline, ForecastStrip, PageHeader, Screen, Section,
+  Button, Card, Chip, DayTimeline, Door, ForecastStrip, PageHeader, Screen, Section,
   Sticker, Stack, Text, TodoList,
 } from '@/components';
 import { threshold } from '@design/tokens';
@@ -19,6 +19,8 @@ import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { WEEK_NUMBER } from '@/data/seed';
 import { clockHour, toMark } from '@/lib/marking';
 import { MarkSheet } from '@/features/marking/MarkSheet';
+import { useCalendar } from '@/features/calendar/useCalendar';
+import { prioritise } from '@/lib/priority';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -34,6 +36,7 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 export default function Plan() {
   const router = useRouter();
   const { ceilings, today, customFlags } = useStore();
+  const { calendar, picture, expired } = useCalendar();
   const items = useItemsWithLogs();
 
   // Arriving from Home's week strip opens straight onto that day.
@@ -67,16 +70,12 @@ export default function Plan() {
   const due = selected === today ? toMark(items, today, hour) : [];
   const [marking, setMarking] = useState<string | null>(null);
   const away = daysBetween(today, selected);
+  const ranked = prioritise(items, today).first.length;
 
   return (
     <Screen
-      footer={
-        collision ? (
-          <Button label="Rebalance next week" onPress={() => router.push('/rebalance')} />
-        ) : (
-          <Button label="Add something" onPress={() => router.push(`/add?date=${selected}`)} />
-        )
-      }
+      // Adding lives on Home and in the day's free gaps; this page's own button is the fix for a wall.
+      footer={collision ? <Button label="Rebalance next week" onPress={() => router.push('/rebalance')} /> : undefined}
     >
       <Stack gap={5} className="pt-4">
         <PageHeader
@@ -139,6 +138,20 @@ export default function Plan() {
                 onOpen={(item) => router.push(`/item/${item.id}`)}
               />
             }
+          />
+        </Section>
+
+        {/* The tools that shape the week, here and nowhere else. */}
+        <Section family="focus" title="Plan it" sticker="star">
+          <Door family="focus" title="What to do first" sub={`${ranked} ranked`} onPress={() => router.push('/priority')} />
+          <Door family="week" sticker="class" title="Timetable" sub="Classes and flags" onPress={() => router.push('/timetable')} />
+          <Door
+            family="week"
+            sticker="calendar"
+            title="Google Calendar"
+            sub={!calendar ? 'Bring your events in' : expired ? 'Reconnect' : picture.fresh.length ? `${picture.fresh.length} new to set up` : '✓ In step'}
+            badge={picture.fresh.length || undefined}
+            onPress={() => router.push('/calendar' as Href)}
           />
         </Section>
 

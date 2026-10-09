@@ -155,6 +155,14 @@ export interface Item {
    * exam hints get given. Marking it changes what the app will let you move.
    */
   flags?: FlagId[];
+
+  // --- brought in from a calendar -------------------------------------------
+  /**
+   * The Google Calendar event this came from. Its time follows Google: move it
+   * there and it moves here. Everything else - how draining, can it move - is
+   * the student's own answer.
+   */
+  source?: { kind: 'google'; eventId: string; seriesId?: string | null };
 }
 
 export type SessionKind = 'lecture' | 'lab' | 'tutorial' | 'seminar';
@@ -595,4 +603,54 @@ export interface SimAction {
    * placing it on a timeline is how it ended up scheduled for the morning.
    */
   logOnly?: boolean;
+}
+
+/* ---------------------------------------------------------- google calendar */
+
+/** A Google Calendar event, in the phone's own time. */
+export interface CalendarEvent {
+  /** `calendarId|eventId`. */
+  id: string;
+  /** Shared by every week of a repeating event. */
+  seriesId: string | null;
+  title: string;
+  date: string;
+  /** Absent for an all-day event. */
+  startHour?: number;
+  hours: number;
+  allDay: boolean;
+  location: string | null;
+  calendar: string;
+  color: string | null;
+}
+
+/** What kind of thing an event is - the one answer that sets up the rest. */
+export type CalKind = 'class' | 'assignment' | 'exam' | 'shift' | 'exercise' | 'people' | 'chore' | 'other';
+
+/** How a calendar event was set up, so the next weeks of it can be set up the same. */
+export interface CalTemplate {
+  title: string;
+  kind: CalKind;
+  bucket: BucketKey;
+  mix: Mix;
+  dread: Dread;
+  commitment: CommitmentKind;
+  want?: 1 | 2 | 3 | 4 | 5;
+  /** Work before the day, for assignments and exams. */
+  prep?: { hours: number; importance: 1 | 2 | 3; daysBefore: number };
+  moduleId?: string;
+  sessionKind?: SessionKind;
+}
+
+/** Your answer to a calendar event (or a whole repeating series). */
+export type CalDecision = { as: 'added'; template: CalTemplate } | { as: 'skipped' };
+
+/** The connection, as the app knows it. */
+export interface CalendarLink {
+  /** Live: through the API. Demo: a sample calendar, so the flow can be tried. */
+  via: 'google' | 'sample';
+  email: string | null;
+  status: 'ok' | 'expired';
+  lastSyncedAt: string | null;
+  calendars: Array<{ id: string; name: string; color: string | null; on: boolean }>;
 }

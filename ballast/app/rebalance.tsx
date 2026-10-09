@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import {
-  Battery, Button, Card, Disclosure, Mascot, PageHeader, Screen, Section, Stack, Text,
+  Battery, Button, Card, Chip, Disclosure, Mascot, PageHeader, Screen, Section, Stack, Text,
 } from '@/components';
 import { color, radius } from '@design/tokens';
 import { SCREEN } from '@design/screens';
-import { bandFor, capacityOf, loadOf, overallOf } from '@/lib/load';
+import { bandFor, capacityOf, loadOf } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
-import { applySelection, buildTrades } from '@/lib/rebalance';
+import { askFor, buildTrades } from '@/lib/rebalance';
 import { CLUSTER_MIN_ITEMS, clusterCount, findCollision } from '@/lib/forecast';
 import { DAY_LETTER, dayIndex, formatShort } from '@/lib/dates';
 import { formatHour, weekDays } from '@/lib/schedule';
@@ -26,17 +26,15 @@ import type { Item, Trade } from '@/lib/types';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
-/** "Ask Jo to take it, saves 14" → "Ask Jo to take it": the action, not the arithmetic. */
-const actionOf = (trade: Trade): string => trade.detail.replace(/,?\s*saves\s+[\d.]+$/, '');
 
 /**
- * Lighten next week - trading, not deleting.
+ * Lighten next week - trading, not deleting, and never in bulk.
  *
- * One picture first: next week's battery now, and after what you pick, with
- * the seven days underneath showing which ones get lighter. Then the things
- * you could put down, each a card you tap, each wearing the battery it gives
- * back. Hard deadlines cannot move, so they are folded away at the bottom
- * rather than taking up the list.
+ * One picture first: next week's battery before, and now, with the seven days
+ * underneath showing which ones got lighter. Then the things you could put
+ * down, one at a time: what it is, what it gives back, who should hear first.
+ * Write to them, put it down (after one step that says what will happen), or
+ * keep it. Hard deadlines cannot move, so they are folded away at the bottom.
  */
 export default function Rebalance() {
   const router = useRouter();
@@ -44,166 +42,103 @@ export default function Rebalance() {
   const withLogs = useItemsWithLogs();
   const capacity = capacityOf(ceilings);
   const pct = (load: number) => (load / capacity) * 100;
-
   const anchor = nextWeek(today);
-  const week = useMemo(() => itemsInWeek(countedOnce(items), anchor), [items, anchor]);
-  const trades = useMemo(() => buildTrades(week), [week]);
-  const byId = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
-
-  const [selected, setSelected] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(trades.map((t) => [t.id, t.selected])),
-  );
-  const [applied, setApplied] = useState<{
-    count: number; charge: number; gain: number; wallGone: boolean; freed: Array<{ date: string; percent: number }>; nextWall: string | null;
-  } | null>(null);
-
-  /** The collision this screen was opened to fix, so we can check that one. */
-  const target = useMemo(() => findCollision(items, today), [items, today]);
-
-  const before = weekReading(items, anchor, ceilings).overall;
-  const afterItems = useMemo(() => applySelection(week, trades, selected), [week, trades, selected]);
-  const after = overallOf(afterItems, ceilings);
-  const gain = chargeOf(after) - chargeOf(before);
-  const chosen = trades.filter((t) => selected[t.id] && !t.locked).length;
-  const open = trades.filter((t) => !t.locked);
-  const locked = trades.filter((t) => t.locked);
-
   const days = weekDays(anchor);
 
-  /**
-   * The trade worth offering, or the reason there is none.
-   *
-   * Read off the list with logs in it rather than `week`, so a thing you typed
-   * in yourself and only have to turn up to can take part in the trade it was
-   * rated for.
+  /*
+   * The week as it was when you opened this, and the trades priced from it.
+   * Held still while you decide: each one taken changes the week underneath,
+   * but the list you are working through should not reshuffle under your thumb.
    */
+  const [start] = useState(() => {
+    const week = itemsInWeek(countedOnce(items), anchor);
+    return {
+      week,
+      trades: buildTrades(week),
+      byId: Object.fromEntries(items.map((item) => [item.id, item])) as Record<string, Item>,
+      overall: weekReading(items, anchor, ceilings).overall,
+      wall: findCollision(items, today),
+    };
+  });
+  const open = start.trades.filter((t) => !t.locked);
+  const locked = start.trades.filter((t) => t.locked);
+  const itemOf = (trade: Trade): Item | undefined => start.byId[trade.itemId.split(',')[0]];
+
+  /** What you said to each: put down, or kept. And who you already wrote to. */
+  const [decided, setDecided] = useState<Record<string, 'down' | 'kept'>>({});
+  const [wrote, setWrote] = useState<Record<string, boolean>>({});
+  const [confirming, setConfirming] = useState(false);
+  const current = open.find((t) => !decided[t.id]);
+  const done = open.filter((t) => decided[t.id]);
+
+  const now = weekReading(items, anchor, ceilings).overall;
+  const gain = chargeOf(now) - chargeOf(start.overall);
+  const downCount = open.filter((t) => decided[t.id] === 'down').length;
+
   const swap = useMemo(() => bestSwap(withLogs, days, modules), [withLogs, days, modules]);
-  const refusal = useMemo(
-    () => (swap ? null : firstRefusal(withLogs, days, modules)),
-    [swap, withLogs, days, modules],
-  );
+  const refusal = useMemo(() => (swap ? null : firstRefusal(withLogs, days, modules)), [swap, withLogs, days, modules]);
 
   /*
-   * The trades are the app's, priced from your week. The AI says, for each, what
-   * putting it down buys or why it should stay, picks which to take, and gives
-   * the swap its reason - and its picks become the starting selection until you
-   * tap a card yourself.
+   * The trades are the app's, priced from your week. The AI says, for each,
+   * what putting it down buys or why it should stay, and leans one way - shown
+   * on the card as a suggestion, never taken for you.
    */
-  const touched = useRef(false);
   const advice = useAiAnswer(
-    trades.length ? `rebalance:${anchor}:${trades.map((t) => t.id).join(',')}:${swap ? swap.drop.id : ''}` : null,
+    start.trades.length ? `rebalance:${anchor}:${start.trades.map((t) => t.id).join(',')}:${swap ? swap.drop.id : ''}` : null,
     async () => {
-      const res = await api.suggestRebalance(rebalanceContext(trades, byId, chargeOf(before), swap
+      const res = await api.suggestRebalance(rebalanceContext(start.trades, start.byId, chargeOf(start.overall), swap
         ? { keep: swap.keep.title, drop: swap.drop.title, day: formatShort(swap.date) }
         : undefined));
       return res.ok && res.data.picks.length ? res.data : null;
     },
   );
-  useEffect(() => {
-    if (!advice || touched.current) return;
-    setSelected(Object.fromEntries(trades.map((t) => [
-      t.id, !t.locked && !!advice.picks.find((pick) => pick.id === t.id)?.take,
-    ])));
-  }, [advice, trades]);
-  const aiWhy = (id: string): string | undefined => advice?.picks.find((pick) => pick.id === id)?.why;
+  const pick = (id: string) => advice?.picks.find((p) => p.id === id);
 
-  /** Each day's cost to the battery, now and after the picks. */
+  /** Each day's cost: as it was, and as it is now. */
   const dayCost = useMemo(() => {
+    const week = itemsInWeek(countedOnce(items), anchor);
     const of = (list: Item[]) =>
       Object.fromEntries(days.map((d) => [d, pct(list.filter((i) => i.date === d).reduce((t, i) => t + loadOf(i), 0))]));
-    return { now: of(week), next: of(afterItems) };
+    return { now: of(start.week), next: of(week) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, week, afterItems, capacity]);
+  }, [days, items, start.week, capacity]);
   const freed = days
     .map((date) => ({ date, percent: Math.round(dayCost.now[date] - dayCost.next[date]) }))
     .filter((day) => day.percent >= 1);
 
-  const toggle = (trade: Trade) => {
+  const putDown = (trade: Trade) => {
+    applyTrades([{ ...trade, selected: true }]);
+    setDecided((d) => ({ ...d, [trade.id]: 'down' }));
+    setConfirming(false);
+    successFeedback();
+  };
+  const keep = (trade: Trade) => {
     tapFeedback();
-    touched.current = true;
-    setSelected((prev) => ({ ...prev, [trade.id]: !prev[trade.id] }));
+    setDecided((d) => ({ ...d, [trade.id]: 'kept' }));
+    setConfirming(false);
+  };
+  const write = (trade: Trade) => {
+    tapFeedback();
+    setWrote((w) => ({ ...w, [trade.id]: true }));
+    router.push(`/decline/${trade.itemId.split(',')[0]}` as Href);
   };
 
-  if (applied) {
-    return (
-      <Screen
-        back="/plan"
-        backLabel="Plan"
-        footer={
-          <>
-            <Button label="See the fortnight" onPress={() => router.replace('/plan')} />
-            <Button label="Back home" kind="secondary" onPress={() => router.replace('/')} />
-          </>
-        }
-      >
-        <Stack gap={5} className="pt-6">
-          {/* The win, as a face and a number. */}
-          <Card tone="steady" gap={3} align="center">
-            <Mascot charge={applied.charge} loadPercent={100 - applied.charge} size={120} />
-            <Text variant="hero" tone="steady" accessibilityLiveRegion="polite">{applied.charge}%</Text>
-            <View className="rounded-pill px-4 py-1" style={{ backgroundColor: color.band.steady.fill }}>
-              <Text variant="callout" weight="bold" tone="inverse">⚡ +{applied.gain}% next week</Text>
-            </View>
-          </Card>
-
-          {/* Did the pile-up it was opened for go? */}
-          <Card tone={applied.wallGone ? 'steady' : 'busy'} gap={2}>
-            <Stack direction="row" gap={3} align="center">
-              <Text variant="title">{applied.wallGone ? '✅' : '⚠️'}</Text>
-              <Text variant="heading" className="flex-1">
-                {applied.wallGone ? 'Pile-up cleared' : 'Lighter, still busy'}
-              </Text>
-            </Stack>
-            {applied.nextWall ? <Text variant="footnote" tone="busy">Next one: {applied.nextWall}</Text> : null}
-          </Card>
-
-          {applied.freed.length ? (
-            <Stack direction="row" gap={2} wrap>
-              {applied.freed.map((day) => (
-                <View key={day.date} className="rounded-pill px-3 py-2" style={{ backgroundColor: color.band.steady.wash }}>
-                  <Text variant="caption" weight="bold" tone="steady">{formatShort(day.date)} · +{day.percent}%</Text>
-                </View>
-              ))}
-            </Stack>
-          ) : null}
-        </Stack>
-      </Screen>
-    );
-  }
+  const finished = open.length > 0 && !current;
+  const wallGone = !start.wall || clusterCount(items, start.wall.from, start.wall.to) < CLUSTER_MIN_ITEMS;
 
   return (
     <Screen
       back="/plan"
       backLabel="Plan"
       footer={
-        <>
-          <Button
-            label={chosen ? `Apply ${chosen} · ⚡ +${gain}%` : 'Pick something to put down'}
-            kind={chosen ? 'primary' : 'secondary'}
-            accessibilityState={{ disabled: !chosen }}
-            onPress={() => {
-              if (!chosen) return;
-              const picked = trades.map((t) => ({ ...t, selected: !!selected[t.id] }));
-              const nextItems = [...items.filter((i) => !week.some((w) => w.id === i.id)), ...afterItems];
-              // Did *this* wall clear, and did another surface elsewhere?
-              const stillClustered =
-                target !== null && clusterCount(nextItems, target.from, target.to) >= CLUSTER_MIN_ITEMS;
-              const elsewhere = findCollision(nextItems, today);
-              setApplied({
-                count: chosen,
-                charge: chargeOf(after),
-                gain,
-                wallGone: !stillClustered,
-                nextWall:
-                  !stillClustered && elsewhere && elsewhere.from !== target?.from ? elsewhere.headline : null,
-                freed,
-              });
-              applyTrades(picked);
-              successFeedback();
-            }}
-          />
+        finished || !open.length ? (
+          <>
+            <Button label="See the fortnight" onPress={() => router.replace('/plan')} />
+            <Button label="Back home" kind="secondary" onPress={() => router.replace('/')} />
+          </>
+        ) : (
           <Button label="Not this week" kind="quiet" onPress={() => (router.canGoBack() ? router.back() : router.replace('/plan'))} />
-        </>
+        )
       }
     >
       <Stack gap={5} className="pt-2">
@@ -214,20 +149,42 @@ export default function Rebalance() {
           sub={advice ? `✨ ${advice.headline}` : undefined}
         />
 
-        {/* Now → after, and the seven days it buys back. */}
+        {/* Then → now, and the seven days it has bought back so far. */}
         <Card gap={4}>
           <Stack direction="row" align="center" justify="between">
-            <Gauge label="NOW" charge={chargeOf(before)} overall={before} faded />
+            <Gauge label="BEFORE" charge={chargeOf(start.overall)} overall={start.overall} faded />
             <Stack gap={1} align="center">
               <View className="rounded-pill px-3 py-1" style={{ backgroundColor: gain > 0 ? color.band.steady.fill : color.surface.sunken }}>
-                <Text variant="callout" weight="bold" tone={gain > 0 ? 'inverse' : 'subtle'}>+{gain}%</Text>
+                <Text variant="callout" weight="bold" tone={gain > 0 ? 'inverse' : 'subtle'}>{gain > 0 ? `+${gain}%` : '±0%'}</Text>
               </View>
               <Text variant="title" tone="subtle">→</Text>
             </Stack>
-            <Gauge label="AFTER" charge={chargeOf(after)} overall={after} />
+            <Gauge label="NOW" charge={chargeOf(now)} overall={now} />
           </Stack>
           <WeekBars days={days} now={dayCost.now} next={dayCost.next} />
         </Card>
+
+        {finished ? (
+          // Every one answered: what it came to.
+          <Card tone={wallGone ? 'steady' : 'busy'} gap={3} align="center">
+            <Mascot charge={chargeOf(now)} loadPercent={now} size={96} />
+            <Text variant="heading" className="text-center">
+              {downCount ? `${downCount} put down · ⚡ +${Math.max(0, gain)}%` : 'Kept everything'}
+            </Text>
+            <Text variant="footnote" tone={wallGone ? 'steady' : 'busy'} weight="semibold">
+              {wallGone ? '✅ Pile-up cleared' : '⚠️ Lighter, still busy'}
+            </Text>
+            {freed.length ? (
+              <Stack direction="row" gap={2} wrap justify="center">
+                {freed.map((day) => (
+                  <View key={day.date} className="rounded-pill px-3 py-1" style={{ backgroundColor: color.band.steady.wash }}>
+                    <Text variant="caption" weight="bold" tone="steady">{formatShort(day.date)} · +{day.percent}%</Text>
+                  </View>
+                ))}
+              </Stack>
+            ) : null}
+          </Card>
+        ) : null}
 
         <SwapCard
           swap={swap}
@@ -241,21 +198,58 @@ export default function Rebalance() {
           }}
         />
 
-        {/* What could come off: one card each, tap to put it down. */}
-        {open.length ? (
-          <Section family="focus" title="Put down" sticker="scales" meta={`${chosen} of ${open.length}`}>
-            {open.map((trade) => (
-              <TradeCard
-                key={trade.id}
-                trade={trade}
-                item={byId[trade.itemId.split(',')[0]]}
-                on={!!selected[trade.id]}
-                percent={pct(trade.saves)}
-                why={aiWhy(trade.id)}
-                onPress={() => toggle(trade)}
-              />
-            ))}
+        {/* One at a time: what it is, what it gives back, who should hear first. */}
+        {current ? (
+          <Section family="focus" title="Put down?" sticker="scales" meta={`${done.length + 1} of ${open.length}`}>
+            <Stack direction="row" gap={1}>
+              {open.map((t) => (
+                <View
+                  key={t.id}
+                  className="flex-1 rounded-pill"
+                  style={{
+                    height: 5,
+                    backgroundColor: decided[t.id] === 'down' ? color.band.steady.fill
+                      : decided[t.id] === 'kept' ? color.line.strong
+                        : t.id === current.id ? color.surface.inverse : color.surface.raised,
+                  }}
+                />
+              ))}
+            </Stack>
+            <Decision
+              key={current.id}
+              trade={current}
+              item={itemOf(current)}
+              percent={pct(current.saves)}
+              suggest={pick(current.id)}
+              wrote={!!wrote[current.id]}
+              confirming={confirming}
+              onWrite={() => write(current)}
+              onAsk={() => { tapFeedback(); setConfirming(true); }}
+              onBack={() => { tapFeedback(); setConfirming(false); }}
+              onDown={() => putDown(current)}
+              onKeep={() => keep(current)}
+            />
           </Section>
+        ) : null}
+
+        {/* What you have answered so far. */}
+        {done.length ? (
+          <Stack gap={2}>
+            {done.map((trade) => {
+              const down = decided[trade.id] === 'down';
+              return (
+                <Stack key={trade.id} direction="row" gap={3} align="center" className="rounded-lg bg-raised px-4 py-3" style={{ borderWidth: 1, borderColor: color.line.hairline, opacity: down ? 1 : 0.7 }}>
+                  <Text variant="heading">{trade.protected ? '🌿' : SPEND[spendKey(itemOf(trade) ?? ({} as Item))]?.emoji ?? '📌'}</Text>
+                  <Text variant="callout" weight="semibold" numberOfLines={1} className="flex-1" style={down ? { textDecorationLine: 'line-through' } : undefined}>{trade.title}</Text>
+                  <View className="rounded-pill px-3 py-1" style={{ backgroundColor: down ? color.band.steady.wash : color.surface.sunken }}>
+                    <Text variant="micro" weight="bold" tone={down ? 'steady' : 'subtle'}>
+                      {down ? `✓ Down${wrote[trade.id] ? ' · ✉️' : ''}` : 'Kept'}
+                    </Text>
+                  </View>
+                </Stack>
+              );
+            })}
+          </Stack>
         ) : null}
 
         {/* Hard deadlines: named, never offered. */}
@@ -264,7 +258,7 @@ export default function Rebalance() {
             <Stack gap={2}>
               {locked.map((trade) => (
                 <Stack key={trade.id} direction="row" gap={3} align="center">
-                  <Text variant="callout">{SPEND[spendKey(byId[trade.itemId.split(',')[0]] ?? ({} as Item))]?.emoji ?? '📌'}</Text>
+                  <Text variant="callout">{SPEND[spendKey(itemOf(trade) ?? ({} as Item))]?.emoji ?? '📌'}</Text>
                   <Text variant="body" className="flex-1" numberOfLines={1}>{trade.title}</Text>
                 </Stack>
               ))}
@@ -314,51 +308,105 @@ function WeekBars({ days, now, next }: { days: string[]; now: Record<string, num
   );
 }
 
-/** One thing that could come off, as a card: tap to put it down. */
-function TradeCard({
-  trade, item, on, percent, why, onPress,
-}: { trade: Trade; item?: Item; on: boolean; percent: number; why?: string; onPress: () => void }) {
+/**
+ * One thing that could come off, and the three honest answers to it.
+ *
+ * Write first (when somebody is waiting on it), put it down, or keep it.
+ * Putting it down is a second step that says what is about to happen - who
+ * has been told, when it leaves, what comes back - so nothing goes on a tap.
+ */
+function Decision({
+  trade, item, percent, suggest, wrote, confirming, onWrite, onAsk, onBack, onDown, onKeep,
+}: {
+  trade: Trade; item?: Item; percent: number; suggest?: { why: string; take?: boolean }; wrote: boolean; confirming: boolean;
+  onWrite: () => void; onAsk: () => void; onBack: () => void; onDown: () => void; onKeep: () => void;
+}) {
+  const ask = askFor(trade, item);
   const info = item ? SPEND[spendKey(item)] : SPEND.errand;
-  // Putting down rest costs battery rather than giving it back: say so in red.
   const value = Math.round(percent);
-  const costs = value < 0;
-  const accent = costs ? color.band.heavy : color.band.steady;
-  const when = item ? `${formatShort(item.date)}${item.startHour !== undefined ? ` · ${formatHour(item.startHour)}` : ''}` : '';
+  const costs = trade.protected || value < 0;
+  const back = costs ? `🌿 −${Math.max(1, Math.abs(value))}%` : `⚡ +${Math.max(1, value)}%`;
+  const when = item
+    ? `${formatShort(item.deadline ?? item.date)}${item.startHour !== undefined && !item.deadline ? ` · ${formatHour(item.startHour)}` : ''}`
+    : '';
+  const shouldTell = !!ask.tell;
+
   return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: on }}
-      accessibilityLabel={`${trade.title}. ${actionOf(trade)}. ${costs ? `Costs ${-value}` : `Gives back ${Math.max(1, value)}`} percent.`}
-      onPress={onPress}
-      className="rounded-xl border-2 px-4 py-3 active:opacity-80"
-      style={{
-        borderColor: on ? accent.fill : color.line.hairline,
-        backgroundColor: on ? accent.wash : color.surface.raised,
-      }}
-    >
+    <Stack gap={4} className="rounded-xl bg-raised px-4 py-4" style={{ borderWidth: 2, borderColor: color.line.hairline }}>
+      {/* What it is. */}
       <Stack direction="row" gap={3} align="center">
-        <View className="items-center justify-center rounded-pill bg-raised" style={{ width: 44, height: 44 }}>
+        <View className="items-center justify-center rounded-lg" style={{ width: 56, height: 56, backgroundColor: costs ? color.band.recovery.wash : color.band.busy.wash }}>
           <Text variant="title">{trade.protected ? '🌿' : info.emoji}</Text>
         </View>
-        <Stack gap={1} grow>
-          <Text variant="body" weight="semibold" numberOfLines={1}>{trade.title}</Text>
-          <Text variant="micro" tone="subtle" numberOfLines={1}>{[when, actionOf(trade)].filter(Boolean).join(' · ')}</Text>
-          {why ? <Text variant="footnote" tone="muted" numberOfLines={2}>✨ {why}</Text> : null}
+        <Stack gap={0} grow>
+          <Text variant="micro" tone="subtle">{ask.kind.toUpperCase()}</Text>
+          <Text variant="heading" numberOfLines={2}>{trade.title}</Text>
+          {when ? <Text variant="caption" weight="semibold" tone="muted">{item?.deadline ? `Due ${when}` : when}</Text> : null}
         </Stack>
-        <Stack gap={2} align="center">
-          <Text variant="heading" tone={costs ? 'heavy' : 'steady'}>{costs ? `−${-value}` : `+${Math.max(1, value)}`}%</Text>
-          <View
-            className="items-center justify-center rounded-pill"
-            style={{
-              width: 26, height: 26,
-              backgroundColor: on ? accent.fill : color.surface.raised,
-              borderWidth: 2, borderColor: on ? accent.fill : color.line.strong,
-            }}
-          >
-            {on ? <Text variant="micro" tone="inverse">✓</Text> : null}
-          </View>
-        </Stack>
+        <View className="items-center rounded-lg px-3 py-2" style={{ backgroundColor: costs ? color.band.heavy.wash : color.band.steady.wash }}>
+          <Text variant="heading" tone={costs ? 'heavy' : 'steady'}>{back.slice(3)}</Text>
+          <Text variant="micro" tone={costs ? 'heavy' : 'steady'}>{costs ? 'costs' : 'back'}</Text>
+        </View>
       </Stack>
-    </Pressable>
+
+      {/* What the app knows about it, as chips. */}
+      <Stack direction="row" gap={2} wrap>
+        {item ? <Chip label={`${{ hard: '🔒 Hard', soft: '↔️ Can move', self: '🙋 Your own goal' }[item.commitment]}`} readOnly /> : null}
+        {shouldTell ? <Chip label={`✉️ ${ask.tell} should hear first`} tone="busy" readOnly /> : null}
+        {item?.want ? <Chip label={item.want >= 4 ? '💛 You want to be there' : item.want <= 2 ? '🤷 You don’t mind missing it' : '😐 Either way'} readOnly /> : null}
+        {suggest ? <Chip label={suggest.take ? '✨ Worth putting down' : '✨ Worth keeping'} tone={suggest.take ? 'steady' : 'plain'} readOnly /> : null}
+      </Stack>
+      {suggest?.why ? <Text variant="footnote" tone="muted">✨ {suggest.why}</Text> : null}
+      {trade.protected ? <Text variant="footnote" tone="heavy" weight="semibold">This is rest. Putting it down takes battery, not gives it.</Text> : null}
+
+      {confirming ? (
+        // The step before: what is about to happen, said out loud.
+        <Stack gap={3} className="rounded-lg px-4 py-3" style={{ backgroundColor: color.surface.sunken }}>
+          <Text variant="callout" weight="bold">Before you {ask.verb.toLowerCase()}</Text>
+          {shouldTell ? (
+            <Stack direction="row" gap={3} align="center">
+              <Text variant="callout">{wrote ? '✅' : '✉️'}</Text>
+              <Text variant="callout" className="flex-1">{wrote ? `Message to ${ask.tell} written` : `${ask.tell} hasn’t heard yet`}</Text>
+              {!wrote ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={`Write to ${ask.tell}`} onPress={onWrite} className="min-h-min justify-center active:opacity-60">
+                  <Text variant="caption" weight="bold" className="underline">Write now ›</Text>
+                </Pressable>
+              ) : null}
+            </Stack>
+          ) : null}
+          <Stack direction="row" gap={3} align="center">
+            <Text variant="callout">📅</Text>
+            <Text variant="callout" className="flex-1">
+              {trade.id.startsWith('batch-') ? 'They become one trip' : `Leaves your week${when ? ` · ${when}` : ''}`}
+            </Text>
+          </Stack>
+          <Stack direction="row" gap={3} align="center">
+            <Text variant="callout">{costs ? '🌿' : '⚡'}</Text>
+            <Text variant="callout" weight="semibold" tone={costs ? 'heavy' : 'steady'} className="flex-1">
+              {costs ? `Costs ${back.slice(3)} of next week` : `${back.slice(3)} back next week`}
+            </Text>
+          </Stack>
+          <Stack direction="row" gap={2}>
+            <Button label="Not yet" kind="secondary" className="flex-1" onPress={onBack} />
+            <Button label={`Yes, ${ask.verb.toLowerCase()}`} kind="steady" className="flex-[2]" onPress={onDown} />
+          </Stack>
+        </Stack>
+      ) : (
+        <Stack gap={2}>
+          {shouldTell && !wrote ? (
+            <Button label={`✉️ Write to ${ask.tell} first`} onPress={onWrite} />
+          ) : null}
+          <Stack direction="row" gap={2}>
+            <Button
+              label={shouldTell && wrote ? `✓ Told · ${ask.verb}` : ask.verb}
+              kind={shouldTell && !wrote ? 'secondary' : 'steady'}
+              className="flex-[3]"
+              onPress={onAsk}
+            />
+            <Button label="Keep it" kind="secondary" className="flex-[2]" onPress={onKeep} />
+          </Stack>
+        </Stack>
+      )}
+    </Stack>
   );
 }
