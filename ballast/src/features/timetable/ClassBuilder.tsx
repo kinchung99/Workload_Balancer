@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { Button, Chip, Disclosure, DrainPicker, Stack, Text } from '@/components';
 import { color, radius } from '@design/tokens';
-import { DAY_LETTER, addDays, startOfWeek } from '@/lib/dates';
+import { addDays, startOfWeek } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import {
   MODULE_EMOJIS, SESSION_KINDS, moduleEmoji, modulesFrom, parseTimetable, slotsOf, toItems,
@@ -82,17 +82,18 @@ function ModuleBlock({ module, classes, open, onToggle }: {
   onToggle: () => void;
 }) {
   const { addClass, removeClass, removeModule } = useStore();
-  const [days, setDays] = useState<number[]>([]);
+  // One day per class: a Monday lecture and a Thursday one are two classes, each with its own time.
+  const [day, setDay] = useState<number | null>(null);
   const [start, setStart] = useState(9);
   const [hours, setHours] = useState(2);
   const [kind, setKind] = useState<SessionKind>('lecture');
   const [room, setRoom] = useState('');
 
   const add = () => {
-    if (!days.length) return;
-    days.forEach((day) => addClass(module.id, { day, startHour: start, hours, kind, room }));
+    if (day === null) return;
+    addClass(module.id, { day, startHour: start, hours, kind, room });
     successFeedback();
-    setDays([]);
+    setDay(null);
     setRoom('');
   };
 
@@ -149,33 +150,69 @@ function ModuleBlock({ module, classes, open, onToggle }: {
           {/* The next class, all buttons. */}
           <Stack gap={3} className="rounded-lg border border-line-hairline px-3 py-3">
             <Text variant="callout" weight="bold">＋ Add a class</Text>
+            {/* Three different questions, three different looks: day tiles, time pills, length blocks. */}
+            <Label emoji="📅" text="DAY" />
             <Stack direction="row" gap={1}>
-              {DAY_LETTER.map((letter, day) => {
-                const on = days.includes(day);
+              {DAYS.map((_, index) => {
+                const on = day === index;
                 return (
                   <Pressable
-                    key={day}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on }}
-                    accessibilityLabel={DAYS[day]}
-                    onPress={() => { tapFeedback(); setDays(on ? days.filter((d) => d !== day) : [...days, day]); }}
-                    className={`min-h-min flex-1 items-center justify-center rounded-md py-2 active:opacity-70 ${on ? 'bg-inverse' : 'bg-sunken'}`}
+                    key={index}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={DAYS[index]}
+                    onPress={() => { tapFeedback(); setDay(on ? null : index); }}
+                    className={`min-h-min flex-1 items-center justify-center rounded-md py-3 active:opacity-70 ${on ? 'bg-inverse' : 'bg-sunken'}`}
                   >
-                    <Text variant="caption" weight="bold" tone={on ? 'inverse' : 'muted'}>{letter}</Text>
+                    <Text variant="caption" weight="bold" tone={on ? 'inverse' : 'default'}>{DAYS[index]}</Text>
                   </Pressable>
                 );
               })}
             </Stack>
+
+            <Label emoji="🕒" text="STARTS AT" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-              {STARTS.map((hour) => (
-                <Chip key={hour} label={formatHour(hour)} tone={hour === start ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setStart(hour); }} />
-              ))}
+              {STARTS.map((hour) => {
+                const on = hour === start;
+                return (
+                  <Pressable
+                    key={hour}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={`Starts ${formatHour(hour)}`}
+                    onPress={() => { tapFeedback(); setStart(hour); }}
+                    className="min-h-min items-center justify-center rounded-pill px-4 active:opacity-70"
+                    style={{ backgroundColor: on ? color.band.recovery.fill : color.band.recovery.wash, borderWidth: 1.5, borderColor: on ? color.band.recovery.ink : color.band.recovery.wash }}
+                  >
+                    <Text variant="caption" weight="bold" tone={on ? 'inverse' : 'recovery'}>{formatHour(hour)}</Text>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
-            <Stack direction="row" gap={2} wrap>
-              {LENGTHS.map((length) => (
-                <Chip key={length} label={hoursLabel(length)} tone={length === hours ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setHours(length); }} />
-              ))}
+
+            <Label emoji="⏱" text="LASTS" />
+            <Stack direction="row" gap={2}>
+              {LENGTHS.map((length) => {
+                const on = length === hours;
+                return (
+                  <Pressable
+                    key={length}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={`Lasts ${hoursLabel(length)}`}
+                    onPress={() => { tapFeedback(); setHours(length); }}
+                    className="min-h-min flex-1 items-center justify-center gap-1 rounded-md py-2 active:opacity-70"
+                    style={{ backgroundColor: on ? color.band.steady.wash : color.surface.sunken, borderWidth: 2, borderColor: on ? color.band.steady.fill : 'transparent' }}
+                  >
+                    {/* A bar as long as the class, so a length reads as a length. */}
+                    <View style={{ height: 6, width: `${(length / 3) * 80}%`, borderRadius: radius.pill, backgroundColor: on ? color.band.steady.fill : color.line.strong }} />
+                    <Text variant="caption" weight="bold" tone={on ? 'steady' : 'muted'}>{hoursLabel(length)}</Text>
+                  </Pressable>
+                );
+              })}
             </Stack>
+
+            <Label emoji="🏷" text="KIND" />
             <Stack direction="row" gap={2} wrap>
               {SESSION_KINDS.map((option) => (
                 <Chip
@@ -196,10 +233,10 @@ function ModuleBlock({ module, classes, open, onToggle }: {
               style={inputStyle}
             />
             <Button
-              label={days.length
-                ? `Add ${days.map((d) => DAYS[d]).join(', ')} · ${formatHour(start)}`
+              label={day !== null
+                ? `Add ${DAYS[day]} · ${formatHour(start)}–${formatHour(start + hours)}`
                 : 'Pick a day first'}
-              kind={days.length ? 'primary' : 'secondary'}
+              kind={day !== null ? 'primary' : 'secondary'}
               onPress={add}
             />
           </Stack>
@@ -312,6 +349,10 @@ function NewModule({ onMade, onCancel }: { onMade: (id: string) => void; onCance
       </Stack>
     </Stack>
   );
+}
+
+function Label({ emoji, text }: { emoji: string; text: string }) {
+  return <Text variant="micro" tone="subtle">{emoji} {text}</Text>;
 }
 
 function Stepper({ label, value, onLess, onMore }: { label: string; value: string; onLess: () => void; onMore: () => void }) {

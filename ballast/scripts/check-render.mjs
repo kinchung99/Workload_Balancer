@@ -68,7 +68,7 @@ const EXPECTATIONS = [
   ['setup/tasks.html', 'Setup · tasks', [
     'STEP 2 OF 4 \u00b7 TASKS', 'What\u2019s on your plate?',
     'Owing work', 'Assignments, prep, revision', 'Errand',   // two kinds of thing, two tiles
-    'DUE', 'NEEDS',
+    'DUE', 'HOURS OF WORK',
     'HOW DRAINING', 'Easy', 'Exhausting',     // what the priority list weighs it by
     'CAN IT MOVE?', 'Hard deadline', 'Soft', 'Self-imposed',
     'Name it first',

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
-  Avatar, Button, Chip, Door, DrainBadge, DrainPicker, Mascot, PageHeader, Screen, Section, Stack, StepDots, StepNav, Sticker, Text,
+  Avatar, Button, Chip, DatePicker, Door, DrainBadge, DrainPicker, Mascot, PageHeader, Screen, Section, Stack, StepDots, StepNav, Sticker, Text,
   type StickerName,
 } from '@/components';
 import { color, radius } from '@design/tokens';
@@ -88,24 +88,24 @@ function TimetableStep() {
 
 /* ------------------------------------------------------------------- tasks */
 
-const DUE = [
-  { label: 'Tomorrow', days: 1 }, { label: 'In 3 days', days: 3 }, { label: 'Next week', days: 7 }, { label: 'In 2 weeks', days: 14 },
-];
-const WHEN = [{ label: 'Today', days: 0 }, { label: 'Tomorrow', days: 1 }, { label: 'This weekend', days: -1 }];
-const NEEDS = [1, 2, 4, 8];
 /** Whether it can move, at a glance. */
 const MOVE_EMOJI: Record<CommitmentKind, string> = { hard: '🔒', soft: '↔️', self: '🙋' };
-const TAKES = [0.25, 0.5, 1];
+/** How far one tap of − or + moves the hours: an hour of work, a quarter-hour of errand. */
+const STEP = { owing: 1, errand: 0.25 } as const;
+const LEAST = { owing: 0.5, errand: 0.25 } as const;
+const tidy = (hours: number) => Math.round(hours * 100) / 100;
 
 function TasksStep() {
   const { items, today, addItem } = useStore();
   const [kind, setKind] = useState<'owing' | 'errand'>('owing');
   const [title, setTitle] = useState('');
-  const [days, setDays] = useState(3);
+  const [date, setDate] = useState(() => addDays(today, 3));
   const [hours, setHours] = useState(4);
+  // What is in the hours box as typed, so "1." can be on its way to "1.5".
+  const [typed, setTyped] = useState('4');
   const [dread, setDread] = useState<Dread>(3);
   const [commitment, setCommitment] = useState<CommitmentKind>('soft');
-  const weekend = addDays(startOfWeek(today), 5);
+  const setBoth = (next: number) => { const h = tidy(Math.max(LEAST[kind], Math.min(200, next))); setHours(h); setTyped(String(h)); };
 
   const owing = items.filter((item) => item.prepHours && !item.parentId && (item.deadline ?? item.date) >= today);
   const errands = items.filter((item) => item.bucket === 'errands' && !item.repeats && item.date >= today && !item.parentId);
@@ -114,16 +114,12 @@ function TasksStep() {
     const name = title.trim();
     if (!name) return;
     if (kind === 'owing') {
-      const due = addDays(today, days);
       addItem({
         title: name, bucket: 'mental', hours, dread, commitment,
-        date: due, deadline: due, prepHours: hours, prepDone: 0, importance: commitment === 'hard' ? 3 : 2,
+        date, deadline: date, prepHours: hours, prepDone: 0, importance: commitment === 'hard' ? 3 : 2,
       });
     } else {
-      addItem({
-        title: name, bucket: 'errands', hours, dread, commitment,
-        date: days < 0 ? weekend : addDays(today, days),
-      });
+      addItem({ title: name, bucket: 'errands', hours, dread, commitment, date });
     }
     successFeedback();
     setTitle('');
@@ -132,8 +128,9 @@ function TasksStep() {
   const pick = (next: 'owing' | 'errand') => {
     tapFeedback();
     setKind(next);
-    setDays(next === 'owing' ? 3 : 0);
+    setDate(next === 'owing' ? addDays(today, 3) : today);
     setHours(next === 'owing' ? 4 : 0.5);
+    setTyped(next === 'owing' ? '4' : '0.5');
     setDread(next === 'owing' ? 3 : 2);
     setCommitment(next === 'owing' ? 'soft' : 'self');
   };
@@ -159,23 +156,37 @@ function TasksStep() {
           className="min-h-row rounded-pill border-2 border-line-hairline bg-sunken px-5 py-3 text-body text-ink-default"
           style={inputStyle}
         />
-        <Text variant="micro" tone="subtle">{kind === 'owing' ? 'DUE' : 'WHEN'}</Text>
-        <Stack direction="row" gap={2} wrap>
-          {(kind === 'owing' ? DUE : WHEN).map((option) => (
-            <Chip key={option.label} label={option.label} tone={days === option.days ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setDays(option.days); }} />
-          ))}
+        {/* The exact day: a calendar, or type it. */}
+        <Stack direction="row" justify="between" align="center">
+          <Text variant="micro" tone="subtle">{kind === 'owing' ? '📅 DUE' : '📅 WHEN'}</Text>
+          <Text variant="callout" weight="bold" tone="recovery">{formatShort(date)}</Text>
         </Stack>
-        <Text variant="micro" tone="subtle">{kind === 'owing' ? 'NEEDS' : 'TAKES'}</Text>
-        <Stack direction="row" gap={2} wrap>
-          {(kind === 'owing' ? NEEDS : TAKES).map((option) => (
-            <Chip
-              key={option}
-              label={option < 1 ? `${option * 60}m` : `${option}h`}
-              tone={hours === option ? 'selected' : 'plain'}
-              onPress={() => { tapFeedback(); setHours(option); }}
+        <DatePicker value={date} min={today} onChange={(next) => { tapFeedback(); setDate(next); }} />
+
+        {/* Hours: type them, or nudge them. */}
+        <Text variant="micro" tone="subtle">{kind === 'owing' ? '⏱ HOURS OF WORK' : '⏱ HOW LONG (HOURS)'}</Text>
+        <Stack direction="row" gap={3} align="center">
+          <Nudge sign="−" label="Fewer hours" onPress={() => setBoth(hours - STEP[kind])} />
+          <View className="flex-1 flex-row items-center justify-center rounded-pill border-2 border-line-hairline bg-sunken px-4">
+            <TextInput
+              value={typed}
+              onChangeText={(text) => {
+                const clean = text.replace(/[^0-9.]/g, '');
+                setTyped(clean);
+                const value = Number(clean);
+                if (clean && Number.isFinite(value) && value > 0) setHours(tidy(Math.min(200, value)));
+              }}
+              onBlur={() => setTyped(String(hours))}
+              keyboardType="decimal-pad"
+              accessibilityLabel="Hours"
+              className="min-h-min py-2 text-center text-title font-bold text-ink-default"
+              style={[{ minWidth: 60 }, inputStyle as object]}
             />
-          ))}
+            <Text variant="callout" tone="muted">{hours === 1 ? 'hour' : 'hours'}</Text>
+          </View>
+          <Nudge sign="+" label="More hours" onPress={() => setBoth(hours + STEP[kind])} />
         </Stack>
+        {hours < 1 ? <Text variant="micro" tone="subtle" className="text-center">= {Math.round(hours * 60)} minutes</Text> : null}
         {/* The two answers the priority list runs on. */}
         <Text variant="micro" tone="subtle">HOW DRAINING</Text>
         <DrainPicker compact value={dread} onChange={(next) => { setDread(next); }} />
@@ -212,6 +223,19 @@ function TasksStep() {
         </Section>
       ) : null}
     </Stack>
+  );
+}
+
+function Nudge({ sign, label, onPress }: { sign: '−' | '+'; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => { tapFeedback(); onPress(); }}
+      className="min-h-min min-w-min items-center justify-center rounded-pill bg-inverse active:opacity-70"
+    >
+      <Text variant="title" tone="inverse">{sign}</Text>
+    </Pressable>
   );
 }
 
