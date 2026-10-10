@@ -97,7 +97,7 @@ const EXPECTATIONS = [
     'A recovery night', 'A balanced night', 'Push through',
     'Early night, a walk, one message sent', '58%', '+10%',  // what each one is, and what it leaves - the same sum as the battery
     'Fine-tune it',                                 // the sliders, folded to one row
-    'Sleep 6 hrs \u00b7 bed by 2:30am',             // sleep says when, not only how long - even folded
+    'Sleep 6 hrs \u00b7 bed by 12:30am',             // sleep says when, not only how long - even folded
     '1 of your own',                                // and an evening of her own, in the model
     'Pick a night first',
   ]],
@@ -428,7 +428,7 @@ const EXPECTATIONS = [
     'WHY IT\u2019S FIRST', 'Due today', 'Hard deadline', 'A 4h block',
     'Booked today at 1pm\u20135pm', 'Open that day',     // when it can actually happen
     'Your next 7 days', '\u2713 It fits', 'still needs a slot',   // the week, and whether it fits
-    'Then', '6 of 24 \u00b7 next 7 days', 'Show the other 18',
+    'Then', '6 of 32 \u00b7 next 7 days', 'Show the other 26',
     'Algorithms problem set', '3h to go', '75%', 'left',   // how much of owing work is left
     'Tomorrow \u00b7 10am\u20133pm',                        // when a fixed thing happens
     'Plan sittings', 'Change time', 'Open day',            // one button to act on each

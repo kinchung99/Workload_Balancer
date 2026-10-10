@@ -34,15 +34,21 @@ for (const [from, to] of [
   ['src/lib/types.ts', 'types.ts'],
   ['src/lib/dates.ts', 'dates.ts'],
   ['src/lib/load.ts', 'load.ts'],
+  ['src/lib/schedule.ts', 'schedule.ts'],
+  ['src/lib/prep.ts', 'prep.ts'],
+  ['src/data/dayFiller.ts', 'dayFiller.ts'],
   ['src/data/seed.ts', 'seed.ts'],
 ]) {
   const src = readFileSync(join(root, from), 'utf8')
     .replace(/'@design\/tokens'/g, "'./tokens.ts'")
     .replace(/'@\/lib\/(\w+)'/g, "'./$1.ts'")
+    .replace(/'@\/data\/(\w+)'/g, "'./$1.ts'")
     .replace(/'\.\/(\w+)'/g, "'./$1.ts'");
   writeFileSync(join(tmp, to), src);
 }
 
+// The deck's week: the plain sample, without the everyday fillers the live demo adds.
+globalThis.__BALLAST_PLAIN_SAMPLE__ = true;
 const { seedItems, CEILINGS, TODAY } = await import(join(tmp, 'seed.ts'));
 const { percentByBucket, overallOf, loadByBucket, BUCKETS, sumLoad, loadOf, capacityOf } = await import(join(tmp, 'load.ts'));
 const { isSameWeek, addDays } = await import(join(tmp, 'dates.ts'));

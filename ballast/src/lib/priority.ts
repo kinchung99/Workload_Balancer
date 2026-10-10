@@ -14,7 +14,7 @@
  * where it is.
  */
 import { BUCKET_LABEL, isMovable, loadOf } from './load';
-import { MAX_SESSION, MIN_SESSION, STUDY_WINDOW, daysLeft, isAtRisk, needsPrep, remaining, sittingStarts, unplanned, workDays } from './prep';
+import { MAX_SESSION, MIN_SESSION, STUDY_WINDOW, daysLeft, isAtRisk, needsPrep, remaining, sittingStarts, sittingsOf, unplanned, workDays } from './prep';
 import { addDays, daysBetween } from './dates';
 import { freeSlots, slotHours } from './schedule';
 import { isProtectedClass } from './timetable';
@@ -269,7 +269,14 @@ export function nextFit(
   let dates: string[];
   if (row.kind === 'owing') {
     const left = unplanned(item, items);
-    if (left <= 0) return null;
+    if (left <= 0) {
+      // All of it is booked: the answer is the next sitting already in the week.
+      const next = sittingsOf(item, items)
+        .filter((s) => !s.sessionDone && s.startHour !== undefined
+          && (s.date > today || (s.date === today && s.startHour + s.hours > (nowHour ?? 0))))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.startHour! - b.startHour!)[0];
+      return next ? { date: next.date, start: next.startHour!, hours: next.hours, booked: true } : null;
+    }
     piece = Math.min(MAX_SESSION, Math.max(MIN_SESSION, Math.ceil(left * 2) / 2));
     dates = workDays(item, today);
   } else {

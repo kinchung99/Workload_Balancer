@@ -132,7 +132,8 @@ export function buildTrades(week: Item[]): Trade[] {
   // d. Recovery is protected by default. The swim is the first thing a stressed
   //    student cuts and the last thing they should. Overriding takes a
   //    deliberate tap, and the app says what it will cost.
-  for (const item of week.filter((i) => i.isRecovery)) {
+  // One is enough to make the point: the biggest piece of rest, not every walk and stretch.
+  for (const item of week.filter((i) => i.isRecovery).sort((a, b) => Math.abs(loadOf(b)) - Math.abs(loadOf(a))).slice(0, 1)) {
     trades.push({
       id: `protect-${item.id}`,
       itemId: item.id,

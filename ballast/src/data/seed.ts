@@ -15,6 +15,7 @@ import type {
 import type { PhoneContact } from '@/lib/sharing';
 import type { PendingRequestDTO } from '@shared/contract';
 import { addDays } from '@/lib/dates';
+import { STUDENT_DAY, fillDays, loadNeutral } from '@/data/dayFiller';
 
 export const TODAY = '2025-11-10';
 export const WEEK_NUMBER = 10;
@@ -123,7 +124,7 @@ function klass(
   };
 }
 
-export const seedItems: Item[] = [
+const baseItems: Item[] = [
   // ---------------------------------------------------------------- yesterday
   // Sunday, which nobody marked. The app marks it the morning after - assumed
   // done, and kept on Home where any of it can be changed.
@@ -205,6 +206,25 @@ export const seedItems: Item[] = [
   { id: 'w11-walk',     title: 'Walk to the shops and back', bucket: 'physical', hours: 1, dread: 1, commitment: 'self', date: d(W11, 5), startHour: 8 },
   { id: 'w11-football', title: 'Football, Saturday',       bucket: 'physical', hours: 2,    dread: 2, commitment: 'soft', date: d(W11, 5), startHour: 14 },
 ];
+
+/**
+ * The ordinary things around the timetable and the deadlines - lunch with
+ * coursemates, the gym, cooking, a society meeting, a call home - two or three
+ * a day across both weeks, each in a real gap. Without them the sample week
+ * read like a list of obligations rather than somebody's life.
+ */
+const DEMO_DAYS = Array.from({ length: 14 }, (_, i) => addDays(W10, i));
+// No extra study: the demo's coursework (and what Rebalance offers to push) stays its own.
+const DEMO_POOL = STUDENT_DAY.filter((f) => f.bucket !== 'mental' || f.isRecovery);
+// Balanced so the battery the deck quotes does not move: fuller days, same week.
+// The behaviour and model checks ask for the plain week they were written
+// against (the deck's week) by setting __BALLAST_PLAIN_SAMPLE__ before import.
+const PLAIN = (globalThis as { __BALLAST_PLAIN_SAMPLE__?: boolean }).__BALLAST_PLAIN_SAMPLE__ === true;
+export const seedItems: Item[] = PLAIN
+  ? baseItems
+  : [...baseItems, ...loadNeutral(fillDays(baseItems, DEMO_DAYS, 'demo', DEMO_POOL, [3, 4])
+    // The demo opens at 2:30pm on Monday: the morning's lecture is the first thing to mark.
+    .filter((f) => !(f.date === TODAY && (f.startHour ?? 0) < 14.5)))];
 
 /**
  * Seeded, and we say so in the pitch. Sleep and step signals need a health

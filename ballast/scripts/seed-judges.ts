@@ -24,6 +24,7 @@ import { countedOnce } from '@/lib/prep';
 import { chargeOf } from '@/lib/battery';
 import { published, DEFAULT_SHARE_RULES } from '@/lib/sharing';
 import type { Item, Module, MoodCheckIn, RecoveryEntry, SessionKind } from '@/lib/types';
+import { bookSittings, fillDays } from '@/data/dayFiller';
 
 const API = process.env.API ?? 'https://ballast-ckc3.vercel.app';
 const ORIGIN = 'https://load-balancer-ballast.expo.app';
@@ -63,7 +64,7 @@ const M = (id: string, code: string, name: string, dread: 1 | 2 | 3 | 4 | 5, imp
 const PEOPLE: Persona[] = [
   {
     key: 'aisyah', name: 'Aisyah Rahman', email: 'aisyah.ballast@example.com',
-    status: '😵‍💫 Two deadlines next week', heavyForDays: 2, capacity: 0.6,
+    status: '😵‍💫 Two deadlines next week', heavyForDays: 2, capacity: 0.72,
     modules: [
       M('fit2004', 'FIT2004', 'Algorithms and Data Structures', 4, 3, 16, 18, 80, '🧮'),
       M('fit2100', 'FIT2100', 'Operating Systems', 3, 3, 14, 18, null, '💻'),
@@ -162,7 +163,7 @@ const PEOPLE: Persona[] = [
   },
   {
     key: 'priya', name: 'Priya Nair', email: 'priya.ballast@example.com',
-    status: '🧪 Lab report weekend', heavyForDays: 6, capacity: 0.5,
+    status: '🧪 Lab report weekend', heavyForDays: 6, capacity: 0.66,
     modules: [
       M('bms2021', 'BMS2021', 'Human Neurobiology', 4, 3, 16, 18, 80, '🧠'),
       M('bms2042', 'BMS2042', 'Molecular Cell Biology', 3, 3, 17, 18, 80, '🧬'),
@@ -208,7 +209,7 @@ const PEOPLE: Persona[] = [
   },
   {
     key: 'hafiz', name: 'Hafiz Ismail', email: 'hafiz.ballast@example.com',
-    status: '🏗️ Design project crunch', heavyForDays: 1, capacity: 0.52,
+    status: '🏗️ Design project crunch', heavyForDays: 1, capacity: 0.62,
     modules: [
       M('eng2005', 'ENG2005', 'Advanced Engineering Mathematics', 4, 3, 15, 18, null, '📐'),
       M('civ3221', 'CIV3221', 'Building Structures and Technology', 3, 3, 16, 18, 80, '🏗️'),
@@ -312,6 +313,11 @@ function weekOf(p: Persona): { items: Item[]; modules: Module[]; moods: MoodChec
     const date = at(week, day);
     items.push({ ...rest, id: `${p.key}-once-${i}`, date, ...(due ? { deadline: date } : {}) } as Item);
   });
+  // Every day lived in: a few of the ordinary things around the classes, and
+  // study sessions booked for each piece of work - how a planned week looks.
+  const days = Array.from({ length: 28 }, (_, i) => addDays(W0, i));
+  items.push(...fillDays(items, days, p.key));
+  items.push(...bookSittings(items, TODAY, now.getHours() + now.getMinutes() / 60, p.key));
   const moods: MoodCheckIn[] = p.moods.map((m, i) => ({
     id: `${p.key}-mood-${i}`, date: addDays(TODAY, -m.daysAgo), at: `${m.daysAgo === 1 ? 'Yesterday' : `${m.daysAgo} days ago`} 9:00 PM`,
     quadrant: m.quadrant, tags: m.tags,

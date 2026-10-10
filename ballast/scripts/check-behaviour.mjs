@@ -57,6 +57,7 @@ for (const [from, to] of [
   ['src/lib/breakdown.ts', 'breakdown.ts'],
   ['src/lib/gcal.ts', 'gcal.ts'],
   ['src/data/sampleCalendar.ts', 'sampleCalendar.ts'],
+  ['src/data/dayFiller.ts', 'dayFiller.ts'],
   ['src/data/seed.ts', 'seed.ts'],
   ['src/state/store.ts', 'store.ts'],
 ]) {
@@ -100,6 +101,8 @@ writeFileSync(
 // __DEV__ is injected by Metro, not Node. False here: these checks are about the
 // model, and the dev-host fallback is a convenience for a laptop.
 globalThis.__DEV__ = false;
+// The plain sample week these checks were written against, without the everyday fillers.
+globalThis.__BALLAST_PLAIN_SAMPLE__ = true;
 
 /*
  * This suite owns EXPO_PUBLIC_API_URL rather than inheriting it.
@@ -1156,6 +1159,10 @@ console.log('\nWhat to do first, answered in full');
   check('and a sitting is at most two hours', fit.hours, 2);
   check('it needs what is neither done nor booked', hoursNeeded(algo, s().items), 3);
   check('something at a time needs no more', hoursNeeded(top, s().items), 0);
+  // Book every loose hour, and the answer becomes the next booked sitting - not "no gap".
+  s().scheduleSessions('algo-set', planSessions(algo.item, s().items, s().today, 9));
+  const bookedFit = nextFit(algo, s().items, s().today, 9);
+  check('fully booked work points at its next sitting', [!!bookedFit, bookedFit?.booked], [true, true]);
   // Late on its day, a loose thing still only fits in hours that are left.
   const loose = first.find((r) => r.kind === 'loose');
   check('a loose thing fits on its own day', nextFit(loose, s().items, s().today).date, loose.item.date);
