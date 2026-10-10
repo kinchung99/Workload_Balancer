@@ -554,6 +554,33 @@ section('Leaving');
     ((await (await call('/api/circle', {}, amira.cookie)).json()) as { circle: unknown[] }).circle.length, 0);
 }
 
+section('Signed in without cookies (iPhone Safari, the phone app)');
+{
+  const email = `bearer-${Date.now()}@example.edu`;
+  const made = await post('/api/auth/sign-up/email', { name: 'Bea Bearer', email, password: 'first-password-1' });
+  const token = made.headers.get('set-auth-token') ?? '';
+  check('signing up hands back a session token', token.length > 10, true);
+  const bearerCall = (path: string, init: RequestInit = {}, t = token) =>
+    app.request(`http://localhost${path}`, { ...init, headers: { 'content-type': 'application/json', authorization: `Bearer ${t}`, ...(init.headers ?? {}) } });
+  const me = await bearerCall('/api/me');
+  check('the token alone is enough to be signed in', me.status, 200);
+  check('as the right person', ((await me.json()) as { email: string }).email, email);
+  check('a made-up token is not', (await bearerCall('/api/me', {}, 'not-a-real-token')).status, 401);
+  const exposed = await app.request('http://localhost/health', { headers: { origin: 'https://load-balancer-ballast.expo.app' } });
+  check('browsers are allowed to read the token header', (exposed.headers.get('access-control-expose-headers') ?? '').toLowerCase().includes('set-auth-token'), true);
+
+  const wrong = await bearerCall('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'not-it-at-all', newPassword: 'second-password-2' }) });
+  check('changing the password needs the current one', wrong.status >= 400, true);
+  const changed = await bearerCall('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'first-password-1', newPassword: 'second-password-2', revokeOtherSessions: true }) });
+  check('with it, the password changes', changed.status, 200);
+  const fresh = changed.headers.get('set-auth-token');
+  check('and this device gets a fresh token', !!fresh && fresh !== token, true);
+  check('which still works', (await bearerCall('/api/me', {}, fresh ?? '')).status, 200);
+  check('while the old session is signed out', (await bearerCall('/api/me')).status, 401);
+  check('the old password no longer signs in', (await post('/api/auth/sign-in/email', { email, password: 'first-password-1' })).status >= 400, true);
+  check('the new one does', (await post('/api/auth/sign-in/email', { email, password: 'second-password-2' })).status, 200);
+}
+
 section('Google Calendar, read-only');
 {
   const off = (await (await call('/api/calendar', {}, amira.cookie)).json()) as CalendarStatusDTO;
@@ -609,6 +636,7 @@ section('Google Calendar, read-only');
   const stateOf = (url: string) => encodeURIComponent(new URL(url).searchParams.get('state') ?? '');
 
   check('connecting needs you signed in', (await gpost('/api/calendar/connect', { returnTo: home })).status, 401);
+  check('the installed app can be sent back to (ballast://)', (await gpost('/api/calendar/connect', { returnTo: 'ballast://calendar' }, amira.cookie)).status, 200);
   check('it will not send you on to somebody else\'s site', (await gpost('/api/calendar/connect', { returnTo: 'https://evil.example/calendar' }, amira.cookie)).status, 400);
   const link = (await (await gpost('/api/calendar/connect', { returnTo: home }, amira.cookie)).json()) as { url: string };
   check('Google is told to come back to the API', new URL(link.url).searchParams.get('redirect'), 'http://localhost/api/calendar/callback');

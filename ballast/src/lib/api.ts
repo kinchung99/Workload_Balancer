@@ -67,6 +67,50 @@ export type Result<T> =
 
 const failure = (error: string, status = 0): Result<never> => ({ ok: false, error, status });
 
+/*
+ * The session, as a token.
+ *
+ * The cookie alone is not enough: the app and the API are on different sites,
+ * and Safari on an iPhone drops cross-site cookies, so a sign-in there would
+ * be forgotten by the next request. The API answers every sign-in with a
+ * `set-auth-token` header; it is kept here and sent back as a bearer token.
+ *
+ * Where it is kept is pluggable so this file stays free of native modules:
+ * localStorage on the web by default, the phone's own store when the app
+ * registers one (see app/_layout).
+ */
+export interface TokenStore {
+  load: () => Promise<string | null>;
+  save: (token: string | null) => Promise<void>;
+}
+const TOKEN_KEY = 'ballast/session-token';
+const webStore: TokenStore = {
+  load: async () => {
+    try { return globalThis.localStorage?.getItem(TOKEN_KEY) ?? null; } catch { return null; }
+  },
+  save: async (token) => {
+    try {
+      if (token) globalThis.localStorage?.setItem(TOKEN_KEY, token);
+      else globalThis.localStorage?.removeItem(TOKEN_KEY);
+    } catch { /* private mode: the cookie still works where it can */ }
+  },
+};
+let tokenStore: TokenStore = webStore;
+let tokenNow: Promise<string | null> | null = null;
+const currentToken = () => (tokenNow ??= tokenStore.load().catch(() => null));
+
+/** Where to keep the session token on this device. */
+export function keepTokenIn(store: TokenStore): void {
+  tokenStore = store;
+  tokenNow = null;
+}
+
+/** Remember (or, with null, forget) the session token. */
+export async function setSessionToken(token: string | null): Promise<void> {
+  tokenNow = Promise.resolve(token);
+  await tokenStore.save(token);
+}
+
 /**
  * One fetch, with the two things every call needs: the session cookie and a
  * timeout.
@@ -82,13 +126,23 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 12_0
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
   try {
+    const token = await currentToken();
     const res = await fetch(`${base}${path}`, {
       ...init,
       signal: abort.signal,
-      // Sessions are cookies, so every request has to carry them.
+      // The cookie where the browser allows it, and the token everywhere.
       credentials: 'include',
-      headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
     });
+    // A sign-in, a sign-up or a password change hands over a new token.
+    const fresh = res.headers.get('set-auth-token');
+    if (fresh) await setSessionToken(fresh);
+    // Sent one and was told it is no good: it never will be again.
+    else if (token && res.status === 401) await setSessionToken(null);
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as { error?: string };
@@ -133,7 +187,15 @@ export const api = {
   keepAccount: (email: string, password: string, name: string) =>
     post<{ status: boolean }>('/api/auth/sign-up/email', { email, password, name }),
 
-  signOut: () => post<{ success: boolean }>('/api/auth/sign-out', {}),
+  signOut: async () => {
+    const res = await post<{ success: boolean }>('/api/auth/sign-out', {});
+    await setSessionToken(null);
+    return res;
+  },
+
+  /** Needs the current password. Signs out every other device, and keeps this one signed in. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    post<{ token: string | null }>('/api/auth/change-password', { currentPassword, newPassword, revokeOtherSessions: true }),
 
   me: () => request<MeDTO>('/api/me'),
 

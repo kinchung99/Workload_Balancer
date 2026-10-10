@@ -292,6 +292,9 @@ const EXPECTATIONS = [
   ['calendar/setup.html', 'Calendar setup', [
     'Already set up', 'Back to your calendar',   // with nothing picked, it says so instead of a blank form
   ]],
+  ['password.html', 'Password', [
+    'No password yet', 'Back to settings',   // signed out, it says what is missing rather than a form
+  ]],
   ['everyone.html', 'All friends', [
     'All friends', '36 CHECKED IN TODAY',
     'Search 60 friends', 'FREQUENT', 'Amin', 'Hana Yusof',   // the few first

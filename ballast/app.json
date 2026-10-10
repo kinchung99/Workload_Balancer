@@ -6,14 +6,15 @@
     "orientation": "portrait",
     "scheme": "ballast",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.ballast.app"
+      "bundleIdentifier": "com.kcchung.ballast",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.ballast.app",
-      "edgeToEdgeEnabled": true
+      "package": "com.kcchung.ballast"
     },
     "web": {
       "bundler": "metro",

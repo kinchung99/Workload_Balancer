@@ -8,7 +8,9 @@ import { useGate, useSession, useWaitingForSession } from '@/hooks/useGate';
 import { useDemoFriends } from '@/hooks/useDemoFriends';
 import { usePopups } from '@/hooks/usePopups';
 import { useCalendarSync } from '@/hooks/useCalendarSync';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { keepTokenIn } from '@/lib/api';
 import { Mascot } from '@/components';
 
 /**
@@ -21,6 +23,18 @@ import { Mascot } from '@/components';
  * and `useGate` sends anyone signed out to the sign-in screen. `useSync` is the
  * app's only background loop, and it does nothing until somebody signs in.
  */
+/*
+ * On a phone the session token lives in the phone's own store. The web keeps
+ * its default (localStorage), which is what makes iPhone Safari stay signed in.
+ */
+if (Platform.OS !== 'web') {
+  const KEY = 'ballast/session-token';
+  keepTokenIn({
+    load: () => AsyncStorage.getItem(KEY),
+    save: async (token) => { if (token) await AsyncStorage.setItem(KEY, token); else await AsyncStorage.removeItem(KEY); },
+  });
+}
+
 export default function RootLayout() {
   useSession();
   useGate();

@@ -50,6 +50,8 @@ export function createApp(
     origin: (origin) => origin ?? '*',
     credentials: true,
     allowHeaders: ['Content-Type', 'Authorization'],
+    // The session token comes back in this header; a browser only lets the app read it if it is listed.
+    exposeHeaders: ['set-auth-token'],
     allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   }));
 

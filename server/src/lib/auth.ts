@@ -13,6 +13,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { anonymous } from 'better-auth/plugins/anonymous';
+import { bearer } from 'better-auth/plugins/bearer';
 import type { Database } from '../db/client.js';
 import * as schema from '../db/schema.js';
 
@@ -47,6 +48,8 @@ const isProduction = (process.env.BASE_URL ?? '').startsWith('https://');
 const configured = (process.env.TRUSTED_ORIGINS ?? [
   'https://load-balancer-ballast.expo.app',
   'https://load-balancer-ballast--*.expo.app',
+  // The installed app: its own scheme (app.json), for sign-in and for coming back from Google.
+  'ballast://*',
 ].join(','))
   .split(',')
   .map((o) => o.trim())
@@ -114,6 +117,17 @@ export function makeAuth(db: Database) {
      * email yet, and can gain one later without losing anything.
      */
     plugins: [
+      /*
+       * The session as a token, beside the cookie.
+       *
+       * The app and this API are on different sites, and Safari on an iPhone
+       * refuses cross-site cookies by default - so sign-in "worked" and the
+       * next request arrived with no session. Every sign-in now also answers
+       * with a `set-auth-token` header; the app keeps it and sends it back as
+       * `Authorization: Bearer`. Cookies still work wherever they are allowed.
+       * A phone app, which has no browser cookie jar at all, needs this too.
+       */
+      bearer(),
       anonymous({
         emailDomainName: 'guest.ballast.app',
         /*

@@ -58,6 +58,8 @@ export default function Settings() {
         { sticker: 'wave', label: 'Edit profile', value: account?.name ?? 'Name, status, initials', to: '/profile' },
         { sticker: 'people', label: 'Your circle', value: friends ? `${friends} ${friends === 1 ? 'friend' : 'friends'}` : 'Nobody yet', to: '/friends' },
         { sticker: 'chat', label: 'Find friends', value: 'Add by email', to: '/find-friends' },
+        // Guests have no password yet; theirs is made when they keep the account.
+        ...(account && !account.isGuest ? [{ sticker: 'star' as StickerName, label: 'Password', value: 'Change it', to: '/password' as Href }] : []),
       ],
     },
     {
