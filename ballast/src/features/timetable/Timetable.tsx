@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -49,6 +49,7 @@ export function Timetable({ initialStep = 0 }: { initialStep?: number }) {
 
   const days = weekDays(today);
   const [selected, setSelected] = useState(today);
+  useEffect(() => { setSelected(today); }, [today]);
   const [openModule, setOpenModule] = useState<string | null>(null);
   const [step, setStep] = useState(initialStep);
   /** The class a new flag is being made on, if any. */

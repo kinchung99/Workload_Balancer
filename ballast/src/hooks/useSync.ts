@@ -118,11 +118,27 @@ export function useSync(): void {
     };
 
     /** Anything changed? Queue it and settle before pushing. */
-    const onStoreChange = () => {
-      const state = useStore.getState();
+    const onStoreChange = (state: ReturnType<typeof useStore.getState>, prev: ReturnType<typeof useStore.getState>) => {
       if (state.mode !== 'live') return;
 
       const next = snapshotOf(state);
+      /*
+       * Arriving in an account is not an edit.
+       *
+       * Signing in clears the sample week and sets every preference back to
+       * its default. Diffing that against the photograph taken before used to
+       * queue the defaults as "changes" - pushed before the first pull, so a
+       * new phone overwrote the account's own limits and note with factory
+       * settings. The server is the truth until its first pull lands: start a
+       * clean photograph and a clean cursor, and pull straight away.
+       */
+      if (prev.mode !== 'live' || prev.account?.id !== state.account?.id) {
+        lastSnapshot.current = next;
+        queue.current = {};
+        cursor.current = null;
+        schedule(0);
+        return;
+      }
       if (lastSnapshot.current) {
         for (const doc of diff(lastSnapshot.current, next)) {
           // Keyed, so eleven edits to one task collapse to one row.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -79,6 +79,9 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
   const evenings = [today, addDays(today, 1), addDays(today, 2)];
   // One evening at a time - starting on the first one that is actually free.
   const [day, setDay] = useState(() => evenings.find((date) => eveningFree(date) >= 2) ?? today);
+  // The date can arrive after the first render (signing in): start again from the real tonight.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setDay(evenings.find((date) => eveningFree(date) >= 2) ?? today); }, [today]);
   const dayName = day === today ? 'Tonight' : day === addDays(today, 1) ? 'Tomorrow night' : formatShort(day);
   const [committed, setCommitted] = useState<{ blocks: number; points: number } | null>(null);
   const value = (id: string) => sim[id] ?? 0;

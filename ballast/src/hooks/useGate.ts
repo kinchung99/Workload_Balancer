@@ -59,6 +59,9 @@ export function useWaitingForSession(): boolean {
   return hydrated && !account && !!remembered && !checked;
 }
 
+/** Once per page load: the demo link starts every visit from the sample week. */
+let demoFresh = false;
+
 export function useGate(): void {
   const router = useRouter();
   const segments = useSegments();
@@ -77,8 +80,11 @@ export function useGate(): void {
     if (now.lastAccountId && !now.account && !now.sessionChecked) return;
     const allowed = !!now.account || (now.guest && guestAllowed());
     const top: string = segments[0] ?? '';
-    if (!allowed && demoBuild()) {
-      // A demo link: straight into the sample week, set up already.
+    if (demoBuild() && !demoFresh) {
+      // A demo link: straight into the sample week, set up already - and the
+      // same sample week on every visit. Whatever the last person tapped is
+      // gone on a reload, so every judge starts from the same Monday.
+      demoFresh = true;
       now.startGuest();
       useStore.getState().finishOnboarding();
       if (top === 'welcome' || top === 'setup') router.replace('/');

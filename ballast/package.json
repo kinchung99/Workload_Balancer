@@ -18,7 +18,8 @@
     "shots": "node scripts/screenshots.mjs",
     "clips": "node scripts/clips.mjs",
     "titles": "node scripts/titles.mjs",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "judges:seed": "npx tsx --tsconfig tsconfig.json scripts/seed-judges.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",

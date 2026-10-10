@@ -50,7 +50,7 @@ export default function Rebalance() {
    * Held still while you decide: each one taken changes the week underneath,
    * but the list you are working through should not reshuffle under your thumb.
    */
-  const [start] = useState(() => {
+  const live = useMemo(() => {
     const week = itemsInWeek(countedOnce(items), anchor);
     return {
       week,
@@ -59,7 +59,12 @@ export default function Rebalance() {
       overall: weekReading(items, anchor, ceilings).overall,
       wall: findCollision(items, today),
     };
-  });
+  }, [items, anchor, ceilings, today]);
+  // Follows the week until the first answer (a signed-in week can arrive a beat
+  // after the page), then holds still while you work through the list.
+  const [frozen, setFrozen] = useState<typeof live | null>(null);
+  const start = frozen ?? live;
+  const hold = () => { if (!frozen) setFrozen(live); };
   const open = start.trades.filter((t) => !t.locked);
   const locked = start.trades.filter((t) => t.locked);
   const itemOf = (trade: Trade): Item | undefined => start.byId[trade.itemId.split(',')[0]];
@@ -107,17 +112,20 @@ export default function Rebalance() {
     .filter((day) => day.percent >= 1);
 
   const putDown = (trade: Trade) => {
+    hold();
     applyTrades([{ ...trade, selected: true }]);
     setDecided((d) => ({ ...d, [trade.id]: 'down' }));
     setConfirming(false);
     successFeedback();
   };
   const keep = (trade: Trade) => {
+    hold();
     tapFeedback();
     setDecided((d) => ({ ...d, [trade.id]: 'kept' }));
     setConfirming(false);
   };
   const write = (trade: Trade) => {
+    hold();
     tapFeedback();
     setWrote((w) => ({ ...w, [trade.id]: true }));
     router.push(`/decline/${trade.itemId.split(',')[0]}` as Href);

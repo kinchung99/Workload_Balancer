@@ -1756,6 +1756,10 @@ console.log('\nA circle of sixty, not four');
   check('the few you talk to most come first',
     frequentFriends(circle, 4).map((p) => p.id), ['amin', 'ravi', 'friend-hana-yusof', 'jo']);
   check('you are never one of your own frequent friends', frequentFriends(circle, 60).some((p) => p.isYou), false);
+  const fresh = [
+    { id: 'a', name: 'Amy', updatedMinsAgo: 300 }, { id: 'b', name: 'Ben', updatedMinsAgo: 5 }, { id: 'c', name: 'Cal' }, { id: 'me', name: 'Me', isYou: true },
+  ];
+  check('a new account with no history still has frequent friends, most recent first', frequentFriends(fresh, 3).map((p) => p.id), ['b', 'a', 'c']);
   const letters = byLetter(circle);
   check('everyone else sits A to Z under a letter', letters[0].letter, 'A');
   check('with every friend under exactly one letter', letters.reduce((n, l) => n + l.people.length, 0), 60);

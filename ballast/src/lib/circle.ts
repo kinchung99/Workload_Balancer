@@ -82,9 +82,15 @@ export const BAND_WORD: Record<BandName, string> = {
 
 /** The people you message and plan with most, most first. */
 export function frequentFriends(people: CircleMember[], count = 6): CircleMember[] {
-  return people
+  const ranked = people
     .filter((p) => !p.isYou && (p.frequency ?? 0) > 0)
-    .sort((a, b) => (b.frequency ?? 0) - (a.frequency ?? 0) || a.name.localeCompare(b.name))
+    .sort((a, b) => (b.frequency ?? 0) - (a.frequency ?? 0) || a.name.localeCompare(b.name));
+  if (ranked.length) return ranked.slice(0, count);
+  // No history of who you talk to yet (a new account, a new phone): whoever
+  // checked in most recently is the best guess at who is around.
+  return people
+    .filter((p) => !p.isYou)
+    .sort((a, b) => (a.updatedMinsAgo ?? Infinity) - (b.updatedMinsAgo ?? Infinity) || a.name.localeCompare(b.name))
     .slice(0, count);
 }
 

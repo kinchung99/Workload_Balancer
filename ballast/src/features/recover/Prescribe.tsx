@@ -74,6 +74,7 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   const [index, setIndex] = useState(0);
   const [hours, setHours] = useState(1);
   const [day, setDay] = useState(today);
+  useEffect(() => { setDay(today); }, [today]);
   const [start, setStart] = useState<number | null>(null);
   const dayOptions = Array.from({ length: 5 }, (_, offset) => addDays(today, offset));
   const [justBooked, setJustBooked] = useState<RestEntry | null>(null);

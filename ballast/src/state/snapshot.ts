@@ -44,6 +44,9 @@ export interface Syncable {
   groups: unknown[];
   shareRules: unknown;
   planActivities: unknown[];
+  /** Your note and emoji for friends - yours on every device, not only this one. */
+  status?: string | null;
+  vibe?: string | null;
 }
 
 const byId = (rows: Array<{ id: string }>): Record<string, unknown> =>
@@ -78,6 +81,8 @@ export function snapshotOf(state: Syncable): Snapshot {
         customActions: state.customActions,
         onboarded: state.onboarded,
         customFlags: state.customFlags,
+        status: state.status ?? null,
+        vibe: state.vibe ?? null,
         groups: state.groups,
         shareRules: state.shareRules,
         planActivities: state.planActivities,

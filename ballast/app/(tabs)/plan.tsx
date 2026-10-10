@@ -44,6 +44,8 @@ export default function Plan() {
   const [selected, setSelected] = useState(params.day ?? today);
   // The tab stays mounted, so a later link to another day has to move it too.
   useEffect(() => { if (params.day) setSelected(params.day); }, [params.day]);
+  // Signing in moves "today" from the sample week to the real date; the panel follows.
+  useEffect(() => { if (!params.day) setSelected(today); }, [today, params.day]);
 
   const days = buildForecast(items, today, ceilings);
   const collision = findCollision(items, today);

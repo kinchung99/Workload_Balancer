@@ -769,6 +769,8 @@ export const useStore = create<State>()(
         if (Array.isArray(settings.customFlags)) patch.customFlags = settings.customFlags as CustomFlag[];
         if (Array.isArray(settings.groups)) patch.groups = settings.groups as Group[];
         if (Array.isArray(settings.planActivities)) patch.planActivities = settings.planActivities as PlanActivity[];
+        if (settings.status === null || typeof settings.status === 'string') patch.status = settings.status as string | null;
+        if (settings.vibe === null || typeof settings.vibe === 'string') patch.vibe = settings.vibe as string | null;
         if (settings.shareRules && typeof settings.shareRules === 'object') {
           patch.shareRules = { ...DEFAULT_SHARE_RULES, ...(settings.shareRules as Partial<ShareRules>) };
         }
