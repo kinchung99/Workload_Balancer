@@ -334,22 +334,37 @@ function Field({
   keyboardType?: 'email-address';
   secure?: boolean;
 }) {
+  const [hidden, setHidden] = useState(true);
   return (
     <Stack gap={2}>
       <Text variant="micro" tone="subtle">{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={color.ink.subtle}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete={autoComplete}
-        keyboardType={keyboardType}
-        secureTextEntry={secure}
-        accessibilityLabel={label}
-        className="min-h-row rounded-md border-2 border-line-hairline bg-decor-cream px-4 py-3 text-body text-ink-default"
-      />
+      <View className="justify-center">
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor={color.ink.subtle}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete={autoComplete}
+          keyboardType={keyboardType}
+          secureTextEntry={secure && hidden}
+          accessibilityLabel={label}
+          className={`min-h-row rounded-md border-2 border-line-hairline bg-decor-cream py-3 pl-4 text-body text-ink-default ${secure ? '' : 'pr-4'}`}
+          style={secure ? { paddingRight: 92 } : undefined}
+        />
+        {secure ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? 'Show password' : 'Hide password'}
+            onPress={() => { tapFeedback(); setHidden(!hidden); }}
+            hitSlop={8}
+            className="absolute right-3 min-h-min items-center justify-center rounded-pill px-3 active:opacity-60"
+          >
+            <Text variant="caption" weight="bold" tone="muted">{hidden ? '👁 Show' : '🙈 Hide'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </Stack>
   );
 }

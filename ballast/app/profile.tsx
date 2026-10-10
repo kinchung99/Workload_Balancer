@@ -33,7 +33,13 @@ const STATUS_MAX = 60;
  */
 export default function Profile() {
   const router = useRouter();
-  const { account, setAccount, status, setStatus, pic, setPic, moods, vibe } = useStore();
+  const { account, setAccount, status, setStatus, pic, setPic: keepPic, moods, vibe, mode } = useStore();
+  // Your picture is kept on your account too, so it follows you to every device
+  // and your friends see it - not only this phone.
+  const setPic = (next: string | null) => {
+    keepPic(next);
+    if (mode === 'live' && account) void api.updateMe({ pic: next });
+  };
   const reading = useReading();
   const band = bandFor(reading.overall);
 

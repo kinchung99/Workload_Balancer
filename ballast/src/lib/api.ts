@@ -199,7 +199,7 @@ export const api = {
 
   me: () => request<MeDTO>('/api/me'),
 
-  updateMe: (patch: { name?: string; initials?: string; phone?: string | null }) =>
+  updateMe: (patch: { name?: string; initials?: string; phone?: string | null; pic?: string | null }) =>
     post<{ ok: true }>('/api/me', patch),
 
   /* ------------------------------------------------------------------ sync */

@@ -121,7 +121,7 @@ export function createApp(
     const [row] = await c.get('db')
       .select({
         id: user.id, email: user.email, name: user.name, isAnonymous: user.isAnonymous,
-        initials: profiles.initials, phone: profiles.phone,
+        initials: profiles.initials, phone: profiles.phone, pic: profiles.pic,
         visibility: profiles.visibility, code: profiles.code,
       })
       .from(user).leftJoin(profiles, eq(profiles.userId, user.id))
@@ -155,6 +155,7 @@ export function createApp(
       visibility: (row.visibility ?? 'evenings') as Visibility,
       code,
       isGuest: row.isAnonymous ?? false,
+      pic: row.pic ?? null,
     };
     return c.json(me);
   });
@@ -163,17 +164,18 @@ export function createApp(
     const id = c.get('userId');
     const parsed = profileSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: 'bad_request' }, 400);
-    const { name, initials, phone } = parsed.data;
+    const { name, initials, phone, pic } = parsed.data;
 
     if (name) await c.get('db').update(user).set({ name }).where(eq(user.id, id));
 
     const patch = {
       ...(initials !== undefined ? { initials } : name ? { initials: initialsFrom(name) } : {}),
       ...(phone !== undefined ? { phone } : {}),
+      ...(pic !== undefined ? { pic } : {}),
     };
     if (Object.keys(patch).length) {
       await c.get('db').insert(profiles)
-        .values({ userId: id, initials: patch.initials ?? '?', phone: patch.phone ?? null, code: makeCode() })
+        .values({ userId: id, initials: patch.initials ?? '?', phone: patch.phone ?? null, pic: patch.pic ?? null, code: makeCode() })
         .onConflictDoUpdate({ target: profiles.userId, set: patch });
     }
 

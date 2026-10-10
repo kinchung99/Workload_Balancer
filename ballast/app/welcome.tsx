@@ -189,21 +189,42 @@ function Field({
   secure?: boolean;
   onSubmit?: () => void;
 }) {
+  // A password can be shown to check it was typed right, then hidden again.
+  const [hidden, setHidden] = useState(true);
   return (
-    <TextInput
-      value={value}
-      onChangeText={onChange}
-      placeholder={label}
-      placeholderTextColor={color.ink.subtle}
-      autoCapitalize={autoComplete === 'name' ? 'words' : 'none'}
-      autoCorrect={false}
-      autoComplete={autoComplete}
-      keyboardType={keyboardType}
-      secureTextEntry={secure}
-      onSubmitEditing={onSubmit}
-      accessibilityLabel={label}
-      className="min-h-row rounded-pill border-2 border-line-hairline bg-sunken px-5 py-3 text-body text-ink-default"
-      style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : undefined}
-    />
+    <View className="justify-center">
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder={label}
+        placeholderTextColor={color.ink.subtle}
+        autoCapitalize={autoComplete === 'name' ? 'words' : 'none'}
+        autoCorrect={false}
+        autoComplete={autoComplete}
+        keyboardType={keyboardType}
+        secureTextEntry={secure && hidden}
+        onSubmitEditing={onSubmit}
+        accessibilityLabel={label}
+        className={`min-h-row rounded-pill border-2 border-line-hairline bg-sunken py-3 pl-5 text-body text-ink-default ${secure ? '' : 'pr-5'}`}
+        // Room on the right for the Show button, so typing never runs under it.
+        style={[Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null, secure ? { paddingRight: 92 } : null]}
+      />
+      {secure ? <Reveal hidden={hidden} onPress={() => { tapFeedback(); setHidden(!hidden); }} /> : null}
+    </View>
+  );
+}
+
+/** The show / hide switch inside a password box. */
+function Reveal({ hidden, onPress }: { hidden: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={hidden ? 'Show password' : 'Hide password'}
+      onPress={onPress}
+      hitSlop={8}
+      className="absolute right-3 min-h-min items-center justify-center rounded-pill px-3 active:opacity-60"
+    >
+      <Text variant="caption" weight="bold" tone="muted">{hidden ? '👁 Show' : '🙈 Hide'}</Text>
+    </Pressable>
   );
 }

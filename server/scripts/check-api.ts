@@ -309,10 +309,11 @@ section('What friends can see');
   check('and how long he has been empty', r.heavyForDays, 11);
   check('the reading is fresh', (r.updatedMinsAgo as number) < 2, true);
 
-  // The privacy promise, as arithmetic: there is no field for a task.
-  check('a friend row carries nothing but a reading and windows',
+  // The privacy promise, as arithmetic: there is no field for a task. The
+  // picture is the one addition, and only ever the one they chose to show.
+  check('a friend row carries nothing but a reading, windows and their picture',
     Object.keys(r).sort(),
-    ['band', 'charge', 'free', 'heavyForDays', 'id', 'initials', 'name', 'status', 'updatedMinsAgo']);
+    ['band', 'charge', 'free', 'heavyForDays', 'id', 'initials', 'name', 'pic', 'status', 'updatedMinsAgo']);
 
   check('a stranger cannot see him at all',
     ((await (await call('/api/circle', {}, jo.cookie)).json()) as { circle: unknown[] }).circle.length, 0);
@@ -537,6 +538,21 @@ section('Gatherings');
   check('the host can', cancelled.status, 200);
   check('and it is gone for everyone',
     ((await (await call('/api/invites', {}, ravi.cookie)).json()) as { invites: unknown[] }).invites.length, 0);
+}
+
+section('Your picture, seen by your friends');
+{
+  const tiny = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
+  const ok = await post('/api/me', { pic: tiny }, amira.cookie);
+  check('a small photo can be your picture', ok.status, 200);
+  check('and it comes back on any device', ((await (await call('/api/me', {}, amira.cookie)).json()) as { pic: string }).pic, tiny);
+  check('an emoji works too', (await post('/api/me', { pic: '🦊' }, amira.cookie)).status, 200);
+  check('a link to somewhere else does not', (await post('/api/me', { pic: 'https://evil.example/x.png' }, amira.cookie)).status, 400);
+  check('nor does anything enormous', (await post('/api/me', { pic: `data:image/jpeg;base64,${'A'.repeat(130_000)}` }, amira.cookie)).status, 400);
+  await post('/api/me', { pic: tiny }, amira.cookie);
+  // Ravi and Amira are friends until "Leaving", further down.
+  const theirs = (await (await call('/api/circle', {}, ravi.cookie)).json()) as { circle: Array<{ id: string; pic: string | null }> };
+  check('her friends see it in their circle', theirs.circle.find((p) => p.id === amira.id)?.pic, tiny);
 }
 
 section('Leaving');

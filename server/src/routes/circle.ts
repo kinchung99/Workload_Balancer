@@ -48,7 +48,7 @@ circle.get('/', async (c) => {
   const people = await db
     .select({
       id: user.id, name: user.name,
-      initials: profiles.initials, visibility: profiles.visibility, hiddenFrom: profiles.hiddenFrom,
+      initials: profiles.initials, visibility: profiles.visibility, hiddenFrom: profiles.hiddenFrom, pic: profiles.pic,
       band: presence.band, charge: presence.charge, status: presence.status,
       heavyForDays: presence.heavyForDays, updatedAt: presence.updatedAt,
     })
@@ -71,6 +71,7 @@ circle.get('/', async (c) => {
     charge: p.charge ?? null,
     status: p.status ?? null,
     heavyForDays: p.heavyForDays ?? 0,
+    pic: p.pic ?? null,
     updatedMinsAgo: p.updatedAt ? Math.round((now - p.updatedAt.getTime()) / 60000) : null,
     /*
      * Windows are already filtered by the publisher's own setting when they were

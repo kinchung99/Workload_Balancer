@@ -107,6 +107,7 @@ export function useSync(): void {
           heavyForDays: p.heavyForDays,
           updatedMinsAgo: p.updatedMinsAgo ?? undefined,
           free: p.free,
+          pic: p.pic ?? undefined,
         })));
       }
       if (pending.ok) useStore.getState().setRequests(pending.data.requests);

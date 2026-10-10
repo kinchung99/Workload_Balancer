@@ -10,7 +10,7 @@
 import { Platform } from 'react-native';
 
 /** The longest side a profile photo is kept at. Twice the largest place it is drawn. */
-const SIDE = 256;
+const SIDE = 192;
 
 export const canPickPhoto = Platform.OS === 'web' && typeof document !== 'undefined';
 
@@ -21,23 +21,33 @@ export function pickPhoto(): Promise<string | null> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    /*
+     * In the page, not floating free. Safari on an iPhone opens the photo
+     * picker for a detached input and then never tells it which photo was
+     * chosen - the picture silently never arrived. Hidden, and gone after.
+     */
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    const done = (result: string | null) => { input.remove(); resolve(result); };
     input.onchange = () => {
       const file = input.files?.[0];
-      if (!file) return resolve(null);
+      if (!file) return done(null);
       const reader = new FileReader();
-      reader.onerror = () => resolve(null);
+      reader.onerror = () => done(null);
       reader.onload = () => {
         const image = new Image();
-        image.onerror = () => resolve(null);
+        image.onerror = () => done(null);
         image.onload = () => {
           const side = Math.min(image.width, image.height);
           const canvas = document.createElement('canvas');
           canvas.width = SIDE;
           canvas.height = SIDE;
           const context = canvas.getContext('2d');
-          if (!context) return resolve(null);
+          if (!context) return done(null);
           context.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, SIDE, SIDE);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
+          done(canvas.toDataURL('image/jpeg', 0.82));
         };
         image.src = String(reader.result);
       };

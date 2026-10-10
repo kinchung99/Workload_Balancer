@@ -487,7 +487,8 @@ export const useStore = create<State>()(
   setSharing: (visibility) => set({ sharing: visibility }),
 
   /** Signing in or out. Deliberately not cleared by `reset`, which is about the week. */
-  setAccount: (account) => set({ account }),
+  // The account's picture, when it has one, is the one to show - set on any device.
+  setAccount: (account) => set((state) => ({ account, pic: account?.pic ?? state.pic })),
 
   /**
    * Become a real account.
@@ -501,6 +502,8 @@ export const useStore = create<State>()(
   goLive: (account, today) =>
     set((state) => ({
       mode: 'live', account, today, guest: false, lastAccountId: account.id,
+      // Your picture comes with your account; a different account starts without this phone's.
+      pic: account.pic ?? (state.lastAccountId === account.id ? state.pic : null),
       // Your note is yours: coming back to the same account keeps it.
       status: state.lastAccountId === account.id ? state.status : null,
       vibe: state.lastAccountId === account.id ? state.vibe : null,

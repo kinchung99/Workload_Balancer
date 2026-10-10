@@ -117,6 +117,8 @@ export interface CircleMemberDTO {
   updatedMinsAgo: number | null;
   /** Their published free windows, already filtered by their own setting. */
   free: Array<{ date: string; start: number; end: number }>;
+  /** Their picture: a small photo or an emoji. Null shows their initials. */
+  pic: string | null;
 }
 
 /* ---------------------------------------------------------------- sharing */
@@ -428,12 +430,20 @@ export interface CoachAdviceResponse { headline: string; picks: CoachPick[]; swa
 
 /* ----------------------------------------------------------------- profile */
 
+/** A profile picture: a small image as a data URI, or a short emoji. Nothing that loads from elsewhere. */
+export const picSchema = z.union([
+  z.string().max(120_000).regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/),
+  z.string().min(1).max(16).regex(/^[^<>"'\s]+$/),
+]);
+
 export const profileSchema = z.object({
   name: z.string().min(1).max(60).optional(),
   /** Two letters on a circle avatar. Derived from the name when not given. */
   initials: z.string().min(1).max(3).optional(),
   /** Only ever used to build a wa.me link on the student's own device. */
   phone: z.string().max(24).nullable().optional(),
+  /** A small photo (JPEG/PNG/WebP data URI, under ~90 KB) or one emoji. Null for initials. */
+  pic: picSchema.nullable().optional(),
 });
 
 export interface MeDTO {
@@ -447,6 +457,8 @@ export interface MeDTO {
   code: string;
   /** True until an email and password are added. Everything else works the same. */
   isGuest: boolean;
+  /** Your picture, as you last set it on any device. */
+  pic: string | null;
 }
 
 /** Initials from a name, the same way on both sides of the wire. */

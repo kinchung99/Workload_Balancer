@@ -59,6 +59,11 @@ export const profiles = pgTable('profiles', {
    */
   code: varchar('code', { length: 8 }).notNull(),
   /**
+   * Your picture: a small square photo (a JPEG data URI, a few kilobytes) or
+   * one emoji. Shown to your friends; null shows your initials.
+   */
+  pic: text('pic'),
+  /**
    * Friends who see none of your times, whatever `visibility` says.
    *
    * A list on the owner's row rather than a per-viewer copy of the windows: one
