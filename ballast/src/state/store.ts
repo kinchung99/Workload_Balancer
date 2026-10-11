@@ -226,9 +226,12 @@ interface State {
   /** Call a plan off: gone for everyone, and out of your week. */
   cancelInvite: (id: string) => void;
   /** Yes or no to a plan you were asked to. Yes puts it in your week. */
+  /** Back to unanswered: an answer that never reached the server. */
+  unanswerReceived: (id: string) => void;
   answerReceived: (id: string, yes: boolean) => void;
   /** Plans as the server holds them, sent and received, in a signed-in week. */
-  setInvitesFromServer: (invites: InviteDTO[], me: string) => void;
+  /** Plans from the server. `answering` holds answers sent but not yet confirmed, so a list fetched before they landed cannot undo them. */
+  setInvitesFromServer: (invites: InviteDTO[], me: string, answering?: Record<string, 'yes' | 'no'>) => void;
   setCalendarLink: (link: CalendarLink | null, available?: boolean) => void;
   /** What Google has coming up. Also adds the next weeks of set-up series and follows moved times. */
   setCalendarEvents: (events: CalendarEvent[]) => void;
@@ -332,6 +335,9 @@ const planAsItem = (plan: { id: string; title: string; date: string; startHour: 
 
 /** "Dinner with Amin and Ravi" → "Dinner", for a line that has to stay short. */
 const shortTitle = (title: string): string => title.split(/ with | · /)[0] ?? title;
+
+/** "Tue 13 Oct · 9:30pm". */
+const planWhenShort = (plan: { date: string; startHour: number }): string => `${formatShort(plan.date)} · ${formatHour(plan.startHour)}`;
 
 let noticeCount = 0;
 /** One thing that happened, stamped now. */
@@ -1272,8 +1278,9 @@ export const useStore = create<State>()(
     set((state) => {
       const invite = state.invites.find((i) => i.id === id);
       if (!invite || state.items.some((item) => item.id === id)) return {};
-      // Only a plan everyone said yes to is a plan; until then it is still a question.
-      if (!invite.people.every((person) => invite.answers?.[person] === 'yes')) return {};
+      // A plan once everyone has answered and somebody is coming; until then it is still a question.
+      const answers = invite.answers ?? {};
+      if (invite.people.some((person) => !answers[person]) || !invite.people.some((person) => answers[person] === 'yes')) return {};
       return {
         invites: state.invites.map((i) => (i.id === id ? { ...i, scheduled: true } : i)),
         items: [...state.items, planAsItem(invite)],
@@ -1284,6 +1291,12 @@ export const useStore = create<State>()(
     set((state) => ({
       invites: state.invites.filter((i) => i.id !== id),
       items: state.items.filter((item) => item.id !== id),
+    })),
+
+  unanswerReceived: (id) =>
+    set((state) => ({
+      received: state.received.map((r) => (r.id === id ? { ...r, answer: undefined } : r)),
+      items: state.items.filter((item) => item.id !== `going-${id}`),
     })),
 
   answerReceived: (id, yes) =>
@@ -1299,24 +1312,92 @@ export const useStore = create<State>()(
       };
     }),
 
-  setInvitesFromServer: (dtos, me) =>
-    set((state) => ({
-      invites: dtos.filter((d) => d.fromMe).map((d) => ({
+  setInvitesFromServer: (dtos, me, answering = {}) =>
+    set((state) => {
+      const invites: Invite[] = dtos.filter((d) => d.fromMe).map((d) => ({
         id: d.id, title: d.title, date: d.date, startHour: d.startHour, hours: d.hours,
         people: d.guests.map((g) => g.id),
         answers: Object.fromEntries(d.guests.filter((g) => g.response !== 'pending').map((g) => [g.id, g.response as 'yes' | 'no'])),
         scheduled: state.items.some((item) => item.id === d.id),
         groupId: state.invites.find((i) => i.id === d.id)?.groupId,
-      })),
-      received: dtos.filter((d) => !d.fromMe).map((d) => {
-        const mine = d.guests.find((g) => g.id === me)?.response;
+        sentAt: state.invites.find((i) => i.id === d.id)?.sentAt,
+      }));
+      const received: ReceivedInvite[] = dtos.filter((d) => !d.fromMe).map((d) => {
+        // An answer still on its way wins over a list fetched before it landed.
+        const mine = (answering[d.id] as 'yes' | 'no' | undefined) ?? d.guests.find((g) => g.id === me)?.response;
         return {
           id: d.id, title: d.title, date: d.date, startHour: d.startHour, hours: d.hours, from: d.host.name,
           others: d.guests.filter((g) => g.id !== me).map((g) => ({ id: g.id, name: g.name, ...(g.response === 'pending' ? {} : { answer: g.response as 'yes' | 'no' }) })),
+          at: state.received.find((r) => r.id === d.id)?.at ?? new Date().toISOString(),
           ...(mine && mine !== 'pending' ? { answer: mine as 'yes' | 'no' } : {}),
         };
-      }),
-    })),
+      });
+
+      /*
+       * Your week follows the plan, not the other way round.
+       *
+       * Going puts it in your week on every phone you use, and moves with it
+       * when the host changes the time. Called off, or no longer going, and it
+       * leaves - but only from today on: the server forgets past plans, and an
+       * evening that already happened stays where it was.
+       */
+      const going = new Map(received.filter((r) => r.answer === 'yes').map((r) => [`going-${r.id}`, r]));
+      const hosting = new Map(invites.map((i) => [i.id, i]));
+      const ahead = (item: Item) => item.date >= state.today;
+      let changed = false;
+      const calledOff: Item[] = [];
+      let items = state.items.flatMap((item) => {
+        const plan = going.get(item.id) ?? (item.id.startsWith('inv-') ? hosting.get(item.id) : undefined);
+        if (plan) {
+          if (item.title === plan.title && item.date === plan.date && item.startHour === plan.startHour && item.hours === plan.hours) return [item];
+          changed = true;
+          return [{ ...item, title: plan.title, date: plan.date, startHour: plan.startHour, hours: plan.hours }];
+        }
+        if (ahead(item) && (item.id.startsWith('going-inv-') || (item.id.startsWith('inv-') && !item.parentId))) {
+          changed = true;
+          // Gone from the server altogether, not just no longer going: the host called it off.
+          if (item.id.startsWith('going-') && !dtos.some((d) => `going-${d.id}` === item.id)) calledOff.push(item);
+          return [];
+        }
+        return [item];
+      });
+      const missing = [...going].filter(([id]) => !items.some((item) => item.id === id));
+      if (missing.length) {
+        changed = true;
+        items = [...items, ...missing.map(([id, plan]) => planAsItem({ ...plan, id }))];
+      }
+
+      /*
+       * What happened since the last look, as notices: the answers to plans
+       * you sent, and plans you said yes to that were called off. Only against
+       * a list already seen - the first one after signing in is not news.
+       */
+      const fresh: Notice[] = [];
+      for (const invite of invites) {
+        const before = state.invites.find((i) => i.id === invite.id);
+        if (!before) continue;
+        for (const id of invite.people) {
+          const now = invite.answers?.[id];
+          if (!now || before.answers?.[id] === now) continue;
+          const name = firstName(state.circle.find((p) => p.id === id)?.name ?? 'A friend');
+          fresh.push(notice(now === 'yes' ? '✅' : '❌', `${name} ${now === 'yes' ? 'is in for' : "can't make"} ${shortTitle(invite.title)}`, '/plans?tab=sent'));
+        }
+        if (invite.people.length && invite.people.every((id) => invite.answers?.[id] === 'yes') && !before.people.every((id) => before.answers?.[id] === 'yes')) {
+          fresh.push(notice('🎉', `Everyone's in for ${shortTitle(invite.title)}`, '/plans?tab=confirmed', 'Add it to your week'));
+        }
+      }
+      // Called off, said by what left your week - so it is heard even after the app was closed.
+      for (const gone of calledOff) {
+        const host = state.received.find((r) => `going-${r.id}` === gone.id)?.from;
+        fresh.push(notice('📭', `${host ? `${firstName(host)} called off` : 'Called off:'} ${shortTitle(gone.title)}`, '/plans', planWhenShort(gone as { date: string; startHour: number })));
+      }
+
+      return {
+        invites, received,
+        ...(changed ? { items } : {}),
+        ...(fresh.length ? { notices: [...fresh, ...state.notices].slice(0, 40) } : {}),
+      };
+    }),
 
   /**
    * "Actually, I'm going." Going is not the wrong answer, so the week re-plans

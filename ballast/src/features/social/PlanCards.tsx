@@ -97,13 +97,27 @@ function Action({ label, kind = 'plain', onPress }: { label: string; kind?: 'str
   );
 }
 
-/** Everyone you asked has said yes: a plan, not a question any more. */
+/** Everyone you asked has said yes. */
 export const allIn = (invite: Invite): boolean => invite.people.every((id) => invite.answers?.[id] === 'yes');
+
+/** Everyone has answered and somebody is coming: a plan, not a question any more. */
+export const settled = (invite: Invite): boolean =>
+  invite.people.every((id) => !!invite.answers?.[id]) && invite.people.some((id) => invite.answers?.[id] === 'yes');
+
+/** One line, in red, when the server could not be reached. */
+function Failed({ text }: { text: string }) {
+  return (
+    <View className="rounded-md px-3 py-2" style={{ backgroundColor: color.band.heavy.wash }}>
+      <Text variant="micro" weight="bold" tone="heavy">{text}</Text>
+    </View>
+  );
+}
 
 /** A plan you sent: who is in, and - once everyone is - putting it in your week. Or calling it off. */
 export function SentPlanCard({ invite }: { invite: Invite }) {
   const circle = useStore((state) => state.circle);
   const [ending, setEnding] = useState(false);
+  const [failed, setFailed] = useState(false);
   const answers = invite.answers ?? {};
   const yes = invite.people.filter((id) => answers[id] === 'yes').length;
   const no = invite.people.filter((id) => answers[id] === 'no').length;
@@ -133,20 +147,29 @@ export function SentPlanCard({ invite }: { invite: Invite }) {
           <Text variant="callout" weight="semibold" tone="heavy">Call it off for everyone?</Text>
           <Stack direction="row" gap={2}>
             <Action label="Keep it" onPress={() => { tapFeedback(); setEnding(false); }} />
-            <Action label="Yes, cancel" kind="danger" onPress={() => { void cancelPlan(invite.id); successFeedback(); }} />
+            <Action
+              label="Yes, cancel"
+              kind="danger"
+              onPress={async () => {
+                setFailed(false);
+                if (await cancelPlan(invite.id)) successFeedback();
+                else { setFailed(true); setEnding(false); }
+              }}
+            />
           </Stack>
         </Stack>
       ) : (
         <Stack direction="row" gap={2}>
           {invite.scheduled
             ? <Action label="✓ In your week" kind="done" />
-            : yes === invite.people.length
-              ? <Action label="📅 Add to week" kind="strong" onPress={() => { schedulePlan(invite.id); successFeedback(); }} />
-              // Into your week only once everyone is in.
-              : <Action label={no ? `✕ ${no} can’t make it` : `⏳ Waiting on ${waiting}`} />}
+            : settled(invite)
+              // Into your week once everyone has answered - all of them in, or going ahead with who is.
+              ? <Action label={no ? `📅 Go ahead with ${yes}` : '📅 Add to week'} kind="strong" onPress={() => { schedulePlan(invite.id); successFeedback(); }} />
+              : <Action label={yes || !no ? `⏳ Waiting on ${waiting}` : `✕ ${no} can’t make it`} />}
           <Action label="Cancel" onPress={() => { tapFeedback(); setEnding(true); }} />
         </Stack>
       )}
+      {failed ? <Failed text="Couldn’t cancel - check your connection and try again" /> : null}
     </Stack>
   );
 }
@@ -160,6 +183,12 @@ export function ReceivedPlanCard({ invite }: { invite: ReceivedInvite }) {
     .reduce((sum, item) => sum + loadOf(item), 0) / capacityOf(ceilings) * 100;
   const busy = dayCost >= 10;
   const day = DAY[dayIndex(invite.date)];
+  const [failed, setFailed] = useState(false);
+  const answer = async (yes: boolean) => {
+    setFailed(false);
+    if (yes) successFeedback(); else tapFeedback();
+    if (!(await answerPlan(invite.id, yes))) setFailed(true);
+  };
 
   return (
     <Stack gap={3} className="rounded-xl bg-raised px-4 py-4" style={{ borderWidth: 2, borderColor: invite.answer === 'yes' ? color.band.steady.fill : color.line.hairline, opacity: invite.answer === 'no' ? 0.6 : 1 }}>
@@ -181,15 +210,16 @@ export function ReceivedPlanCard({ invite }: { invite: ReceivedInvite }) {
       {invite.answer ? (
         <Stack direction="row" gap={2}>
           <Action label={invite.answer === 'yes' ? '✓ Going · in your week' : '✕ Declined'} kind={invite.answer === 'yes' ? 'done' : 'plain'} />
-          <Action label={invite.answer === 'yes' ? 'Can’t go' : 'Go after all'} onPress={() => { tapFeedback(); void answerPlan(invite.id, invite.answer !== 'yes'); }} />
+          <Action label={invite.answer === 'yes' ? 'Can’t go' : 'Go after all'} onPress={() => void answer(invite.answer !== 'yes')} />
         </Stack>
       ) : (
         <Stack direction="row" gap={2}>
-          <Action label="✓ Accept" kind="strong" onPress={() => { void answerPlan(invite.id, true); successFeedback(); }} />
-          <Action label="Decline" onPress={() => { void answerPlan(invite.id, false); tapFeedback(); }} />
+          <Action label="✓ Accept" kind="strong" onPress={() => void answer(true)} />
+          <Action label="Decline" onPress={() => void answer(false)} />
           <Action label={`See ${day} ›`} onPress={() => { tapFeedback(); router.push(`/plan?day=${invite.date}` as Href); }} />
         </Stack>
       )}
+      {failed ? <Failed text="Didn’t send - check your connection and tap again" /> : null}
     </Stack>
   );
 }

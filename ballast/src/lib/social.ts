@@ -8,7 +8,7 @@
  *
  * Screens call these and never decide which of the two they are talking to.
  */
-import { api } from './api';
+import { api, type InviteDTO } from './api';
 import { useStore } from '@/state/store';
 
 const live = () => useStore.getState().mode === 'live' && !!useStore.getState().account;
@@ -20,7 +20,15 @@ export async function refreshSocial(): Promise<void> {
   const [requests, groups, plans] = await Promise.all([api.requests(), api.groups(), api.invites()]);
   if (requests.ok) useStore.getState().setRequests(requests.data.requests);
   if (groups.ok) useStore.getState().setGroupsFromServer(groups.data.groups, me);
-  if (plans.ok) useStore.getState().setInvitesFromServer(plans.data.invites, me);
+  if (plans.ok) applyInvites(plans.data.invites, me);
+}
+
+/** Answers to plans sent but not yet confirmed by the server. */
+const answering: Record<string, 'yes' | 'no'> = {};
+
+/** Plans from the server, with any answer still on its way kept as given. */
+export function applyInvites(invites: InviteDTO[], me: string): void {
+  useStore.getState().setInvitesFromServer(invites, me, { ...answering });
 }
 
 /** Ask to be friends, by email (or a six-letter code when signed in). */
@@ -133,20 +141,36 @@ export async function sendPlan(plan: PlanDraft): Promise<boolean> {
 /** A plan you sent, into your week. Your week is yours, so this stays on the phone. */
 export const schedulePlan = (id: string): void => useStore.getState().scheduleInvite(id);
 
-/** Call it off, for everyone. */
-export async function cancelPlan(id: string): Promise<void> {
-  useStore.getState().cancelInvite(id);
+/** Call it off, for everyone. False when the server could not be reached, and nothing changed. */
+export async function cancelPlan(id: string): Promise<boolean> {
   if (live()) {
-    await api.cancelInvite(id);
-    await refreshSocial();
+    const res = await api.cancelInvite(id);
+    // Already gone is gone.
+    if (!res.ok && res.status !== 404) return false;
   }
+  useStore.getState().cancelInvite(id);
+  if (live()) await refreshSocial();
+  return true;
 }
 
-/** Yes or no to a plan you were asked to. Yes puts it in your week. */
-export async function answerPlan(id: string, yes: boolean): Promise<void> {
+/**
+ * Yes or no to a plan you were asked to. Yes puts it in your week.
+ *
+ * Shown at once, then sent. Until the server has it, a refresh that started
+ * earlier cannot flip the card back; if it never gets there, the card goes
+ * back to the question and this returns false, so the screen can say so.
+ */
+export async function answerPlan(id: string, yes: boolean): Promise<boolean> {
+  const before = useStore.getState().received.find((r) => r.id === id)?.answer;
   useStore.getState().answerReceived(id, yes);
-  if (live()) {
-    await api.replyToInvite(id, yes ? 'yes' : 'no');
-    await refreshSocial();
+  if (!live()) return true;
+  answering[id] = yes ? 'yes' : 'no';
+  const res = await api.replyToInvite(id, yes ? 'yes' : 'no');
+  delete answering[id];
+  if (!res.ok) {
+    if (before) useStore.getState().answerReceived(id, before === 'yes');
+    else useStore.getState().unanswerReceived(id);
   }
+  await refreshSocial();
+  return res.ok;
 }

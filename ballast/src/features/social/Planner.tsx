@@ -78,6 +78,7 @@ export function Planner({
   const [choice, setChoice] = useState<PlanBlock | null>(null);
   const [week, setWeek] = useState(0);
   const [sent, setSent] = useState<{ title: string; count: number } | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(today, week * 7 + i)), [today, week]);
   // The week as blocks the length of the plan: green for everyone, blue for some.
@@ -281,13 +282,19 @@ export function Planner({
               title, date: choice.date, startHour: choice.start, hours: plan.hours,
               people: chosen.map((f) => f.id), groupId: group?.id,
             });
-            if (!ok) return;
+            if (!ok) { setFailed(true); return; }
+            setFailed(false);
             successFeedback();
             setChoice(null);
             setSent({ title, count: chosen.length });
           }}
         />
       )}
+      {failed && !sent ? (
+        <View className="rounded-md px-3 py-2" style={{ backgroundColor: color.band.heavy.wash }}>
+          <Text variant="micro" weight="bold" tone="heavy">Didn’t send - check your connection and try again</Text>
+        </View>
+      ) : null}
     </Stack>
   );
 }

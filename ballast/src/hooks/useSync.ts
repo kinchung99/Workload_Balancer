@@ -23,6 +23,7 @@ import { useStore } from '@/state/store';
 import { readingFrom } from '@/state/selectors';
 import { logItems } from '@/lib/logs';
 import { presenceLine, splitPresence } from '@/lib/checkin';
+import { applyInvites } from '@/lib/social';
 
 /** How often to look for other people's changes when nothing of ours moved. */
 const PULL_EVERY_MS = 60_000;
@@ -97,7 +98,7 @@ export function useSync(): void {
       const [people, pending, shared, plans] = await Promise.all([api.circle(), api.requests(), api.groups(), api.invites()]);
       const me = useStore.getState().account?.id ?? '';
       if (shared.ok) useStore.getState().setGroupsFromServer(shared.data.groups, me);
-      if (plans.ok) useStore.getState().setInvitesFromServer(plans.data.invites, me);
+      if (plans.ok) applyInvites(plans.data.invites, me);
       if (people.ok) {
         useStore.getState().setCircle(people.data.circle.map((p) => ({
           id: p.id, name: p.name, initials: p.initials, band: p.band,

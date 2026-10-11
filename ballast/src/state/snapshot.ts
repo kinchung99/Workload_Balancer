@@ -91,6 +91,13 @@ export function snapshotOf(state: Syncable): Snapshot {
   };
 }
 
+/** JSON with every object's keys in order, so two orderings of one row compare equal. */
+export function stable(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) => (v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    : v));
+}
+
 /**
  * Rows that appeared, changed, or went away.
  *
@@ -108,8 +115,11 @@ export function diff(prev: Snapshot, next: Snapshot): SyncDoc[] {
 
     for (const [id, row] of Object.entries(after)) {
       // JSON rather than a deep compare: these rows are plain data by
-      // construction, and stringify is both faster and easier to trust here.
-      if (JSON.stringify(before[id]) !== JSON.stringify(row)) {
+      // construction. Keys sorted, because the server keeps rows as jsonb,
+      // which hands them back in its own key order - the same row, and
+      // without sorting it read as an edit, went back up, and came back
+      // reordered again, every few seconds for as long as the app was open.
+      if (stable(before[id]) !== stable(row)) {
         out.push({ collection, id, data: row, updatedAt, deleted: false });
       }
     }

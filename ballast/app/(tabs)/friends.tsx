@@ -20,6 +20,7 @@ import { PersonRow } from '@/features/social/PersonRow';
 import { api } from '@/lib/api';
 import { useAiAnswer } from '@/lib/ai';
 import type { BandName, CircleMember } from '@/lib/types';
+import { settled } from '@/features/social/PlanCards';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy', recovery: 'recovery' } as const;
 const SHARE_EMOJI = (mode: ShareMode) => VISIBILITY.find((option) => option.value === mode)?.emoji ?? '';
@@ -51,9 +52,10 @@ export default function Friends() {
   const { circle, phoneContacts, sharing, markContacted, logMoment, groups, pic, status, account, moods, vibe, invites, received } = useStore();
   const newPlans = received.filter((invite) => !invite.answer).length;
   const waitingOn = invites.filter((invite) => invite.people.some((id) => !invite.answers?.[id])).length;
-  const everyoneIn = invites.filter((invite) => invite.people.every((id) => invite.answers?.[id] === 'yes'));
+  const everyoneIn = invites.filter(settled);
   const readyToAdd = everyoneIn.filter((invite) => !invite.scheduled).length;
-  const addedPlans = everyoneIn.filter((invite) => invite.scheduled).length;
+  // Confirmed is everything you are going to: yours once settled, and the ones you said yes to.
+  const addedPlans = everyoneIn.filter((invite) => invite.scheduled).length + received.filter((invite) => invite.answer === 'yes').length;
   const goingTo = received.filter((invite) => invite.answer === 'yes').length + invites.filter((invite) => invite.scheduled).length;
   const myMood = shownMood(vibe, moods);
   const reading = useReading();
@@ -206,7 +208,7 @@ export default function Friends() {
           <Stack direction="row" gap={2}>
             {([
               { tab: 'received', emoji: '📥', title: 'Received', sub: newPlans ? `${newPlans} new` : `${received.length}`, hot: newPlans },
-              { tab: 'sent', emoji: '📤', title: 'Sent', sub: waitingOn ? `${waitingOn} waiting` : `${invites.length - readyToAdd - addedPlans}`, hot: 0 },
+              { tab: 'sent', emoji: '📤', title: 'Sent', sub: waitingOn ? `${waitingOn} waiting` : `${invites.length - everyoneIn.length}`, hot: 0 },
               { tab: 'confirmed', emoji: '✅', title: 'Confirmed', sub: readyToAdd ? `${readyToAdd} to add` : `${addedPlans}`, hot: readyToAdd },
             ] as const).map((tile) => (
               <Pressable

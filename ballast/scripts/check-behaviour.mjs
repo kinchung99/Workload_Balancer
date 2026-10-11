@@ -146,6 +146,7 @@ const { CHECK_IN_MESSAGE, EVENING_FROM, PLAN_MESSAGE, VISIBILITY, busyFrom, free
 const { CADENCE_WORD, DEFAULT_WEIGHTS, REVIEW_FROM_HOUR, VERDICT, adherence, describeWeights, dueForReview, retune, reviewEvery, weightsFrom } = await import(join(tmp, 'review.ts'));
 const { applyPull, backoffFor, emptySync, enqueue, runSync, syncLabel, DEBOUNCE_MS, MAX_BACKOFF_MS } = await import(join(tmp, 'sync.ts'));
 const { diff, mergeInto, snapshotOf } = await import(join(tmp, 'snapshot.ts'));
+const { addDays } = await import(join(tmp, 'dates.ts'));
 const { REST_LOAD_PER_HOUR, percentByBucket, overallPercent, overallOf, capacityOf, costPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
 const { KIND, applyMark, autoMark, autoMarkedIn, canMark, clockHour, markKind, markStatus, outcomeWord, toMark } = await import(join(tmp, 'marking.ts'));
 const { moduleTerm, bestCase } = await import(join(tmp, 'timetable.ts'));
@@ -2299,8 +2300,15 @@ console.log('\nInviting people');
   check('a plan nobody has answered cannot go in your week', s().items.some((i) => i.id === split.id), false);
   s().demoTick(Date.parse(split.sentAt) + DEMO_ANSWER_MS + 1);
   s().scheduleInvite(split.id);
-  check('nor one somebody said no to', [s().invites.at(-1).answers.aisyah, s().items.some((i) => i.id === split.id)], ['no', false]);
+  // Aisyah is running on empty and says no; Amin says yes.
+  check('once everyone has answered, you can go ahead with who said yes', [s().invites.at(-1).answers.aisyah, s().invites.at(-1).answers.amin, s().items.some((i) => i.id === split.id)], ['no', 'yes', true]);
+  s().sendInvite({ title: 'Walk with Aisyah', date: s().today, startHour: 7, hours: 1, people: ['aisyah'] });
+  const nobody = s().invites.at(-1);
+  s().demoTick(Date.parse(nobody.sentAt) + DEMO_ANSWER_MS + 1);
+  s().scheduleInvite(nobody.id);
+  check('but not one nobody is coming to', [s().invites.at(-1).answers.aisyah, s().items.some((i) => i.id === nobody.id)], ['no', false]);
   s().cancelInvite(sent.id);
+  s().cancelInvite(split.id);
   check('calling it off takes it out of your week too', [s().items.length, s().invites.some((i) => i.id === sent.id)], [before, false]);
 
   // Asked to someone else's plan.
@@ -2310,6 +2318,69 @@ console.log('\nInviting people');
   s().answerReceived(asked.id, false);
   check('changing your mind takes it out again', s().items.some((i) => i.id === `going-${asked.id}`), false);
   check('and your answer is kept', s().received[0].answer, 'no');
+}
+
+console.log('\nPlans, from the server');
+{
+  s().reset();
+  const today = s().today;
+  const later = addDays(today, 2);
+  const dto = (over = {}) => ({
+    id: 'inv-walk', title: 'A walk with Kai', date: later, startHour: 21.5, hours: 1, fromMe: false,
+    host: { id: 'host', name: 'Chung Kin' }, guests: [{ id: 'me', name: 'Kai', response: 'pending' }, { id: 'jo', name: 'Jo', response: 'pending' }], ...over,
+  });
+  const going = () => s().items.find((i) => i.id === 'going-inv-walk');
+  s().setInvitesFromServer([dto()], 'me');
+  check('an invitation arrives as a question', [s().received.length, s().received[0].answer, !!going()], [1, undefined, false]);
+  s().answerReceived('inv-walk', true);
+  s().setInvitesFromServer([dto()], 'me', { 'inv-walk': 'yes' });
+  check('a list fetched before your yes landed does not undo it', [s().received[0].answer, !!going()], ['yes', true]);
+  s().setInvitesFromServer([dto()], 'me');
+  check('without it, the server is the answer', [s().received[0].answer, !!going()], [undefined, false]);
+  s().setInvitesFromServer([dto({ guests: [{ id: 'me', name: 'Kai', response: 'yes' }] })], 'me');
+  check('said yes on another phone: it is in this week too', [going()?.date, going()?.startHour], [later, 21.5]);
+  s().setInvitesFromServer([dto({ startHour: 20, guests: [{ id: 'me', name: 'Kai', response: 'yes' }] })], 'me');
+  check('the host moves it, it moves in your week', going()?.startHour, 20);
+  s().setInvitesFromServer([], 'me');
+  check('called off: out of your week', !!going(), false);
+  check('and you hear about it', s().notices.some((n) => n.title === 'Chung called off A walk'), true);
+  s().setInvitesFromServer([dto({ id: 'inv-tea', title: 'Tea', guests: [{ id: 'me', name: 'Kai', response: 'yes' }] })], 'me');
+  s().goLive({ id: 'me', name: 'Kai', email: 'k@x.y' }, today);
+  s().hydrate(new Map([['items', [{ id: 'going-inv-tea', data: { id: 'going-inv-tea', title: 'Tea', bucket: 'social', hours: 1, dread: 1, commitment: 'soft', date: later, startHour: 21.5 } }]]]), new Map());
+  s().setInvitesFromServer([], 'me');
+  check('called off while the app was closed: still heard', [s().notices.some((n) => n.title === 'Called off: Tea'), s().items.some((i) => i.id === 'going-inv-tea')], [true, false]);
+  s().goDemo();
+  s().reset();
+  s().addItem({ title: 'Old dinner', bucket: 'social', hours: 2, dread: 1, commitment: 'soft', date: addDays(today, -3), startHour: 19 });
+  const past = s().items.at(-1);
+  s().hydrate(new Map([['items', [{ id: 'going-inv-old', data: { ...past, id: 'going-inv-old' } }]]]), new Map());
+  s().setInvitesFromServer([], 'me');
+  check('a plan already past stays where it was', s().items.some((i) => i.id === 'going-inv-old'), true);
+
+  // Hosting.
+  s().reset();
+  const mine = { ...dto(), id: 'inv-film', title: 'Film with Jo and Ravi', fromMe: true, host: { id: 'me', name: 'Kai' },
+    guests: [{ id: 'jo', name: 'Jo', response: 'pending' }, { id: 'ravi', name: 'Ravi', response: 'pending' }] };
+  s().setInvitesFromServer([mine], 'me');
+  check('a first look is not news', s().notices.filter((n) => n.title.includes('Film')).length, 0);
+  s().setInvitesFromServer([{ ...mine, guests: [{ id: 'jo', name: 'Jo', response: 'yes' }, { id: 'ravi', name: 'Ravi', response: 'pending' }] }], 'me');
+  check('a friend saying yes is', s().notices[0]?.title.endsWith('is in for Film'), true);
+  s().scheduleInvite('inv-film');
+  check('still waiting on one: not in your week yet', s().items.some((i) => i.id === 'inv-film'), false);
+  s().setInvitesFromServer([{ ...mine, guests: [{ id: 'jo', name: 'Jo', response: 'yes' }, { id: 'ravi', name: 'Ravi', response: 'no' }] }], 'me');
+  s().scheduleInvite('inv-film');
+  check('everyone answered, one coming: it goes ahead', s().items.some((i) => i.id === 'inv-film'), true);
+  s().setInvitesFromServer([], 'me');
+  check('cancelled on another phone: gone from this week', s().items.some((i) => i.id === 'inv-film'), false);
+  s().goDemo();
+}
+
+console.log('\nSync does not echo');
+{
+  const a = { items: { x: { id: 'x', title: 'Run', hours: 1 } } };
+  const b = { items: { x: { hours: 1, id: 'x', title: 'Run' } } };
+  check('the same row in another key order is not an edit', diff(a, b).length, 0);
+  check('a real edit still is', diff(a, { items: { x: { id: 'x', title: 'Walk', hours: 1 } } }).length, 1);
 }
 
 console.log('\nFriends and groups, asked rather than added');

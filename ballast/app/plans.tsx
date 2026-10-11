@@ -5,7 +5,7 @@ import { Button, PageHeader, Screen, Stack, Sticker, Text } from '@/components';
 import { color } from '@design/tokens';
 import { tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
-import { ReceivedPlanCard, SentPlanCard, allIn } from '@/features/social/PlanCards';
+import { ReceivedPlanCard, SentPlanCard, settled } from '@/features/social/PlanCards';
 
 /**
  * Plans - the invitations you were sent, and the ones you sent.
@@ -25,10 +25,16 @@ export default function Plans() {
   // Unanswered first, then by day.
   const sortedReceived = [...received].sort((a, b) => Number(!!a.answer) - Number(!!b.answer) || a.date.localeCompare(b.date));
   const byDay = [...invites].sort((a, b) => a.date.localeCompare(b.date) || a.startHour - b.startHour);
-  // Sent is still a question; once everyone says yes it moves to Confirmed, the one place it can go in your week.
-  const sortedSent = byDay.filter((invite) => !allIn(invite));
-  const confirmed = byDay.filter(allIn);
-  const list = showing === 'received' ? sortedReceived : showing === 'sent' ? sortedSent : confirmed;
+  // Sent is still a question; once everyone has answered and someone is in, it moves to Confirmed.
+  const sortedSent = byDay.filter((invite) => !settled(invite));
+  const confirmed = byDay.filter(settled);
+  // Confirmed is everything you are going to: your own plans, and the ones you said yes to.
+  const going = [...received].filter((invite) => invite.answer === 'yes');
+  const onDeck = [
+    ...confirmed.map((invite) => ({ key: invite.id, date: invite.date, startHour: invite.startHour, card: <SentPlanCard key={invite.id} invite={invite} /> })),
+    ...going.map((invite) => ({ key: invite.id, date: invite.date, startHour: invite.startHour, card: <ReceivedPlanCard key={invite.id} invite={invite} /> })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.startHour - b.startHour);
+  const list = showing === 'received' ? sortedReceived : showing === 'sent' ? sortedSent : onDeck;
 
   return (
     <Screen back="/friends" backLabel="Friends" footer={<Button label="✨ Plan something" onPress={() => router.push('/plan-together')} />}>
@@ -64,8 +70,10 @@ export default function Plans() {
           </Stack>
         ) : showing === 'received' ? (
           sortedReceived.map((invite) => <ReceivedPlanCard key={invite.id} invite={invite} />)
+        ) : showing === 'sent' ? (
+          sortedSent.map((invite) => <SentPlanCard key={invite.id} invite={invite} />)
         ) : (
-          (showing === 'sent' ? sortedSent : confirmed).map((invite) => <SentPlanCard key={invite.id} invite={invite} />)
+          onDeck.map((entry) => entry.card)
         )}
 
         <View className="h-2" />
