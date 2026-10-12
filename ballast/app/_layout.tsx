@@ -12,6 +12,8 @@ import { Platform, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { keepTokenIn } from '@/lib/api';
 import { Mascot } from '@/components';
+import { useHydrated } from '@/hooks/useHydrated';
+import { isClient } from '@/state/storage';
 
 /**
  * Root layout.
@@ -43,6 +45,15 @@ export default function RootLayout() {
   usePopups();
   useCalendarSync();
   const waiting = useWaitingForSession();
+  /*
+   * Every page is prerendered from the sample week, because the build has no
+   * account to render. Until this device's own state is read back, the
+   * battery covers it - otherwise the first thing anyone opening the app saw
+   * was a stranger's Monday, for the moment before their own week (or the
+   * sign-in screen) replaced it.
+   */
+  const hydrated = useHydrated();
+  const cover = !isClient || !hydrated || waiting;
 
   return (
     <SafeAreaProvider>
@@ -57,8 +68,8 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ animation: 'default' }} />
       </Stack>
-      {/* Coming back signed in: a moment with the battery while the session is confirmed. */}
-      {waiting ? (
+      {/* Opening, or coming back signed in: a moment with the battery while your own state loads. */}
+      {cover ? (
         <View className="absolute inset-0 items-center justify-center bg-page">
           <Mascot charge={72} loadPercent={28} size={120} />
         </View>

@@ -17,7 +17,7 @@ import { remaining } from './prep';
 import { findCollision, leadLabel } from './forecast';
 import { worthANudge } from './circle';
 import { firstName } from './people';
-import type { CircleMember, GroupInvite, Item, MoodCheckIn, Notice, ReceivedInvite } from './types';
+import type { CircleMember, GroupInvite, Invite, Item, MoodCheckIn, Notice, ReceivedInvite } from './types';
 import { formatHour } from './schedule';
 import type { PendingRequestDTO } from '@shared/contract';
 
@@ -39,7 +39,7 @@ export function quickUpdate(state: { items: Item[]; today: string; moods: MoodCh
   return { toMark: due, auto, checkIn: !checkedIn, count: due.length + auto.length + (checkedIn ? 0 : 1) };
 }
 
-export type BellKind = 'friend' | 'group' | 'plan' | 'update' | 'calendar' | 'due' | 'wall' | 'nudge' | 'rest' | 'low' | 'event';
+export type BellKind = 'friend' | 'group' | 'plan' | 'ready' | 'update' | 'calendar' | 'due' | 'wall' | 'nudge' | 'rest' | 'low' | 'event';
 
 export interface Bell {
   id: string;
@@ -60,6 +60,8 @@ export interface BellState {
   requests: PendingRequestDTO[];
   groupInvites: GroupInvite[];
   received: ReceivedInvite[];
+  /** Plans you sent. */
+  invites?: Invite[];
   circle: CircleMember[];
   notices: Notice[];
   restOwed: number;
@@ -84,6 +86,20 @@ export function bells(state: BellState): Bell[] {
     out.push({
       id: `plan:${plan.id}`, kind: 'plan', emoji: '🎉', title: `${plan.from} invited you to ${plan.title.split(/ with | · /)[0]}`,
       body: `${formatShort(plan.date)} · ${formatHour(plan.startHour)}`, ref: plan.id, at: plan.at, to: '/plans',
+    });
+  }
+
+  // A plan you sent that everyone has answered, someone is coming to, and is
+  // not in your week yet. Read from the plan itself, so it is still here when
+  // the answers came in while the app was closed.
+  for (const plan of (state.invites ?? []).filter((i) => !i.scheduled && i.date >= today)) {
+    const answers = plan.answers ?? {};
+    const yes = plan.people.filter((id) => answers[id] === 'yes').length;
+    if (!yes || plan.people.some((id) => !answers[id])) continue;
+    out.push({
+      id: `ready:${plan.id}:${yes}`, kind: 'ready', emoji: '🎉',
+      title: `${yes === plan.people.length ? 'Everyone’s in' : `${yes} of ${plan.people.length} in`} for ${plan.title.split(/ with | · /)[0]}`,
+      body: `${formatShort(plan.date)} · ${formatHour(plan.startHour)} · Add it to your week`, to: '/plans?tab=confirmed',
     });
   }
 

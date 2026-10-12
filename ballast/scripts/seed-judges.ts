@@ -17,7 +17,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { addDays, isSameWeek, startOfWeek } from '@/lib/dates';
+import { addDays, dayIndex, isSameWeek, startOfWeek } from '@/lib/dates';
 import { classItems, type ClassSlot } from '@/lib/timetable';
 import { bandFor, DEFAULT_CEILINGS, DEFAULT_OVERALL_CEILING, overallOf } from '@/lib/load';
 import { countedOnce } from '@/lib/prep';
@@ -316,8 +316,14 @@ function weekOf(p: Persona): { items: Item[]; modules: Module[]; moods: MoodChec
   // Every day lived in: a few of the ordinary things around the classes, and
   // study sessions booked for each piece of work - how a planned week looks.
   const days = Array.from({ length: 28 }, (_, i) => addDays(W0, i));
-  items.push(...fillDays(items, days, p.key));
-  items.push(...bookSittings(items, TODAY, now.getHours() + now.getMinutes() / 60, p.key));
+  // Tuesday and Thursday evenings stay clear of the filler and the study
+  // sessions, for everyone - so friends planning together find real evenings
+  // when they are all free, the way a group of friends would keep one.
+  const kept = days.filter((d) => dayIndex(d) === 1 || dayIndex(d) === 3).map((d) => ({
+    id: `hold-${d}`, title: 'Evening kept free', bucket: 'time', hours: 3.5, dread: 1, commitment: 'self', date: d, startHour: 19,
+  }) as Item);
+  items.push(...fillDays([...items, ...kept], days, p.key));
+  items.push(...bookSittings([...items, ...kept], TODAY, now.getHours() + now.getMinutes() / 60, p.key));
   const moods: MoodCheckIn[] = p.moods.map((m, i) => ({
     id: `${p.key}-mood-${i}`, date: addDays(TODAY, -m.daysAgo), at: `${m.daysAgo === 1 ? 'Yesterday' : `${m.daysAgo} days ago`} 9:00 PM`,
     quadrant: m.quadrant, tags: m.tags,

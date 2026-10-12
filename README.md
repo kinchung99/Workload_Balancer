@@ -32,17 +32,19 @@ Ballast installs straight from the link. It gets a home-screen icon and opens fu
 
 ## 🔑 Judge accounts
 
-Five real accounts on the live app. They're Monash Malaysia students with a real timetable, coursework, shifts, moods and plans, and **they're all friends with each other**. Sign in as two of them on two phones (or a phone and a laptop), and invitations, answers and batteries pass between them within a minute.
+Five real accounts on the live app. They're Monash Malaysia students with a real timetable, coursework, shifts, moods and plans, and every day is planned: study sessions booked for each assignment, plus lunches, the gym, society meetings and downtime. **They're all friends with each other.** Sign in as two of them on two phones (or a phone and a laptop), and invitations, answers and batteries pass between them within a minute.
+
+*Battery numbers below are from Mon 12 Oct. They move as the week goes, just as a real week would.*
 
 **Password for all five: `BallastDemo2026`**
 
 | Student | Email | Their week | Try this as them |
 |---|---|---|---|
-| 💻 **Aisyah Rahman**<br>Computer Science, Y2 | `aisyah.ballast@example.com` | 65% this week, but **next week is a wall**: two assignments and a birthday dinner in 3 days | Tap the red **wall** warning, then **Lighten next week**. Answer Daniel's **Mamak supper** invite. Add the confirmed **Study session** to your week. |
-| 🧪 **Priya Nair**<br>Biomedical Science, Y2 | `priya.ballast@example.com` | **28%, running on empty**: lab report due, 5.8h of sleep, heavy for 6 days | **Check in**, then open **Recovery** to book something that helps. Her friends get a nudge to check on her. |
-| 📊 **Daniel Lim**<br>Business, Y3 | `daniel.ballast@example.com` | 84%, steady, barista shifts | Open **Plans → Sent**: see who has said yes to his Mamak supper. Plan an evening with **Plan something together**. |
-| 🏗️ **Hafiz Ismail**<br>Civil Engineering, Y3 | `hafiz.ballast@example.com` | 61%, design project crunch | His **birthday dinner** plan has every kind of answer: yes, no, and still waiting. |
-| 🎨 **Mei Ling Tan**<br>Communication Design, Y1 | `meiling.ballast@example.com` | 91%, the calm one | Answer the **Badminton club** group invitation and Priya's **Movie night** from the 🔔 bell. |
+| 💻 **Aisyah Rahman**<br>Computer Science, Y2 | `aisyah.ballast@example.com` | 52% this week, but **next week is a wall**: two assignments and a birthday dinner, Wednesday to Friday | Tap the red **wall** warning, then **Lighten next week**. Answer Daniel's **Mamak supper** invite. Add the confirmed **Study session** to your week. |
+| 🧪 **Priya Nair**<br>Biomedical Science, Y2 | `priya.ballast@example.com` | **29%, running on empty**: lab report due, 5.8h of sleep, heavy for 6 days | **Check in**, then open **Recovery** to book something that helps. Her friends get a nudge to check on her. |
+| 📊 **Daniel Lim**<br>Business, Y3 | `daniel.ballast@example.com` | 75%, steady, barista shifts | Open **Plans → Sent**: see who has said yes to his Mamak supper. **Plan something** with Mei Ling: Thursday evening lights up green. |
+| 🏗️ **Hafiz Ismail**<br>Civil Engineering, Y3 | `hafiz.ballast@example.com` | 46%, design project crunch | His **birthday dinner** plan has every kind of answer: yes, no, and still waiting. |
+| 🎨 **Mei Ling Tan**<br>Communication Design, Y1 | `meiling.ballast@example.com` | 83%, the calm one | Answer the **Badminton club** group invitation and Priya's **Movie night** from the 🔔 bell. |
 
 > [!WARNING]
 > **These accounts are shared by every judge. Please play, but don't wreck them.**
@@ -60,7 +62,7 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 2. Tap the red **"…is a wall"** card, then **Lighten next week**. Take things off one at a time; for anything involving someone else, it offers to write the message first.
 3. Open **Plan** and tap a day: see the hours, and the battery each block costs.
 4. Go to **Friends** and tap **Priya** (28%). Her week is heavy, her free evenings are shared, and **Text something** writes the message for you.
-5. **Plan something together**: pick two friends and an activity. **Green blocks** are the times everyone is free.
+5. **Plan something together**: pick **Daniel** and **Mei Ling**, then **Dinner**. The **green block** (Thursday, 7pm) is when all three of you are free.
 6. Tap the 🔔 **bell** and answer an invitation right there.
 
 ---
@@ -151,12 +153,12 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 <td width="300"><img src="docs/guide/03-update.jpg" width="280" alt="Quick update"></td>
 <td>
 
-1. **To mark**: a class or task whose time has just passed. ✓ or ✕, one tap.
-2. **Marked for you**: forgot? The next morning Ballast assumes it happened, and lets you check.
-3. **Keep**, **Missed** or **Change** each one…
-4. …or **Keep all** in one tap.
+1. **To mark**: everything whose time has just passed.
+2. **✓ or ✕**, one tap each. Classes count towards attendance, and done work moves the progress bars forward.
+3. **How today feels**: check in right here, and each answer shows what it does to your battery.
+4. **Sleep**: short nights cost, good ones refill.
 
-*Classes count towards attendance, and done work moves the progress bars forward.*
+*Forgot to mark something? The next morning Ballast assumes it happened, and shows it under **Marked for you** to keep or change.*
 
 </td>
 </tr>
@@ -167,7 +169,7 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 1. **Pop-ups**: opt in, and Ballast nudges you when a class ends while the app is open in the background.
 2. **Invitations** from friends and groups…
 3. …answered **right here**.
-4. Everything else worth knowing: things to update, deadlines, a friend having a hard week. Each one opens where you deal with it.
+4. Everything else worth knowing: who said yes to your plan, a plan that's ready for your week, a plan that was called off, deadlines, a friend having a hard week. Each one opens where you deal with it.
 
 </td>
 </tr>
@@ -196,7 +198,8 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 
 1. Its area, its **battery cost**, and whether it can move. Hard deadlines are **locked**.
 2. **Progress**: done, booked into your week, and still loose.
-3. **✨ Suggest sittings** splits the remaining hours into sessions on your lightest days.
+3. **Booked sittings.** When one ends, tap **How much? ✓** to say how far you got.
+4. **Plan, move or add sittings.** With hours still loose, **✨ Suggest** splits them onto your lightest days.
 
 </td>
 </tr>
@@ -207,9 +210,10 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 **Booking the sittings**
 
 1. One bar shows **done · booked · loose**.
-2. **Suggested**: lightest days first, and never on the due day if it can help it. Each one says why.
-3. **Change** any day, time or length, using days from this week or next.
-4. **Book** puts them in your week, and nothing is booked unseen.
+2. **Booked**: every sitting, with its battery cost.
+3. **⋯** to move one (any day this week or next) or give it back. **Push today's to tomorrow** when today falls apart.
+
+*With hours still loose, **✨ Suggest** proposes sittings on your lightest days, each with its reason, and nothing is booked until you say so.*
 
 </td>
 </tr>
@@ -231,10 +235,10 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 
 **What to do first**
 
-1. **Start here**: due date, hours needed, and what it costs.
+1. **Start here**: due date, hours needed, and what it costs. Work and promises come first; your own routines (the gym, breakfast) never jump the queue.
 2. **Why it's first**, in plain reasons.
-3. **When it fits**: the next real gap in your day.
-4. **Plan the sittings** in one tap.
+3. **When it happens**: already booked, or the next real gap in your day.
+4. **Your next 7 days**: how many hours the list needs against the free time you have.
 
 </td>
 </tr>
@@ -324,7 +328,7 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 1. **Received · Sent · Confirmed**.
 2. Who's asking, and who else is going (✓ or ✕ on their faces).
 3. **How full that day already is**, before you say yes.
-4. **Accept**, **Decline**, or **See** that day.
+4. **Accept**, **Decline**, or **See** that day. **Accept** puts it in your week on every device you use. If the host moves it, it moves; if they call it off, it leaves and you're told.
 
 </td>
 </tr>
@@ -334,8 +338,8 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 
 **Confirmed**
 
-1. 🎉 **Everyone's in.**
-2. **Add to week**, available only once *everyone* has said yes.
+1. 🎉 **Everyone's in**: every plan you're going to, yours and the ones you said yes to.
+2. **Add to week** once everyone has answered. If someone can't make it, **Go ahead with 2** keeps the plan with whoever's coming.
 
 </td>
 </tr>

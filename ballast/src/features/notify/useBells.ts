@@ -9,15 +9,15 @@ import { useItemsWithLogs, useReading } from '@/state/selectors';
 import { useCalendar } from '@/features/calendar/useCalendar';
 
 export function useBells() {
-  const { items, today, moods, sleepHours, requests, groupInvites, received, circle, notices, recovery, seenNotices } = useStore();
+  const { items, today, moods, sleepHours, requests, groupInvites, received, invites, circle, notices, recovery, seenNotices } = useStore();
   const withLogs = useItemsWithLogs();
   const reading = useReading();
   const { picture, expired } = useCalendar();
   const fresh = picture.fresh.length;
   const update = useMemo(() => quickUpdate({ items, today, moods, sleepHours }), [items, today, moods, sleepHours]);
   const list = useMemo(() => bells({
-    items: withLogs, today, requests, groupInvites, received, circle, notices,
+    items: withLogs, today, requests, groupInvites, received, invites, circle, notices,
     restOwed: restOwedFrom(recovery), charge: reading.charge, update, calendar: { fresh, expired },
-  }), [withLogs, today, requests, groupInvites, received, circle, notices, recovery, reading.charge, update, fresh, expired]);
+  }), [withLogs, today, requests, groupInvites, received, invites, circle, notices, recovery, reading.charge, update, fresh, expired]);
   return { list, update, unseen: unseen(list, seenNotices), calendar: picture };
 }

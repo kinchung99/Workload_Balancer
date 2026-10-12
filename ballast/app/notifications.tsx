@@ -120,6 +120,7 @@ const PICTURE: Record<Bell['kind'], { sticker: StickerName; wash: string }> = {
   friend:   { sticker: 'wave',       wash: color.decor.candy },
   group:    { sticker: 'people',     wash: color.decor.lilac },
   plan:     { sticker: 'heart',      wash: color.decor.blush },
+  ready:    { sticker: 'star',       wash: color.band.steady.wash },
   update:   { sticker: 'clock',      wash: color.decor.sky },
   calendar: { sticker: 'calendar',   wash: color.decor.sky },
   due:      { sticker: 'assignment', wash: color.decor.lemon },

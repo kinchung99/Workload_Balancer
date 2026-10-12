@@ -74,6 +74,9 @@ const IMPORTANCE_FACTOR = { 1: 0.8, 2: 1, 3: 1.35 } as const;
  */
 const WANT_FACTOR = [1, 0.9, 0.95, 1, 1.08, 1.15] as const;
 
+/** How much a self-imposed routine counts against real work. */
+const ROUTINE_FACTOR = 0.2;
+
 /** Not being able to finish it in the time left is the loudest signal there is. */
 const AT_RISK_BONUS = 40;
 
@@ -108,6 +111,10 @@ export function rank(
    */
   const score =
     weight *
+      // A routine of your own - the gym, breakfast, tidying - happens at its
+      // time; it is not something to start first. Only work, deadlines and
+      // promises to other people should be able to top this list.
+      (!owing && item.commitment === 'self' && item.deadline === undefined ? ROUTINE_FACTOR : 1) *
       urgencyFactor(days) ** weights.urgency *
       COMMITMENT_FACTOR[item.commitment] *
       IMPORTANCE_FACTOR[item.importance ?? 2] ** weights.importance *

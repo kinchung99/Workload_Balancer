@@ -20,7 +20,7 @@ export interface CalmModeProps {
   percent: number;
   today: string;
   /** The one thing. The app has already made the call so the student does not have to. */
-  focus: Item;
+  focus?: Item;
   onHide: () => void;
   onShowEverything: () => void;
   /**
@@ -61,7 +61,7 @@ export function CalmMode({ percent, today, focus, onHide, onShowEverything, back
 
         {/* One sentence. Not a list, not a chart, not a prompt to log anything. */}
         <Text variant="heading" weight="regular" className="pt-4">
-          Do the {focus.title.toLowerCase()}. Everything else on today's list can wait until Friday and
+          {focus ? `Do the ${focus.title.toLowerCase()}. ` : 'Rest tonight. '}Everything else on today's list can wait until Friday and
           nothing bad will happen.
         </Text>
       </Stack>
