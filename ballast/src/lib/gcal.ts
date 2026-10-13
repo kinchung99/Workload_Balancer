@@ -289,6 +289,8 @@ export function followCalendar(
   for (const event of events.filter((e) => upcoming(e, today, nowHour))) {
     const decision = handled[keyOf(event)];
     if (decision?.as !== 'added' || imported.has(event.id) || alreadyThere(event, items)) continue;
+    // One week of a series you cancelled stays cancelled.
+    if (handled[`event:${event.id}`]?.as === 'skipped') continue;
     add.push(itemFrom(event, decision.template));
   }
 

@@ -12,9 +12,22 @@ import {
 import { tapFeedback } from '@/lib/haptics';
 import { capacityOf } from '@/lib/load';
 import { useStore } from '@/state/store';
+import { displacedBy, swappableOn, withoutSwappable } from '@/lib/replace';
 import type { Item } from '@/lib/types';
 
 const LENGTHS = [0.5, 1, 1.5, 2, 2.5, 3];
+
+/** Blocks you could give up: amber, between taken grey and free. */
+const MOVABLE = { fill: color.band.busy.wash, border: color.band.busy.fill };
+
+function Key({ fill, border, label }: { fill: string; border?: string; label: string }) {
+  return (
+    <Stack direction="row" gap={1} align="center">
+      <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: fill, borderWidth: border ? 1.5 : 0, borderColor: border }} />
+      <Text variant="micro" tone="muted">{label}</Text>
+    </Stack>
+  );
+}
 const RIBBON_TICKS = [7, 11, 15, 19, 23];
 
 /**
@@ -39,7 +52,13 @@ export function SittingEditor({
   mode = 'sitting',
   calendar = false,
   anytime = false,
+  replace = false,
 }: {
+  /**
+   * Let it land on a block you are allowed to move. Those blocks show in their
+   * own colour; whatever it lands on is named, and moved straight after.
+   */
+  replace?: boolean;
   /** Offer a month calendar for any later date, as well as the two weeks. */
   calendar?: boolean;
   /** Offer "any time that day" - a day without a set time. */
@@ -66,7 +85,10 @@ export function SittingEditor({
   const nextMonday = startOfWeek(days[days.length - 1]);
   const weeks = [days.filter((d) => d < nextMonday), days.filter((d) => d >= nextMonday)].filter((w) => w.length);
   const notBefore = (date: string) => (date === today ? nowHour : undefined);
-  const startsFor = (date: string, hours: number) => sittingStarts(busy, date, hours, notBefore(date));
+  const startsFor = (date: string, hours: number) =>
+    sittingStarts(replace ? withoutSwappable(busy, date) : busy, date, hours, notBefore(date));
+  const movable = replace ? new Set(swappableOn(busy, value.date).map((item) => item.id)) : new Set<string>();
+  const displaced = replace ? displacedBy(busy, value) : [];
   const options = startsFor(value.date, value.hours);
   // The calendar opens by itself when the day is beyond the two weeks shown.
   const [onCalendar, setOnCalendar] = useState(() => calendar && !days.includes(value.date));
@@ -186,8 +208,24 @@ export function SittingEditor({
           date={value.date}
           value={value}
           options={options}
+          movable={movable}
           onPick={(startHour) => { tapFeedback(); onChange({ ...value, startHour }); }}
         />
+        {replace && movable.size ? (
+          <Stack direction="row" gap={3} align="center">
+            <Key fill={color.line.strong} label="Fixed" />
+            <Key fill={MOVABLE.fill} border={MOVABLE.border} label="Can give up" />
+            <Key fill={color.surface.sunken} label="Free" />
+          </Stack>
+        ) : null}
+        {displaced.length ? (
+          <Stack direction="row" gap={2} align="center" className="rounded-md px-3 py-2" style={{ backgroundColor: MOVABLE.fill }}>
+            <Text variant="callout">↔️</Text>
+            <Text variant="micro" weight="semibold" className="flex-1">
+              Takes the place of {displaced.map((item) => `${item.title} ${formatHour(item.startHour!)}`).join(', ')} · you’ll move {displaced.length === 1 ? 'it' : 'them'} next
+            </Text>
+          </Stack>
+        ) : null}
         {anytime ? (
           <Chip
             label="Any time that day"
@@ -272,11 +310,14 @@ function DayRibbon({
   value,
   options,
   onPick,
+  movable = new Set<string>(),
 }: {
   busy: Item[];
   date: string;
   value: Draft;
   options: number[];
+  /** Blocks it may land on, drawn in their own colour. */
+  movable?: Set<string>;
   onPick: (startHour: number) => void;
 }) {
   const [width, setWidth] = useState(0);
@@ -333,7 +374,9 @@ function DayRibbon({
               style={{
                 position: 'absolute', top: 0, bottom: 0,
                 left: block.left * width, width: Math.max(2, block.width * width - 1),
-                backgroundColor: color.line.strong, opacity: 0.7,
+                ...(movable.has(block.id)
+                  ? { backgroundColor: MOVABLE.fill, borderWidth: 1.5, borderColor: MOVABLE.border }
+                  : { backgroundColor: color.line.strong, opacity: 0.7 }),
               }}
             />
           ))}

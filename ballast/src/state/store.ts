@@ -185,6 +185,8 @@ interface State {
   setDread: (id: string, dread: Dread) => void;
   /** Can it move, and how much it matters - the two answers the lists sort on. */
   setItemTraits: (id: string, traits: { commitment?: CommitmentKind; importance?: Importance }) => void;
+  /** Take something off your week for good - with its booked sittings. A calendar event stays off. */
+  cancelItem: (id: string) => void;
   applyTrades: (trades: Trade[]) => void;
   dropSwap: (id: string) => void;
   addFriend: (contactId: string) => void;
@@ -423,6 +425,19 @@ export const useStore = create<State>()(
    * re-price the assignment and leave its booked hours at the old price. The
    * ones still ahead follow it now; a sitting already done keeps what it cost.
    */
+  cancelItem: (id) =>
+    set((state) => {
+      const item = state.items.find((candidate) => candidate.id === id);
+      if (!item) return {};
+      const gone = new Set([id, ...state.items.filter((other) => other.parentId === id).map((other) => other.id)]);
+      const eventId = item.source?.kind === 'google' ? item.source.eventId : undefined;
+      return {
+        items: state.items.filter((other) => !gone.has(other.id)),
+        // Without this the next look at Google would set it up again.
+        ...(eventId ? { calendarHandled: { ...state.calendarHandled, [`event:${eventId}`]: { as: 'skipped' as const } } } : {}),
+      };
+    }),
+
   setItemTraits: (id, traits) =>
     set((state) => ({
       items: state.items.map((item) => (item.id !== id ? item : {

@@ -245,9 +245,12 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 2. **Why it's first**, in plain reasons.
 3. **Your next 7 days**: how many hours the list needs against the free time you have.
 4. **Then**: only owing work and tasks without a set time, in the order you have to **start** them. Heavy work due later rises above light work due sooner; importance decides within a day. Booked work shows its next sitting.
-5. **Could move**: blocks at a set time that you're allowed to move, least important first, each with why and a lighter slot it fits. **Move it** opens the day-and-time picker right there. Fixed plans and hard deadlines never appear.
+5. **Could move**: blocks at a set time that you're allowed to move, least important first, each with why and a lighter slot it fits. Fixed plans and hard deadlines never appear.
+6. **Move it → Swap this time**, in three steps: **pick** what the time should go to (the same sorted list, each saying how much of the slot it gets), **plan** it into the slot, then **move** the block that was there to a new time, or drop it.
 
-*Every time you pick a time in Ballast, it's the same picker: this week and next with how full each day is (or a calendar for later dates), then drag the block along the day.*
+*Every time you pick a time in Ballast, it's the same picker: this week and next with how full each day is (or a calendar for later dates), then drag the block along the day. On the slider, 🟧 amber blocks are things you could give up: slide onto one to take its place, and Ballast asks where it goes next.*
+
+*Changed your mind? Every task has **🗑 Cancel** beside **Done**, with a second "Yes, cancel it" so nothing goes by accident. Cancelling a Google event keeps it out of your week; cancelling a plan tells your friends.*
 
 </td>
 </tr>

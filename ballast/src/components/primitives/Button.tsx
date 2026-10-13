@@ -14,6 +14,7 @@ const KIND = {
   secondary: { box: 'bg-raised border-line-hairline',         tone: 'default' },
   quiet:     { box: 'bg-transparent border-transparent',      tone: 'muted' },
   steady:    { box: 'bg-steady-fill border-steady-fill',      tone: 'inverse' },
+  danger:    { box: 'bg-heavy-fill border-heavy-fill',        tone: 'inverse' },
 } as const;
 
 export interface ButtonProps extends PressableProps {

@@ -193,14 +193,14 @@ export function describeChange(item: Item, base: Item[], from: Draft, to: Draft,
  * Drawn under the sitting being edited, so "7pm" is not an abstract chip but a
  * gap you can see between a shift and bedtime.
  */
-export function dayRibbon(busy: Item[], date: string): Array<{ left: number; width: number; title: string }> {
+export function dayRibbon(busy: Item[], date: string): Array<{ id: string; left: number; width: number; title: string }> {
   const span = DAY_END - DAY_START;
   return daySchedule(busy, date).timed
     .filter((i) => !i.isLog)
     .map((i) => {
       const start = Math.max(DAY_START, i.startHour);
       const end = Math.min(DAY_END, endHour(i));
-      return { left: (start - DAY_START) / span, width: Math.max(0, end - start) / span, title: i.title };
+      return { id: i.id, left: (start - DAY_START) / span, width: Math.max(0, end - start) / span, title: i.title };
     })
     .filter((block) => block.width > 0);
 }

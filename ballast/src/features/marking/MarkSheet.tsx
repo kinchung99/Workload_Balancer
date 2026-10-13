@@ -26,6 +26,7 @@ import {
 import { useStore } from '@/state/store';
 import { ProgressPicker } from './ProgressPicker';
 import { MoveItem } from '@/features/item/MoveItem';
+import { CancelTask } from '@/features/item/CancelTask';
 import type { Dread, Item, Outcome } from '@/lib/types';
 
 
@@ -203,6 +204,11 @@ function Body({
         ) : null}
       </Stack>
       )}
+
+      {/* Not every task ends done. Not for a class or a sitting - those belong to the timetable and the work. */}
+      {kind !== 'class' && kind !== 'sitting' && !item.repeats ? (
+        <CancelTask item={item} kind="quiet" label="🗑 Cancel it instead" onCancelled={onClose} />
+      ) : null}
 
       {/* How it felt - the same five faces as everywhere else. */}
       <Stack gap={2}>

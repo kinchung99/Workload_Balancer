@@ -32,7 +32,10 @@ All notable changes to Ballast. Dates are when the change went live.
 - **What to do first** lists only owing work and tasks without a set time, sorted by the day each has to be **started** (walking back from the deadline through your real free time), so heavy work due later rises; importance decides within a day. Booked work shows its next sitting.
 - **Could move** lists only movable blocks at a set time, least important first, each with reasons and a lighter nearby slot; *Move it* opens the picker preset to that slot.
 - One way to pick a time everywhere (adding, moving, planning, booking rest, the marking sheet): this week and next with each day's load, or a calendar for any later date, plus the drag-along day slider.
-- Moving something is visual: *Change the time* / *Give it a time* show each day of this week and next with its battery load, and a ribbon of the chosen day to drag the block along. **Move it** on the priority list opens the same picker as a sheet (owing work opens its sittings, since its date is the deadline).
+- Moving something is visual: *Change the time* / *Give it a time* show each day of this week and next with its battery load, and a ribbon of the chosen day to drag the block along.
+- **Swap this time** (`/swap/[id]`): *Move it* on a movable block opens three steps: pick what the time should go to from the sorted list (owing work gets its share, booked work brings its next sitting in), plan it, then re-home the block or drop it.
+- The time slider shows three colours: fixed (grey), **could give up (amber)**, and free. Sliding onto amber takes its place, then asks where the displaced block goes; the same happens when booking sittings.
+- **Cancel** on every task, the marking sheet and swaps, behind a second confirmation. Cancelled Google events stay out of the week; a cancelled plan is called off for friends, an accepted one is answered "Can't go".
 - "What to do first" ranks work and promises above your own routines.
 - Judge accounts rebuilt around the current week, with shared free evenings so plan-together finds green blocks.
 - 12-page judges' guide (PDF) and a project thumbnail.

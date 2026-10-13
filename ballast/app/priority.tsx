@@ -25,7 +25,6 @@ import { api } from '@/lib/api';
 import { priorityContext } from '@/lib/coach';
 import { clockHour } from '@/lib/marking';
 import { useAiAnswer } from '@/lib/ai';
-import { MoveSheet } from '@/features/item/MoveItem';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -84,8 +83,6 @@ export default function Priority() {
   const ahead = useMemo(() => weekAhead(first, items, today), [first, items, today]);
 
   const [showAll, setShowAll] = useState(false);
-  // Which "Could move" row has its move sheet open.
-  const [moving, setMoving] = useState<{ id: string; suggest?: { date: string; startHour: number } } | null>(null);
   const top = first[0];
   const rest = first.slice(1);
   const shown = showAll ? rest : rest.slice(0, 5);
@@ -234,10 +231,11 @@ export default function Priority() {
                   ))}
                 </Stack>
                 <Stack direction="row" gap={2} wrap>
+                  {/* Make room: give this time to something on the list, then find the block a new home. */}
                   <Chip
-                    label={row.suggest ? `Move it · ${formatShort(row.suggest.date).slice(0, 3)} ${formatHour(row.suggest.startHour)}` : 'Move it'}
+                    label="↔️ Move it"
                     tone="selected"
-                    onPress={() => { tapFeedback(); setMoving({ id: row.item.id, suggest: row.suggest }); }}
+                    onPress={() => { tapFeedback(); router.push(`/swap/${row.item.id}` as Href); }}
                   />
                   {/* Only somebody else's plans need a message; your own idea just moves. */}
                   {row.item.commitment === 'soft' ? (
@@ -251,7 +249,6 @@ export default function Priority() {
 
         <View className="h-2" />
       </Stack>
-      <MoveSheet itemId={moving?.id ?? null} suggest={moving?.suggest} onClose={() => setMoving(null)} />
     </Screen>
   );
 }

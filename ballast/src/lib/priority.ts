@@ -19,6 +19,7 @@ import { MAX_SESSION, MIN_SESSION, STUDY_WINDOW, bestStart, loadOnDay, needsPrep
 import { addDays, daysBetween } from './dates';
 import { formatHour, freeSlots, slotHours } from './schedule';
 import { isProtectedClass } from './timetable';
+import { isSwappable } from './replace';
 import { wantOf } from './swap';
 import { DEFAULT_WEIGHTS } from './review';
 import type { Item, Weights } from './types';
@@ -215,24 +216,11 @@ const isActionable = (item: Item, today: string): boolean =>
 const isTask = (item: Item): boolean =>
   item.commitment !== 'fixed' && (needsPrep(item) || item.startHour === undefined || item.deadline !== undefined);
 
-/**
- * A block with a time that you are allowed to move: not fixed, not a hard
- * deadline, not a class, not rest you booked on purpose.
- */
+/** A block with a time that you are allowed to move - see lib/replace - and that has not already gone by. */
 const isMovableBlock = (item: Item, today: string, nowHour?: number): boolean =>
-  !needsPrep(item) &&
-  item.startHour !== undefined &&
-  item.deadline === undefined &&
-  isMovable(item) &&
-  !isProtectedClass(item) &&
-  !item.moduleId &&
-  !item.repeats &&
-  !item.isLog &&
-  !item.isRecovery &&
-  !item.parentId &&
-  !item.outcome &&
+  isSwappable(item) &&
   item.date >= today &&
-  !(item.date === today && nowHour !== undefined && item.startHour + item.hours <= nowHour);
+  !(item.date === today && nowHour !== undefined && item.startHour! + item.hours <= nowHour);
 
 /**
  * Why a block is worth moving, and where it could go.

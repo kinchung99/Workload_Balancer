@@ -18,6 +18,8 @@ import { MarkSheet } from '@/features/marking/MarkSheet';
 import type { Item } from '@/lib/types';
 import { Cheer } from './Cheer';
 import { SittingEditor } from './SittingEditor';
+import { RehomeSheet } from './MoveItem';
+import { displacedBy } from '@/lib/replace';
 
 /** A sitting on the drawing board. `origin` is what the planner proposed; none means you added it. */
 interface Proposal extends Draft {
@@ -46,6 +48,8 @@ const placedOnly = (drafts: Proposal[]): Session[] =>
 export function Sittings({ item, items, autoSuggest = false }: { item: Item; items: Item[]; autoSuggest?: boolean }) {
   const router = useRouter();
   const { today, scheduleSessions, unscheduleSession, updateSession, pushSittings, ceilings } = useStore();
+  // Blocks a booking landed on, waiting for a new time.
+  const [rehome, setRehome] = useState<string[]>([]);
   const [marking, setMarking] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Proposal[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -123,7 +127,10 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
     const hours = ready.reduce((total, d) => total + d.hours, 0);
     const days = new Set(ready.map((d) => d.date)).size;
     const after = Math.max(0, Math.round((loose - hours) * 10) / 10);
+    // Anything you could give up that a sitting landed on gets a new time straight after.
+    const pushed = [...new Set(ready.flatMap((d) => displacedBy(items, d).map((block) => block.id)))];
     scheduleSessions(item.id, ready.map(({ date, startHour, hours: h }) => ({ date, startHour, hours: h })));
+    if (pushed.length) setRehome(pushed);
     successFeedback();
     setDrafts(null);
     setOpen(null);
@@ -150,8 +157,10 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
 
   const saveMove = (session: Item) => {
     if (!moving || moving.startHour === undefined) return;
+    const pushed = displacedBy(items, moving, session.id).map((block) => block.id);
     updateSession(session.id, moving);
     successFeedback();
+    if (pushed.length) setRehome(pushed);
     setOpen(null);
     setMoving(null);
     setCheer({ id: Date.now(), title: `Moved to ${formatShort(moving.date)}`, sub: spanLabel(moving) });
@@ -166,6 +175,7 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
     <Stack gap={4}>
       {cheer ? <Cheer key={cheer.id} title={cheer.title} sub={cheer.sub} /> : null}
       <MarkSheet itemId={marking} onClose={() => setMarking(null)} />
+      <RehomeSheet ids={rehome} onClose={() => setRehome([])} />
 
       {/* ------------------------------------------------ where the work stands, in one bar */}
       <Stack gap={3} className="rounded-xl bg-raised px-4 py-4" style={{ borderWidth: 2, borderColor: color.line.hairline }}>
@@ -258,6 +268,7 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
                       origin={{ date: session.date, startHour: session.startHour, hours: session.hours }}
                       maxHours={session.hours + loose}
                       onChange={setMoving}
+                      replace
                     />
                     <Stack direction="row" gap={2}>
                       <Button label="Cancel" kind="secondary" className="flex-1" onPress={() => { tapFeedback(); setOpen(null); setMoving(null); }} />
@@ -339,6 +350,7 @@ export function Sittings({ item, items, autoSuggest = false }: { item: Item; ite
                       origin={draft.origin}
                       maxHours={loose - (placedHours - draft.hours)}
                       onChange={(next) => setDrafts(drafts.map((d) => (d.key === draft.key ? { ...d, ...next } : d)))}
+                      replace
                     />
                     <Pressable
                       accessibilityRole="button"

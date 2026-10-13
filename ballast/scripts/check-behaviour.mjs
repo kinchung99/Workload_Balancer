@@ -42,6 +42,7 @@ for (const [from, to] of [
   ['src/lib/circle.ts', 'circle.ts'],
   ['src/lib/swap.ts', 'swap.ts'],
   ['src/lib/importance.ts', 'importance.ts'],
+  ['src/lib/replace.ts', 'replace.ts'],
   ['src/lib/sharing.ts', 'sharing.ts'],
   ['src/lib/review.ts', 'review.ts'],
   ['src/lib/api.ts', 'api.ts'],
@@ -141,6 +142,7 @@ const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
 const { prioritise, rank, urgencyFactor, whyFirst, rowWeight, nextFit, weekAhead, hoursNeeded, startByFor, startWord, startLabel } = await import(join(tmp, 'priority.ts'));
 const { importanceOf, wantFor, IMPORTANCE_LEVELS } = await import(join(tmp, 'importance.ts'));
+const { isSwappable, swappableOn, withoutSwappable, displacedBy } = await import(join(tmp, 'replace.ts'));
 const { DRAIN, LEVELS, drainCosts, costLabel, withDrain, toggleArea, batteryCost } = await import(join(tmp, 'drain.ts'));
 const { circleOrder, isStale, lastSeen, updatedToday, worthANudge, STALE_AFTER_MINS, frequentFriends, searchPeople, byLetter } = await import(join(tmp, 'circle.ts'));
 const { bestSwap, findSwap, firstRefusal, skippable, wantOf, whyNoSwap, DEFAULT_WANT, WANT_CHOICES } = await import(join(tmp, 'swap.ts'));
@@ -2433,6 +2435,36 @@ console.log('\nWhat to do first, by when it has to start');
   s().setItemTraits('books', { commitment: 'fixed', importance: 4 });
   const books = s().items.find((i) => i.id === 'books');
   check('can it move and how important, changed on the item', [books.commitment, books.importance, books.want], ['fixed', 4, 5]);
+}
+
+console.log('\nMaking room, and cancelling');
+{
+  s().reset();
+  const today = s().today;
+  const day = addDaysISO(today, 1);
+  const gym = { id: 'gym-x', title: 'Gym', bucket: 'physical', hours: 1, dread: 2, commitment: 'self', date: day, startHour: 17 };
+  const dinner = { id: 'dinner-x', title: 'Dinner with Ravi', bucket: 'social', hours: 2, dread: 1, commitment: 'fixed', date: day, startHour: 19 };
+  const week = [...s().items, gym, dinner];
+  check('your own gym session can be given up', isSwappable(gym), true);
+  check('a fixed dinner cannot', isSwappable(dinner), false);
+  check('the day shows what could move', swappableOn(week, day).some((i) => i.id === 'gym-x'), true);
+  check('and without it, the gap opens', withoutSwappable(week, day).some((i) => i.id === 'gym-x'), false);
+  check('a time on top of the gym names it', displacedBy(week, { date: day, startHour: 17, hours: 1 }).map((i) => i.id).includes('gym-x'), true);
+  check('a time beside it does not', displacedBy(week, { date: day, startHour: 15, hours: 1 }).length, 0);
+  check('and nothing lands on the fixed dinner', displacedBy(week, { date: day, startHour: 19, hours: 1 }).length, 0);
+
+  // Cancelling: the thing and its sittings go; a calendar event stays gone.
+  s().scheduleSessions('algo-set', planSessions(s().items.find((i) => i.id === 'algo-set'), s().items, today, 9));
+  check('booked sittings are there first', s().items.some((i) => i.parentId === 'algo-set'), true);
+  s().cancelItem('algo-set');
+  check('cancelling takes it off your week', s().items.some((i) => i.id === 'algo-set'), false);
+  check('with every sitting booked for it', s().items.some((i) => i.parentId === 'algo-set'), false);
+  s().addItem({ title: 'Dentist', bucket: 'errands', hours: 1, dread: 2, commitment: 'fixed', date: day, startHour: 10 });
+  const dentist = s().items.at(-1);
+  s().hydrate(new Map([['items', [{ id: dentist.id, data: { ...dentist, source: { kind: 'google', eventId: 'evt-1' } } }]]]), new Map());
+  s().cancelItem(dentist.id);
+  check('a cancelled calendar event is remembered', s().calendarHandled['event:evt-1'], { as: 'skipped' });
+  s().reset();
 }
 
 console.log('\nSync does not echo');

@@ -18,6 +18,7 @@ import { LogTime, OwingSummary } from '@/features/item/Owing';
 import { SittingsPreview } from '@/features/item/Sittings';
 import { DrainDisclosure } from '@/features/item/Dread';
 import { MoveItem } from '@/features/item/MoveItem';
+import { CancelTask } from '@/features/item/CancelTask';
 
 /**
  * Two real items, so `/item/...` renders in the static export rather than the
@@ -66,7 +67,17 @@ export default function ItemDetail() {
     <Screen
       back="/plan"
       backLabel="Plan"
-      footer={<Button label="Done" kind="secondary" onPress={() => (router.canGoBack() ? router.back() : router.replace('/plan'))} />}
+      footer={
+        <Stack direction="row" gap={3}>
+          {/* Done is not the only ending: plans fall through and work gets dropped. Not for classes - the timetable owns those. */}
+          {!item.moduleId && !item.repeats && !item.isLog ? (
+            <View className="flex-1">
+              <CancelTask item={item} onCancelled={() => (router.canGoBack() ? router.back() : router.replace('/plan'))} />
+            </View>
+          ) : null}
+          <Button label="Done" kind="primary" className="flex-1" onPress={() => (router.canGoBack() ? router.back() : router.replace('/plan'))} />
+        </Stack>
+      }
     >
       <Stack gap={5} className="pt-2">
         <PageHeader
@@ -138,7 +149,7 @@ export default function ItemDetail() {
         {/* Anything with a slot, or wanting one: the days, how full each is, and the day itself to drag along. */}
         {!owing && !finished && !locked && !item.repeats ? (
           <Section family="week" title={item.startHour === undefined ? 'Give it a time' : 'Move it'} sticker="clock">
-            <MoveItem key={`${item.date}-${item.startHour}`} item={item} />
+            <MoveItem key={item.id} item={item} />
             {item.startHour !== undefined ? (
               <Chip label="Take the time away" onPress={() => { scheduleItem(item.id, undefined); successFeedback(); }} />
             ) : null}

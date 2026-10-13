@@ -437,8 +437,15 @@ const EXPECTATIONS = [
     // The blocks that could move: least important first, each with why and where it would fit.
     'Could move', 'least important first', 'back',
     'Week 10 catch-up revision', 'Your own idea',
-    'Mon is one of your heaviest days', 'Fits Sun 7am, a lighter day', 'Move it \u00b7 Sun 7am',
+    'Mon is one of your heaviest days', 'Fits Sun 7am, a lighter day', '\u2194\ufe0f Move it',
     'Soft, can be rearranged', 'Write the message',
+  ]],
+  ['swap/revision.html', 'Swap', [
+    'MAKE ROOM', 'Swap this time',                       // give a movable block to something that matters more
+    'Week 10 catch-up revision', 'back',                 // the block, and what it gives back
+    'Pick',                                              // the first of three steps
+    'Use this time for\u2026', 'Emails I have been avoiding', 'gets',   // the same list as what to do first
+    'Leave it empty \u00b7 just move it',
   ]],
 ];
 
@@ -460,6 +467,7 @@ const EXITS = [
   ['widget.html', 'Back'],
   ['calm.html', 'Home'],
   ['priority.html', 'Home'],
+  ['swap/revision.html', 'What first'],
   ['checkin.html', 'You'],
   ['plan-together.html', 'Friends'],
   ['sharing.html', 'Friends'],
