@@ -241,11 +241,11 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 
 **What to do first**
 
-1. **Start here**: due date, hours needed, and what it costs.
-2. **Why it's first**, in plain reasons.
-3. **Your next 7 days**: how many hours the list needs against the free time you have.
-4. **Then**: only owing work and tasks without a set time, in the order you have to **start** them. Heavy work due later rises above light work due sooner; importance decides within a day. Booked work shows its next sitting.
-5. **Could move**: blocks at a set time that you're allowed to move, least important first, each with why and a lighter slot it fits. Fixed plans and hard deadlines never appear.
+1. **Start here**: due, needs and costs as three tiles, and the next time it fits.
+2. **Why first**: keyword tags (🚨 Short on time · ⏰ Start today · 📦 4h to go), each with 1–3 strength dots.
+3. **Next 7 days**: free hours per day, and one bar of hours needed against hours free.
+4. **Then**: only owing work and tasks without a set time, in the order you have to **start** them. Each row is tags (▶ start day, ⏳ hours · due), with the rank coloured by how soon: red today, amber within two days. Heavy work due later rises above light work due sooner; importance decides within a day.
+5. **Could move**: blocks at a set time you're allowed to move, least important first, tagged 🙋 Your idea · 📈 Heavy Mon · 🪶 Lighter Sun 7am. Fixed plans and hard deadlines never appear.
 6. **Move it → Swap this time**, in three steps: **pick** what the time should go to (the same sorted list, each saying how much of the slot it gets), **plan** it into the slot, then **move** the block that was there to a new time, or drop it.
 
 *Every time you pick a time in Ballast, it's the same picker: this week and next with how full each day is (or a calendar for later dates), then drag the block along the day. On the slider, 🟧 amber blocks are things you could give up: slide onto one to take its place, and Ballast asks where it goes next.*

@@ -44,6 +44,8 @@ export interface Ranked {
   need?: number;
   /** Could-move rows: why this one, in a few words each. */
   moveReasons?: string[];
+  /** The same reasons as keywords, for a row of tags: 🙋 Your idea · 📈 Heavy Mon · 🪶 Sun 7am. */
+  moveTags?: Array<{ emoji: string; label: string }>;
   /** Could-move rows: a lighter slot it would fit, if there is one. */
   suggest?: { date: string; startHour: number };
 }
@@ -255,6 +257,12 @@ function moveRow(item: Item, items: Item[], today: string, weights: Weights, hor
   if (importance === 1) moveReasons.push('Optional to you');
   if (heavy) moveReasons.push(`${weekdayOf(item.date)} is one of your heaviest days`);
   if (target) moveReasons.push(`Fits ${weekdayOf(target.date)} ${formatHour(target.start!)}, a lighter day`);
+  const moveTags = [
+    item.commitment === 'self' ? { emoji: '🙋', label: 'Your idea' } : { emoji: '↔️', label: 'Soft' },
+    ...(importance === 1 ? [{ emoji: '🍃', label: 'Optional' }] : []),
+    ...(heavy ? [{ emoji: '📈', label: `Heavy ${weekdayOf(item.date)}` }] : []),
+    ...(target ? [{ emoji: '🪶', label: `Lighter ${weekdayOf(target.date)} ${formatHour(target.start!)}` }] : []),
+  ];
 
   const score =
     (4 - importance) * 10 * weights.importance +
@@ -271,6 +279,7 @@ function moveRow(item: Item, items: Item[], today: string, weights: Weights, hor
     kind: 'fixed',
     saves,
     moveReasons,
+    moveTags,
     ...(target ? { suggest: { date: target.date, startHour: target.start! } } : {}),
   };
 }

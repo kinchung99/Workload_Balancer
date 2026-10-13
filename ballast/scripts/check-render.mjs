@@ -424,21 +424,21 @@ const EXPECTATIONS = [
   ['priority.html', 'Priority', [
     'WHAT TO DO FIRST', 'Start with this',
     'START HERE', 'Emails I have been avoiding',        // number one: the work that has to start today
-    'DUE', 'NEEDS', 'COSTS', 'of the week',             // three facts, as tiles
-    'WHY IT\u2019S FIRST', 'Not enough free time left to finish', 'Start today \u00b7 due in 2 days', '4h of work to go',
+    'DUE', 'NEEDS', 'COSTS', 'battery',                 // three facts, as tiles
+    'WHY FIRST', 'Short on time', 'Start today', '4h to go',   // why, as keywords with strength dots
     'Plan the sittings',                                // when it can actually happen
-    'Your next 7 days', '\u2713 It fits', 'still needs a slot',   // the week, and whether it fits
+    'Next 7 days', '\u2713 Fits', 'Needs', 'Free',      // the week, and whether the hours fit
     // Only owing work and tasks without a set time, in the order they have to be started.
-    'Then', '6 of 6 \u00b7 next 7 days',
-    'Return the library books', '\u25b6 Start today \u00b7 no time yet \u00b7 20m',
-    'Algorithms problem set', '\u25b6 Start by Wed \u00b7 due Thu 13 Nov \u00b7 3h to go', '75%', 'left',
-    'Group presentation', '\u25b6 Start by Sun \u00b7 due Wed 19 Nov \u00b7 6h to go',
-    'Plan sittings', 'Plan time',                       // one button to act on each
-    // The blocks that could move: least important first, each with why and where it would fit.
-    'Could move', 'least important first', 'back',
-    'Week 10 catch-up revision', 'Your own idea',
-    'Mon is one of your heaviest days', 'Fits Sun 7am, a lighter day', '\u2194\ufe0f Move it',
-    'Soft, can be rearranged', 'Write the message',
+    'Then', 'by start day',
+    'Return the library books', '20m',
+    'Algorithms problem set', 'Start by Wed', '3h \u00b7 due Thu 13', '75%', 'left',
+    'Group presentation', '6h \u00b7 due Wed 19',
+    'Sittings', 'Plan time',                            // one button to act on each
+    // The blocks that could move: least important first, each with keywords and a lighter spot.
+    'Could move', 'least important first',
+    'Week 10 catch-up revision', 'Your idea',
+    'Heavy Mon', 'Lighter Sun 7am', '\u2194\ufe0f Move it',
+    'Soft', '\u2709\ufe0f Message',
   ]],
   ['swap/revision.html', 'Swap', [
     'MAKE ROOM', 'Swap this time',                       // give a movable block to something that matters more

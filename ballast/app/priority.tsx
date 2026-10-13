@@ -13,7 +13,7 @@ import {
 import { weightsFrom } from '@/lib/review';
 import { DAY_LETTER, addDays, dayIndex, daysBetween, formatShort, parseISO } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
-import { percentUndone, remaining, scheduledHours } from '@/lib/prep';
+import { percentUndone, remaining } from '@/lib/prep';
 import { isProtectedClass } from '@/lib/timetable';
 import { batteryCost, costLabel } from '@/lib/drain';
 import { nowHourFor } from '@/lib/sittings';
@@ -41,7 +41,7 @@ const lockedIn = (row: Ranked) => isProtectedClass(row.item) || row.item.commitm
 /** Where its button goes: sittings for owing work, a time for loose work, the day or the time for fixed. */
 const actionFor = (row: Ranked): { label: string; to: string } =>
   row.kind === 'owing'
-    ? { label: '✍️ Plan sittings', to: `/item/${row.item.id}/sittings` }
+    ? { label: '✍️ Sittings', to: `/item/${row.item.id}/sittings` }
     : row.kind === 'loose'
       ? { label: '🕒 Plan time', to: `/item/${row.item.id}` }
       : lockedIn(row)
@@ -52,9 +52,7 @@ const actionFor = (row: Ranked): { label: string; to: string } =>
 const dayWord = (date: string, today: string): string =>
   date === today ? 'Today' : date === addDays(today, 1) ? 'Tomorrow' : formatShort(date);
 
-/** "today", "tomorrow", "on Thu 13 Nov" - for the middle of a sentence. */
-const onDay = (date: string, today: string): string =>
-  date === today ? 'today' : date === addDays(today, 1) ? 'tomorrow' : `on ${formatShort(date)}`;
+const WEEKDAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const hoursWord = (hours: number): string => (hours < 1 ? `${Math.round(hours * 60)}m` : `${Math.round(hours * 10) / 10}h`);
 
@@ -137,17 +135,28 @@ export default function Priority() {
 
         {/* Under a quarter, rest is not the reward for finishing the list. */}
         {restFirst && restIdea ? (
-          <Card tone="recovery" gap={4}>
-            <Stack direction="row" gap={4} align="center">
-              <Sticker name="leaf" size={44} wiggle />
-              <Stack gap={1} grow>
-                <Text variant="micro" tone="recovery">BEFORE ANY OF IT</Text>
-                <Text variant="heading">{restIdea.title}</Text>
-                <Text variant="footnote" tone="muted">{restOwed}h of rest owed · {reading.charge}% battery</Text>
+          <View
+            className="flex-row items-center gap-3 rounded-xl px-4 py-3"
+            style={{ backgroundColor: color.band.recovery.wash, borderWidth: 2, borderColor: color.band.recovery.fill }}
+          >
+            <Sticker name="leaf" size={36} wiggle />
+            <Stack gap={1} grow>
+              <Text variant="micro" tone="recovery">REST FIRST</Text>
+              <Text variant="body" weight="semibold">{restIdea.title}</Text>
+              <Stack direction="row" gap={1} wrap>
+                <Tag emoji="🌙" label={`${restOwed}h owed`} tone="recovery" />
+                <Tag emoji="🔋" label={`${reading.charge}%`} tone={TONE[bandFor(reading.overall)]} />
               </Stack>
             </Stack>
-            <Button label="Book it" kind="secondary" onPress={() => router.push('/prescription')} />
-          </Card>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Book ${restIdea.title}`}
+              onPress={() => { tapFeedback(); router.push('/prescription'); }}
+              className="min-h-min items-center justify-center rounded-pill bg-inverse px-4 py-2 active:opacity-70"
+            >
+              <Text variant="caption" weight="bold" tone="inverse">Book</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {top ? (
@@ -157,7 +166,6 @@ export default function Priority() {
             cost={batteryCost(items, top.item, ceilings)}
             fit={nextFit(top, items, today, nowHourFor(today))}
             needs={hoursNeeded(top, items)}
-            booked={scheduledHours(top.item, items)}
             today={today}
             why={aiWhy(top.item.id)}
             onGo={() => go(top)}
@@ -166,7 +174,7 @@ export default function Priority() {
           <Card gap={4}>
             <Stack direction="row" gap={4} align="center">
               <Sticker name="sun" size={44} />
-              <Text variant="callout" tone="muted" className="flex-1">Nothing is due in the next week. Genuinely.</Text>
+              <Text variant="callout" tone="muted" className="flex-1">Nothing due this week.</Text>
             </Stack>
           </Card>
         )}
@@ -182,15 +190,14 @@ export default function Priority() {
           />
         ) : null}
 
-        {/* Then: one line each, in order, with how hard each one presses. */}
+        {/* Then: one card each, in the order they have to be started. */}
         {rest.length ? (
-          <Section family="focus" title="Then" meta={`${shown.length + 1} of ${first.length} · next 7 days`}>
+          <Section family="focus" title="Then" meta={`${first.length} to do · by start day`}>
             {shown.map((row, index) => (
               <Row
                 key={row.item.id}
                 row={row}
                 rank={index + 2}
-                pressure={row.startBy ? 1 - Math.min(7, daysBetween(today, row.startBy)) / 8 : 0.2}
                 today={today}
                 why={aiWhy(row.item.id)}
                 onOpen={() => { tapFeedback(); router.push(`/item/${row.item.id}` as Href); }}
@@ -199,16 +206,16 @@ export default function Priority() {
             ))}
 
             {rest.length > shown.length ? (
-              <Chip label={`Show the other ${rest.length - shown.length}`} onPress={() => { tapFeedback(); setShowAll(true); }} />
+              <Chip label={`Show ${rest.length - shown.length} more`} onPress={() => { tapFeedback(); setShowAll(true); }} />
             ) : null}
           </Section>
         ) : null}
 
-        {/* The half nobody asks: what are you allowed to move, and what would it give back? */}
+        {/* The other question: what are you allowed to move, and what would it give back? */}
         {couldMove.length ? (
           <Section family="rest" title="Could move" sticker="scales" meta="least important first">
             {couldMove.slice(0, 4).map((row) => (
-              <Stack key={row.item.id} gap={3} className="rounded-lg border border-line-hairline bg-raised px-4 py-3">
+              <Stack key={row.item.id} gap={2} className="rounded-lg border-2 border-dashed bg-raised px-4 py-3" style={{ borderColor: color.band.busy.fill }}>
                 <Stack direction="row" gap={3} align="center">
                   <View
                     className="items-center justify-center rounded-pill"
@@ -216,18 +223,18 @@ export default function Priority() {
                   >
                     <AreaIcon area={row.item.bucket} size={19} />
                   </View>
-                  <Stack gap={1} grow>
-                    <Text variant="body" weight="semibold">{row.item.title}</Text>
+                  <Stack gap={0} grow>
+                    <Text variant="body" weight="semibold" numberOfLines={2}>{row.item.title}</Text>
                     <Text variant="micro" tone="subtle">
                       {dayWord(row.item.date, today)} · {formatHour(row.item.startHour ?? 0)}–{formatHour((row.item.startHour ?? 0) + row.item.hours)}
                     </Text>
                   </Stack>
-                  <Chip label={`+${Math.max(1, batteryCost(items, row.item, ceilings))}% back`} tone="recovery" readOnly />
+                  <Tag emoji="⚡" label={`+${Math.max(1, batteryCost(items, row.item, ceilings))}%`} tone="steady" />
                 </Stack>
-                {/* Why this one: what kind of promise it is, how much it matters, the day it sits on, and where it would fit. */}
-                <Stack gap={1}>
-                  {(row.moveReasons ?? []).map((reason) => (
-                    <Text key={reason} variant="micro" tone="muted">· {reason}</Text>
+                {/* Why this one, as keywords: what kind of promise, how much it matters, its day, a lighter spot. */}
+                <Stack direction="row" gap={1} wrap>
+                  {(row.moveTags ?? []).map((tag) => (
+                    <Tag key={tag.label} emoji={tag.emoji} label={tag.label} tone={tag.emoji === '🪶' ? 'recovery' : 'plain'} />
                   ))}
                 </Stack>
                 <Stack direction="row" gap={2} wrap>
@@ -239,7 +246,7 @@ export default function Priority() {
                   />
                   {/* Only somebody else's plans need a message; your own idea just moves. */}
                   {row.item.commitment === 'soft' ? (
-                    <Chip label="Write the message" onPress={() => router.push(`/decline/${row.item.id}`)} />
+                    <Chip label="✉️ Message" onPress={() => router.push(`/decline/${row.item.id}`)} />
                   ) : null}
                 </Stack>
               </Stack>
@@ -253,19 +260,49 @@ export default function Priority() {
   );
 }
 
+/** How soon something has to start, as a colour: today is red, within two days amber. */
+const urgency = (row: Ranked, today: string): 'heavy' | 'busy' | 'plain' => {
+  if (!row.startBy) return 'plain';
+  const days = daysBetween(today, row.startBy);
+  return days <= 0 ? 'heavy' : days <= 2 ? 'busy' : 'plain';
+};
+
+/** The reason, as a keyword: what the tag on number one says. */
+const pushWord = (push: Push, row: Ranked, today: string): string =>
+  push.key === 'risk' ? 'Short on time'
+    : push.key === 'deadline' ? startLabel(row, today)
+      : push.key === 'size' ? (row.kind === 'owing' ? `${remaining(row.item)}h to go` : `${hoursWord(row.item.hours)} block`)
+        : push.label;
+
+/** "Wed 12" - a day short enough for a tile. */
+const shortDay = (date: string, today: string): string =>
+  date === today ? 'Today' : date === addDays(today, 1) ? 'Tomorrow' : `${WEEKDAY[dayIndex(date)]} ${parseISO(date).getUTCDate()}`;
+
+/** A keyword with an emoji, on a soft wash: the page's building block instead of a sentence. */
+function Tag({ emoji, label, tone = 'plain' }: { emoji?: string; label: string; tone?: 'plain' | 'steady' | 'busy' | 'heavy' | 'recovery' }) {
+  return (
+    <View
+      className="flex-row items-center gap-1 rounded-pill px-2 py-1"
+      style={{ backgroundColor: tone === 'plain' ? color.surface.sunken : color.band[tone].wash }}
+    >
+      {emoji ? <Text variant="micro">{emoji}</Text> : null}
+      <Text variant="micro" weight="semibold" tone={tone === 'plain' ? 'muted' : tone}>{label}</Text>
+    </View>
+  );
+}
+
 /**
- * Number one, answered in full: when it is due, how long it needs, what it
- * will take out of you, why it is first, and when it could actually happen.
+ * Number one, answered at a glance: due, needs, costs as tiles, why it is first
+ * as tags with strength dots, and the next time it fits.
  */
 function Hero({
-  row, pushes, cost, fit, needs, booked, today, why, onGo,
+  row, pushes, cost, fit, needs, today, why, onGo,
 }: {
   row: Ranked;
   pushes: Push[];
   cost: number;
   fit: ReturnType<typeof nextFit>;
   needs: number;
-  booked: number;
   today: string;
   /** The AI's reason, in a line, when it has given one. */
   why?: string;
@@ -274,7 +311,6 @@ function Hero({
   const { item } = row;
   const due = item.deadline ?? item.date;
   const days = Math.max(0, daysBetween(today, due));
-  const risky = pushes.some((p) => p.key === 'risk');
 
   return (
     <View className="overflow-hidden rounded-xl border-2 border-inverse" style={{ backgroundColor: FAMILY.focus.wash }}>
@@ -290,46 +326,55 @@ function Hero({
           </View>
         </Stack>
 
-        <Text variant="title">{item.title}</Text>
-        {why ? <Text variant="callout" weight="semibold">✨ {why}</Text> : null}
+        <Stack gap={1}>
+          <Text variant="title">{item.title}</Text>
+          {why ? <Text variant="footnote" tone="muted" numberOfLines={2}>✨ {why}</Text> : null}
+        </Stack>
 
         {/* Three facts, as tiles: due, needs, costs. */}
         <Stack direction="row" gap={2}>
-          <Fact emoji="⏰" label="DUE" value={dayWord(due, today)} sub={days <= 1 ? formatShort(due) : `in ${days} days`} hot={days <= 1} />
+          <Fact emoji="⏰" label="DUE" value={shortDay(due, today)} sub={days <= 1 ? 'now' : `in ${days} days`} hot={days <= 1} />
           <Fact
             emoji="⏳"
             label="NEEDS"
             value={row.kind === 'owing' ? `${remaining(item)}h` : hoursWord(item.hours)}
-            sub={row.kind === 'owing' ? `${percentUndone(item)}% left` : row.kind === 'fixed' ? 'booked' : 'no time yet'}
+            sub={row.kind === 'owing' ? `${percentUndone(item)}% left` : 'no time yet'}
           />
-          <Fact emoji="🔋" label="COSTS" value={costLabel(cost)} sub="of the week" extra={<DrainBadge value={item.dread} />} />
+          <Fact emoji="🔋" label="COSTS" value={costLabel(cost)} sub="battery" extra={<DrainBadge value={item.dread} />} />
         </Stack>
 
-        {/* Why it is first: the three things pushing hardest, each with its strength. */}
+        {/* Why it is first: keywords, each with how hard it pushes. */}
         {pushes.length ? (
           <Stack gap={2}>
-            <Text variant="micro" tone="muted">WHY IT’S FIRST</Text>
-            {pushes.map((push) => (
-              <Stack key={push.key} direction="row" gap={3} align="center">
-                <Text variant="callout">{push.emoji}</Text>
-                <Text variant="footnote" weight="semibold" tone={push.key === 'risk' ? 'heavy' : 'default'} className="flex-1">
-                  {push.label}
-                </Text>
-                <Stack direction="row" gap={1} accessible accessibilityRole="image" accessibilityLabel={`${push.strength} of 3`}>
-                  {[1, 2, 3].map((dot) => (
-                    <View
-                      key={dot}
-                      style={{
-                        width: 10, height: 10, borderRadius: radius.pill,
-                        backgroundColor: dot <= push.strength
-                          ? (push.key === 'risk' ? color.band.heavy.fill : color.ink.default)
-                          : color.surface.track,
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </Stack>
-            ))}
+            <Text variant="micro" tone="muted">WHY FIRST</Text>
+            <Stack direction="row" gap={2} wrap>
+              {pushes.map((push) => {
+                const hot = push.key === 'risk';
+                return (
+                  <View
+                    key={push.key}
+                    accessible
+                    accessibilityLabel={`${pushWord(push, row, today)}, ${push.strength} of 3`}
+                    className="flex-row items-center gap-2 rounded-pill px-3 py-2"
+                    style={{ backgroundColor: hot ? color.band.heavy.wash : color.surface.raised }}
+                  >
+                    <Text variant="caption">{push.emoji}</Text>
+                    <Text variant="caption" weight="semibold" tone={hot ? 'heavy' : 'default'}>{pushWord(push, row, today)}</Text>
+                    <Stack direction="row" gap={1}>
+                      {[1, 2, 3].map((dot) => (
+                        <View
+                          key={dot}
+                          style={{
+                            width: 7, height: 7, borderRadius: radius.pill,
+                            backgroundColor: dot <= push.strength ? (hot ? color.band.heavy.fill : color.ink.default) : color.surface.track,
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </View>
+                );
+              })}
+            </Stack>
           </Stack>
         ) : null}
 
@@ -339,18 +384,13 @@ function Hero({
           style={{ backgroundColor: fit ? color.band.steady.wash : color.band.heavy.wash }}
         >
           <Text variant="heading">{fit ? '🕑' : '⚠️'}</Text>
-          <Stack gap={1} grow>
-            <Text variant="footnote" weight="semibold" tone={fit ? 'steady' : 'heavy'}>
-              {fit
-                ? `${fit.booked ? 'Booked' : 'Fits'} ${onDay(fit.date, today)} at ${formatHour(fit.start)}–${formatHour(fit.start + fit.hours)}`
-                : risky ? 'No gap left before it’s due' : 'No gap that fits before it’s due'}
-            </Text>
-            <Text variant="micro" tone="muted">
-              {fit
-                ? fit.booked ? 'Already in your day' : row.kind === 'owing' ? `A ${hoursWord(fit.hours)} sitting · ${hoursWord(needs)} still unplanned` : 'The first gap long enough'
-                : 'Something has to move - see below'}
-            </Text>
-          </Stack>
+          <Text variant="footnote" weight="semibold" tone={fit ? 'steady' : 'heavy'} className="flex-1">
+            {fit
+              ? `${fit.booked ? 'Booked' : 'Fits'} ${shortDay(fit.date, today)} · ${formatHour(fit.start)}–${formatHour(fit.start + fit.hours)}`
+              : 'No gap before it’s due'}
+          </Text>
+          {fit && !fit.booked && row.kind === 'owing' && needs > 0 ? <Tag label={`${hoursWord(needs)} to plan`} tone="busy" /> : null}
+          {!fit ? <Tag label="Move something ↓" tone="heavy" /> : null}
         </View>
 
         <Button label={row.kind === 'fixed' && !lockedIn(row) ? 'Change the time' : ACTION[row.kind]} onPress={onGo} />
@@ -377,7 +417,8 @@ function Fact({
 
 /**
  * The next seven days as one picture: a column per day, its height the free
- * time that day, with the rank of whatever is due sitting on top of it.
+ * time that day, with the rank of whatever is due on top - and one bar for
+ * the hours the list needs against the hours you have.
  */
 function WeekAhead({
   ahead, today, charge, band, shownRanks, onDay,
@@ -392,13 +433,14 @@ function WeekAhead({
 }) {
   const spare = Math.round((ahead.free - ahead.needed) * 10) / 10;
   const verdict = {
-    fits: { tone: 'steady' as const, wash: color.band.steady.wash, line: `✓ It fits · ${spare}h to spare` },
-    tight: { tone: 'busy' as const, wash: color.band.busy.wash, line: `Tight · only ${spare}h to spare` },
-    short: { tone: 'heavy' as const, wash: color.band.heavy.wash, line: `Short by ${Math.abs(spare)}h · something has to move` },
+    fits: { tone: 'steady' as const, line: `✓ Fits · ${spare}h spare` },
+    tight: { tone: 'busy' as const, line: `Tight · ${spare}h spare` },
+    short: { tone: 'heavy' as const, line: `Short ${Math.abs(spare)}h · move something` },
   }[ahead.verdict];
+  const used = ahead.free > 0 ? Math.min(1, ahead.needed / ahead.free) : 1;
 
   return (
-    <Section family="week" title="Your next 7 days">
+    <Section family="week" title="Next 7 days" meta="free hours a day">
     <Card gap={4}>
       <Stack direction="row" gap={1} align="end">
         {ahead.days.map((day) => {
@@ -448,62 +490,64 @@ function WeekAhead({
         })}
       </Stack>
 
-      <View className="gap-1 rounded-md px-3 py-3" style={{ backgroundColor: verdict.wash }}>
-        <Stack direction="row" gap={3} align="center">
+      {/* Needs against free, as one bar. */}
+      <Stack gap={2}>
+        <Stack direction="row" gap={2} align="center">
           <Text variant="footnote" weight="semibold" tone={verdict.tone} className="flex-1">{verdict.line}</Text>
-          <Text variant="micro" tone={TONE[band]}>🔋 {charge}% left</Text>
+          <Tag emoji="🔋" label={`${charge}%`} tone={TONE[band]} />
         </Stack>
-        <Text variant="micro" tone="muted">{ahead.needed}h still needs a slot · {ahead.free}h free</Text>
-      </View>
+        <View
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`${ahead.needed} hours needed of ${ahead.free} free`}
+          className="h-3 overflow-hidden rounded-pill"
+          style={{ backgroundColor: color.band.recovery.wash }}
+        >
+          <View style={{ width: `${ahead.needed > 0 ? Math.max(4, used * 100) : 0}%`, height: '100%', backgroundColor: color.band[verdict.tone].fill }} />
+        </View>
+        <Stack direction="row" justify="between">
+          <Text variant="micro" weight="semibold" tone={verdict.tone}>Needs {ahead.needed}h</Text>
+          <Text variant="micro" weight="semibold" tone="recovery">Free {ahead.free}h</Text>
+        </Stack>
+      </Stack>
     </Card>
     </Section>
   );
 }
 
 /**
- * One thing after the first: when it happens - or, for owing work, how much is
- * left - and one button to do something about it: plan its sittings, give it a
- * time, or change the one it has.
+ * One thing after the first: its rank, coloured by how soon it has to start,
+ * a row of keywords - start, due, hours - and one button to act on it.
  */
 function Row({
-  row, rank, pressure, today, why, onOpen, onAction,
-}: { row: Ranked; rank: number; pressure: number; today: string; why?: string; onOpen: () => void; onAction: () => void }) {
+  row, rank, today, why, onOpen, onAction,
+}: { row: Ranked; rank: number; today: string; why?: string; onOpen: () => void; onAction: () => void }) {
   const { item } = row;
   const due = item.deadline ?? item.date;
   const left = row.kind === 'owing' ? percentUndone(item) : null;
   const action = actionFor(row);
-  // Every row leads with the day it has to start - the order the list is in.
-  const start = row.startBy ? startLabel(row, today) : null;
-  const when = row.kind === 'fixed'
-    ? `🕒 ${dayWord(item.date, today)} · ${formatHour(item.startHour ?? 0)}–${formatHour((item.startHour ?? 0) + item.hours)}`
-    : row.kind === 'loose'
-      ? `▶ ${start ?? dayWord(item.date, today)} · no time yet · ${hoursWord(item.hours)}`
-      : `▶ ${start ?? ''} · due ${dayWord(due, today)} · ${remaining(item)}h to go`;
+  const hot = urgency(row, today);
+  const start = row.startBy ? startLabel(row, today) : dayWord(item.date, today);
+  const size = row.kind === 'owing' ? `${remaining(item)}h` : hoursWord(item.hours);
   return (
     <View className="overflow-hidden rounded-lg border-2 border-line-hairline bg-raised">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Number ${rank}. ${item.title}. ${when.replace(/^\S+ /, '')}${left !== null ? `. ${left} percent left` : ''}.`}
+        accessibilityLabel={`Number ${rank}. ${item.title}. ${start}${row.kind === 'owing' ? `, due ${dayWord(due, today)}` : ''}, ${size}${left !== null ? `, ${left} percent left` : ''}.`}
         onPress={onOpen}
-        className="px-4 pb-2 pt-3 active:opacity-70"
+        className="gap-2 px-4 pb-2 pt-3 active:opacity-70"
       >
         <Stack direction="row" gap={3} align="center">
-          <View className="items-center justify-center rounded-pill bg-sunken" style={{ width: 30, height: 30 }}>
-            <Text variant="callout" weight="bold" tone="muted">{rank}</Text>
+          <View
+            className="items-center justify-center rounded-pill"
+            style={{ width: 30, height: 30, backgroundColor: hot === 'plain' ? color.surface.sunken : color.band[hot].wash }}
+          >
+            <Text variant="callout" weight="bold" tone={hot === 'plain' ? 'muted' : hot}>{rank}</Text>
           </View>
-          <Stack gap={1} grow>
-            <Text variant="body" weight="semibold">{item.title}</Text>
-            <Text variant="micro" tone={row.kind === 'loose' ? 'busy' : 'subtle'}>{when}</Text>
-            {why ? <Text variant="footnote" tone="muted">✨ {why}</Text> : null}
-          </Stack>
+          <Text variant="body" weight="semibold" className="flex-1" numberOfLines={2}>{item.title}</Text>
           {left !== null ? (
             // How much of it is left, as a ring that fills as it gets done.
-            <Ring
-              size={50}
-              stroke={5}
-              label={`${left} percent left`}
-              segments={[{ value: (100 - left) / 100, color: color.band.steady.fill }]}
-            >
+            <Ring size={50} stroke={5} label={`${left} percent left`} segments={[{ value: (100 - left) / 100, color: color.band.steady.fill }]}>
               <Text variant="micro" weight="bold">{left}%</Text>
               <Text variant="micro" tone="subtle">left</Text>
             </Ring>
@@ -511,19 +555,20 @@ function Row({
             <DrainBadge value={item.dread} />
           )}
         </Stack>
+        {why ? <Text variant="micro" tone="muted" numberOfLines={1}>✨ {why}</Text> : null}
       </Pressable>
-      <Stack direction="row" gap={3} align="center" className="px-4 pb-3">
-        {/* How hard it presses, against number one. */}
-        <View className="h-1 flex-1 overflow-hidden rounded-pill bg-track">
-          <View style={{ width: `${Math.max(6, Math.min(100, pressure * 100))}%`, height: '100%', backgroundColor: color.ink.subtle }} />
-        </View>
+      <Stack direction="row" gap={2} align="center" className="px-4 pb-3">
+        <Stack direction="row" gap={1} wrap className="flex-1">
+          <Tag emoji="▶" label={start} tone={hot} />
+          <Tag emoji="⏳" label={row.kind === 'owing' ? `${size} · due ${shortDay(due, today)}` : size} />
+        </Stack>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${action.label.replace(/^\S+ /, '')}: ${item.title}`}
           onPress={onAction}
-          className="min-h-min items-center justify-center rounded-pill bg-inverse px-3 py-2 active:opacity-70"
+          className="min-h-min items-center justify-center rounded-pill bg-inverse px-3 py-1 active:opacity-70"
         >
-          <Text variant="micro" weight="bold" tone="inverse">{action.label}</Text>
+          <Text variant="micro" weight="bold" tone="inverse">{action.label.replace(/^\S+ /, '')}</Text>
         </Pressable>
       </Stack>
     </View>

@@ -35,6 +35,7 @@ All notable changes to Ballast. Dates are when the change went live.
 - Moving something is visual: *Change the time* / *Give it a time* show each day of this week and next with its battery load, and a ribbon of the chosen day to drag the block along.
 - **Swap this time** (`/swap/[id]`): *Move it* on a movable block opens three steps: pick what the time should go to from the sorted list (owing work gets its share, booked work brings its next sitting in), plan it, then re-home the block or drop it.
 - The time slider shows three colours: fixed (grey), **could give up (amber)**, and free. Sliding onto amber takes its place, then asks where the displaced block goes; the same happens when booking sittings.
+- **What to do first**, decluttered: keyword tags instead of sentences (why first, start day, hours, move reasons), ranks coloured by how soon they start, one needs-vs-free bar for the week, a one-line rest banner, and dashed amber cards for blocks that could move.
 - **Cancel** on every task, the marking sheet and swaps, behind a second confirmation. Cancelled Google events stay out of the week; a cancelled plan is called off for friends, an accepted one is answered "Can't go".
 - "What to do first" ranks work and promises above your own routines.
 - Judge accounts rebuilt around the current week, with shared free evenings so plan-together finds green blocks.
