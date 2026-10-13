@@ -34,7 +34,7 @@ jobs:
         working-directory: ballast
 
   api:
-    name: api — 72 checks against real Postgres
+    name: api — 209 checks against real Postgres
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

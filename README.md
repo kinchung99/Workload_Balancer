@@ -411,6 +411,8 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 | Numbers look out of date | Reload the page. Your week syncs in seconds, and friends' updates within a minute. |
 | The demo looks different from a judge account | The demo is a separate sample student, and it resets on every reload. |
 | Google shows "unverified app" | Expected while Google reviews us. Tap **Advanced → Go to Ballast**. |
+| An ✨ AI line looks plainer than usual | Gemini's free tier was busy, so Ballast wrote it itself. Nothing is broken. |
+| "Something went wrong" | Tap **Try again**. It has already been reported to us automatically. |
 
 Contact: **kcchung82@gmail.com** · [Privacy policy](https://ballast-ckc3.vercel.app/privacy.html)
 
@@ -437,6 +439,11 @@ Contact: **kcchung82@gmail.com** · [Privacy policy](https://ballast-ckc3.vercel
 | `ballast/` | The app: Expo (React Native + web), Expo Router, Zustand. The battery model, forecast, rebalancer and planner all run on the device. |
 | `server/` | The API: Hono on Vercel, Postgres on Neon, Better Auth (email + guest, bearer tokens), Gemini for writing, Google Calendar (read-only). |
 | `shared/` | The wire contract (zod), used by both sides. |
+| `scripts/` | `monitor.mjs`: the live checks the monitor workflow runs every 30 minutes. |
+| `.github/workflows/` | `ci` (checks on every push), `deploy` (after checks pass), `monitor` (every 30 minutes). |
+| `docs/` | Guide screenshots, the [PDF guide](docs/Ballast-Judges-Guide.pdf), the [architecture diagram](docs/architecture.svg), the [thumbnail](docs/Ballast-Thumbnail.pdf). |
+
+How the app is built, decision by decision: [ballast/README.md](ballast/README.md). What changed: [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
 npm run setup          # install everything

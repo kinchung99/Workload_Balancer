@@ -1,25 +1,33 @@
-# Ballast — frontend
+# Ballast — the app
 
 A stress and workload manager for students who are already far too busy to manage
-their stress. Frontend only: React Native, no backend, no auth, no database
-server. Every number on every screen is computed from a seeded fictional
-semester, and the whole thing is authored so it converts into Figma mechanically
-rather than by redrawing.
+their stress. This folder is the app: React Native through Expo, one codebase for
+iPhone, Android and the web. Everything that *decides* — the battery, the
+forecast, the priority list, the rebalancer, the planner — runs on the phone. The
+API in `../server` keeps accounts, syncs your week between devices, and carries
+what friends can see of each other; it never computes anything about your week.
 
-Built from two briefs — the twelve-page `Ballast-interface-study.pdf` and the
-`REBOOT` feature deck — merged into one app. What each side contributed, and why
-the merge went the way it did, is in *The merge* below.
+It started as a frontend-only study of two briefs — the twelve-page
+`Ballast-interface-study.pdf` and the `REBOOT` feature deck — and most of this
+file is the record of how that study became the app. The early sections describe
+the app as it was when they were written; *Architecture*, *Tech stack*,
+*Accessibility*, *What is real* and *Verification* describe it as it is now.
 
 ```
 Load Balancer/
-├── README.md    ← the submission: problem, ideation, prototype, feasibility
-├── docs/        ← problem tree, mindmap, user flow
+├── README.md        ← the judges' guide: links, accounts, a tour of every feature
+├── CHANGELOG.md     ← what changed, by release
+├── docs/            ← guide screenshots, PDF guide, architecture diagram, thumbnail
+├── scripts/         ← monitor.mjs: the live checks GitHub runs every 30 minutes
+├── .github/         ← checks on every push · deploy after checks · monitor
+├── shared/          ← contract.ts: the zod schemas both sides import
+├── server/          ← the API: Hono on Vercel, Neon Postgres, Better Auth
 └── ballast/
-    └── README.md  ← you are here: how it is built
+    └── README.md    ← you are here: how the app is built
 ```
 
-This is the engineering documentation. For the problem, the ideation process and
-the prototype links, start at the [submission README](../README.md).
+For the product itself — what it does and how to try it — start at the
+[top-level README](../README.md).
 
 ---
 
@@ -31,60 +39,58 @@ npm start           # scan the QR code with Expo Go (iOS: Camera app; Android: i
 npm run web         # or open it in a browser
 ```
 
-Expo Go from the App Store runs this as-is, provided the phone is on iOS 16.4 or
-newer. See *A note on Expo Go and SDK versions* if it isn't.
+With no `EXPO_PUBLIC_API_URL` the app runs on the sample week alone, offline,
+with nothing to sign in to. Three build-time variables decide which app you get:
+
+| Variable | Effect |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | The API to talk to (`https://ballast-ckc3.vercel.app`). Without it: sample week only. |
+| `EXPO_PUBLIC_GUEST=1` | Adds *Look around as a guest*. Preview only — production is sign-in only. |
+| `EXPO_PUBLIC_DEMO=1` | With `GUEST`: opens straight on the sample week and resets it on every load. |
+
+They are inlined at build time, so `npx expo export --clear` after changing them.
 
 Verification, all of which runs without a device:
 
 ```bash
-npm run preflight        # all five checks below, in order — what `deploy` runs first
+npm run preflight        # everything below, in order — what `deploy` runs first
 npm run typecheck        # tsc --noEmit, strict
-npm run tokens:check     # figma/tokens.json and src/design/tokens.ts have not drifted
+npm run tokens:check     # tokens.json and tokens.ts have not drifted (90 scalars)
 npm run model:check      # the load model reproduces the study's stated figures
-npm run behaviour:check  # every button actually changes the state it claims to
-npm run render:check     # those figures actually reach the rendered screens
-npm run figma:canvas   # build figma/canvas.html — all 32 frames, ready to import
-npm run shots          # re-photograph every screen into docs/shots/ for the submission README
+npm run behaviour:check  # every button actually changes the state it claims to (844 checks)
+npm run render:check     # 681 expected strings reach 53 prerendered pages
+npm run shots            # re-photograph every screen into docs/shots/
+npm run judges:seed      # rebuild the five judge accounts around today's date
 ```
 
 ---
 
-## Sharing it with teammates
+## The live links, and how they get there
 
-`npm start` serves Metro from your own machine, so the QR code points at your
-laptop's LAN address. That is why only you can open it: teammates need to be on
-the same Wi-Fi, with your laptop awake, and on iOS 16.4+ for Expo Go 57.
+| Link | Build | For |
+|---|---|---|
+| https://load-balancer-ballast.expo.app | `API_URL` only | The real app. Sign-in only. |
+| https://load-balancer-ballast--preview.expo.app | `+ GUEST=1` | The same, plus *Look around as a guest*. |
+| https://load-balancer-ballast--demo.expo.app | `+ GUEST=1 DEMO=1` | Opens on the sample week; resets on reload. |
 
-**The app is deployed as a website instead:**
-
-> **https://load-balancer-ballast.expo.app**
-
-Any browser, any device, no install and no Expo Go version to worry about. Every
-screen is there and the routes are real, so
-`/actions`, `/areas/mental` and `/foundations` can be linked directly.
-
-To push changes:
+On every push to `main`, `.github/workflows/checks` runs the whole preflight and
+the API suite; when it passes, `deploy` publishes the API to Vercel and all three
+builds to Expo hosting, then runs the live checks against them. By hand, from
+this folder:
 
 ```bash
-cd ballast
-npm run deploy        # expo export --platform web && eas-cli deploy --prod
+env -u EXPO_PUBLIC_GUEST -u EXPO_PUBLIC_DEMO EXPO_PUBLIC_API_URL=https://ballast-ckc3.vercel.app npm run deploy
+EXPO_PUBLIC_API_URL=https://ballast-ckc3.vercel.app EXPO_PUBLIC_GUEST=1 npx expo export --platform web --clear && npx eas deploy --alias preview
+EXPO_PUBLIC_API_URL=https://ballast-ckc3.vercel.app EXPO_PUBLIC_GUEST=1 EXPO_PUBLIC_DEMO=1 npx expo export --platform web --clear && npx eas deploy --alias demo
 ```
 
-That rebuilds and promotes to the same URL. The EAS project is
-`@kc699/load-balancer-ballast`; its dashboard is on expo.dev under the kc699
-account, and it can be transferred to `kc699s-team` if teammates need to deploy
-it themselves.
+An alias can keep serving the previous build for a minute or two after a deploy;
+compare the page's `entry-*.js` with the one in `dist/` before calling it live.
+The EAS project is `@kc699/load-balancer-ballast`.
 
-The hosting subdomain is fixed on a project's **first** deployment and
-`eas deploy --dev-domain` refuses to change it afterwards, so renaming the URL
-meant creating a new EAS project and claiming the domain on its first deploy.
-The earlier `kc699-ballast.expo.app` is still serving a stale build; delete that
-project from the dashboard when you no longer want it reachable.
-
-**What the web build cannot tell you.** It is React Native Web, so the simulator
-sliders respond to a mouse rather than a finger, and 44pt touch targets, dynamic
-type at 200% and VoiceOver all behave differently on a real handset. For those,
-run it in Expo Go on a phone.
+**What the web build cannot tell you.** It is React Native Web, so sliders answer
+a mouse rather than a finger, and dynamic type at 200% and VoiceOver behave
+differently on a real handset. For those, run it in Expo Go on a phone.
 
 ---
 
@@ -127,6 +133,10 @@ Three specific things a fresh reader tripped on, now fixed: the battery says
 ---
 
 ## Feeling finished without a backend
+
+*Written before accounts existed. The app now has a backend — see
+Architecture — but everything here still holds: it saves on the phone first,
+and the server only ever catches up.*
 
 - **It remembers.** Zustand persists to AsyncStorage — device-local, no server.
   A week you rebalanced stays rebalanced and the intro does not run twice. The
@@ -398,6 +408,8 @@ same honesty as the parser: rule-based, and labelled as such.
 One thing it can tell you that no list does: whether there is genuinely enough
 free time left before the deadline. If not, the row turns red and says so.
 
+---
+
 ## The timetable, made real
 
 The interface study calls the timetable "imported, zero effort", and the build
@@ -451,6 +463,8 @@ Scanning was the obvious alternative and was rejected for the same reason as the
 LLM parser: OCR needs a camera, a permission dialogue and usually a network, and
 this app works in a basement lecture theatre.
 
+---
+
 ## One thing, five areas
 
 The model's oldest simplification was **one bucket per task**. A group
@@ -499,6 +513,8 @@ the model did not say so they would not be worth having.
 Fixing the ordering exposed that the seeded prescription list had never been
 ordered at all — it was offering the river walk first because it was written
 first, and matching the screen's own sentence by coincidence.
+
+---
 
 ## Capture, as four pages
 
@@ -562,6 +578,8 @@ a licence; each of these is a few dozen bytes that renders identically offline,
 in a static export and on a Figma frame. The motion is real motion — a slow lean
 either side — and it stops dead under Reduce Motion.
 
+---
+
 ## Looking like something you would open
 
 The app read as an audit. It was accurate and slightly grim, and an app that only
@@ -606,6 +624,8 @@ game *pressure* was not.
 
 Pill buttons, softer cards, bigger numbers, and the five spot drawings. Home is
 now a face, a number and a word, above five colourful tiles — still 208 words.
+
+---
 
 ## Saying less
 
@@ -923,6 +943,8 @@ their own screens, which is the job those hues already had. Anything carrying a
 value is still band-coloured, and `/foundations` states the rule with the
 palette next to it.
 
+---
+
 ## Screens that were doing too much
 
 Three screens were a single scroll doing three jobs. Each is now short pages,
@@ -960,6 +982,8 @@ Worth it twice over. A link can point at one question, and the static export
 renders each page separately — so `render:check` covers **26 pages** rather than
 the first page of each of nineteen screens. Splitting a screen without this would
 have quietly halved the coverage.
+
+---
 
 ## What to do first
 
@@ -1001,6 +1025,8 @@ allowed to move, and what does each one give back? Sorted by saving, and **hard
 deadlines and flagged lectures can never appear in it** — the app does not offer
 you something it would then refuse to do.
 
+---
+
 ## Four bugs worth writing down
 
 ### Dragging one dial cleared the other four
@@ -1041,6 +1067,8 @@ where you were, so it read as broken.
 Hiding is now a real place you land: Home, cut to the hard deadlines, the owing
 list put away, and a card that says what is hidden and how to get it back.
 
+---
+
 ## Progress is sittings ticked off
 
 Dragging a percentage asked the student to estimate something they do not know.
@@ -1054,6 +1082,8 @@ three pieces of work with three sittings each was nine open rows on one screen.
 
 Work done without booking anything first still counts, in half-hours, because
 that happens.
+
+---
 
 ## Recalibrating the battery
 
@@ -1136,6 +1166,8 @@ All of it is asserted. `behaviour:check` holds the seeded week between 30 and 50
 proves a quiet week reaches the seventies, proves a good day is worth ten points
 or more, and proves a rough day costs less than a good day returns.
 
+---
+
 ## Nothing is a dead button
 
 An audit found nine controls that looked functional and were not, including two
@@ -1161,28 +1193,42 @@ was replaced by a real field), and the step and cohort figures are seeded. Those
 
 ---
 
-## Building and deploying it later
+## Building, deploying and watching it
 
 ```bash
-npm run preflight     # typecheck → tokens → model → rendered output
+npm run preflight     # typecheck → tokens → model → behaviour → rendered output
 npm run deploy        # preflight, then export, then promote to production
+node ../scripts/monitor.mjs   # the live checks, against the deployed app and API
 ```
 
 `deploy` will not publish if any check fails, so a broken build cannot reach the
-URL. `eas-cli` is a pinned devDependency rather than an `npx eas-cli@latest`
-call, so the deploy uses the same version every time.
+URL. Once it is live, three things keep watching:
 
-The things most likely to break later, and where they are handled:
+- **CI** (`.github/workflows/ci.yml`) — every push runs the app preflight and the
+  API's 209 checks against Postgres in WebAssembly. Nothing deploys on red.
+- **The monitor** (`monitor.yml`, every 30 minutes) signs in as a judge account
+  and checks the API, `/health/db`, the app and demo bundles, sync, friends and
+  plans, then signs out. A failure opens a `monitor` issue; the next green run
+  closes it.
+- **Error reports.** A screen that throws shows *Something went wrong · Try
+  again* (`ErrorBoundary` in `app/_layout.tsx`) and posts the message, page and
+  build to `/api/report`; uncaught errors on the web do the same
+  (`src/lib/report.ts`). They land in the Vercel logs under `[client]`, with no
+  personal data, capped at five a page load.
+
+The things most likely to break, and where they are handled:
 
 | Risk | Handling |
 |---|---|
-| Tokens drift from Figma | `tokens:check` compares both files, 73 scalars |
-| A component hard-codes a number | `render:check` asserts 398 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through all 329 actions |
+| Tokens drift between the JSON and the code | `tokens:check` compares both files, 90 scalars |
+| A component hard-codes a number | `render:check` asserts 681 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through 844 checks |
+| The API changes shape under the app | Both import `shared/contract.ts`; the API suite parses every route |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
-| A screen becomes a dead end | `render:check` asserts all 29 non-tab routes carry an exit |
+| A screen becomes a dead end | `render:check` asserts every non-tab route carries an exit |
 | Persistence crashes the static build | Storage adapter falls back to memory when `window` is undefined |
-| Typed routes go stale after adding a screen | `expo start` regenerates `.expo/types`; typecheck fails loudly until it does |
+| The live site breaks between pushes | The monitor, every 30 minutes |
+| A screen crashes on someone's phone | The crash screen, and its report in the logs |
 | SDK upgrade breaks the build | See *A note on Expo Go and SDK versions* |
 
 ---
@@ -1212,6 +1258,11 @@ hour of laundry is not an hour of group presentation.
 | **Body log** | New. Meals logged qualitatively — Ate · Filling, Light snack, Skipped — plus steps and active minutes. |
 | **Contact gaps** | New, merged with Ballast's circle. "Last spoke 9 days ago", sorted longest-gap first, with one-tap reconnection. |
 | **Categorised errands** | New. Grouped into Groceries, Admin and Academic with per-group counts. |
+
+*Since the merge: accounts, sync, Google Calendar and Gemini all arrived, in
+that order, once friends needed real people on the other end — through an API
+that stores rows and never reasons about a week. The paragraph below is the
+decision as it stood at the time.*
 
 **Deliberately not taken.** REBOOT's stack is cloud-shaped — FastAPI, WebSockets,
 Google Calendar, Gemini, Cloud Speech-to-Text. None of it is here. The app runs
@@ -1252,19 +1303,23 @@ event loop for as long as Chrome is open — a server sharing that loop would si
 there unable to answer the page it was being asked for, which is a deadlock that
 looks like a hang.
 
+---
+
 ## Tech stack
 
 | Layer | Choice | Why this one |
 |---|---|---|
-| Runtime | **Expo SDK 57** / React Native 0.86 / React 19.2 | Runs on a judge's own phone from a QR code rather than in a simulator. New Architecture on. |
+| Runtime | **Expo SDK 57** / React Native 0.86 / React 19.2 | One codebase for a phone, a tablet and a browser; installs from a link. |
 | Language | **TypeScript 6**, `strict` | Every domain concept — bucket, dread, commitment — is a union type, so an invalid week does not compile. |
-| Routing | **Expo Router 57** (file-based) | The route tree *is* the screen inventory, which is what lets `figma/` name frames off the filesystem. Typed routes on. |
-| Styling | **NativeWind 4** + Tailwind 3.4 | Tailwind's config is generated from the design tokens, so a class name in a screen and a variable in Figma are the same decision. |
-| State | **Zustand 5** | The model is small, local and synchronous. No provider tree, no async, no cache layer to explain. |
+| Routing | **Expo Router 57** (file-based) | The route tree *is* the screen inventory. Static export, rendered fresh on the client behind a loading cover. |
+| Styling | **NativeWind 4** + Tailwind 3.4 | Tailwind's theme is generated from the design tokens, so a class name and a token are the same decision. |
+| State | **Zustand 5** + persist | The model is small and synchronous. Saved on the device first; a snapshot diff feeds the sync queue. |
+| Sync & accounts | **Hono API** on Vercel, **Better Auth** | Bearer tokens (iPhone Safari drops cross-site cookies), `/api/sync` last-write-wins documents. See `../server`. |
+| Database | **Neon Postgres** via Drizzle | Rows, not opinions: the schema has no column for a friend to read your tasks from. |
+| Writing | **Gemini** through the API | Message drafts, ideas and one-line advice. Every call has a hand-written fallback on the phone. |
+| Calendar | **Google Calendar**, read-only | Events become things to set up; nothing is written back or stored. |
 | Charts | **Hand-built + react-native-svg** | Deliberately *not* a chart library — see below. |
-| Icons | **Inline SVG** (4 glyphs) | Four vectors that paste into Figma, instead of a font the bundle needs four characters from. |
-| Animation | React Native `Animated` | There is exactly one animation. It did not justify a dependency. |
-| Persistence | none — in-memory + seed | Cut on purpose. See *What is real, what is seeded, what is cut*. |
+| Animation | React Native `Animated` | Native driver on phones (`NATIVE_DRIVER`), JavaScript on the web. |
 
 ### A note on Expo Go and SDK versions
 
@@ -1309,80 +1364,51 @@ The five chart components total 343 lines and depend on nothing but `react-nativ
 
 ## Architecture
 
+![How Ballast is built](../docs/architecture.svg)
+
 ```
 ballast/
 ├── app/                        Expo Router. One file per screen, nothing else.
-│   ├── _layout.tsx             Root stack + SafeAreaProvider
-│   ├── (tabs)/                 Home · Areas · Plan · Actions
-│   │   ├── index.tsx           Battery, areas, drains, today
-│   │   ├── areas.tsx           Five batteries, emptiest first
-│   │   ├── plan.tsx            14-day forecast + clustering flag
-│   │   └── actions.tsx         The What-If simulator
-│   ├── areas/[key].tsx         Dispatches to the five area screens
-│   ├── timetable.tsx           Classes, modules, flags
-│   ├── add.tsx                 Capture, page one
-│   ├── add/[step].tsx          …and a way into any of its four pages
-│   ├── tonight/[step].tsx      Tonight, opened at a chosen page
-│   ├── timetable/[step].tsx    Week · modules · import
-│   ├── prescription/[step].tsx What would help · when it goes
-│   ├── rebalance.tsx           Trade sheet
-│   ├── prescription.tsx        Matched recovery
-│   ├── recover.tsx             The ledger
-│   ├── decline/[id].tsx        The drafter
-│   ├── calm.tsx                Calm mode, as a reviewable frame
-│   ├── widget.tsx              Lock screen + the daily ask
-│   └── foundations.tsx         The quality floor, rendered from tokens
+│   ├── _layout.tsx             Root stack, session gate, sync loop, ErrorBoundary
+│   ├── +html.tsx               The HTML shell: boot cover, no hydration, iOS input size
+│   ├── (tabs)/                 Home · Plan · Friends · You
+│   ├── welcome.tsx, setup/     Sign up / sign in, and the four setup steps
+│   ├── timetable…, module/     Week, modules, attendance, flags, paste import
+│   ├── add…, item/             Capture, a task, its sittings
+│   ├── priority, rebalance     What to do first; lighten next week
+│   ├── plans, plan-together, group/, friend/, message, decline/
+│   ├── recover, prescription…, tonight/, checkin
+│   └── calendar…, notifications, settings, sharing…, profile, password, account
 │
 ├── src/
-│   ├── design/
-│   │   ├── tokens.ts           Typed mirror of figma/tokens.json
-│   │   ├── screens.ts          Which drawing and colour each screen opens with
-│   │   └── figma.ts            The Figma bridge: rules, frame map, component map
-│   ├── components/
-│   │   ├── primitives/         Stack Text Card Button Chip Toggle Divider
-│   │   │                       DreadDots ItemRow Slider Checkbox MoodGrid AreaTile
-│   │   │                       AreaDial StepDots Sticker Reveal DatePicker
-│   │   ├── charts/             BandPattern Bar Battery ForecastStrip WeekGrid
-│   │   └── layout/             Screen PageHeader StepNav TabIcon
-│   ├── features/
-│   │   ├── home/CalmMode.tsx
-│   │   ├── add/Capture.tsx     The four-page capture flow
-│   │   ├── tonight/Tonight.tsx The three-page evening planner
-│   │   ├── timetable/          Week, modules, import
-│   │   ├── recover/Prescribe.tsx  What would help, and when
-│   │   └── areas/              Mental Time Physical Social Errands
+│   ├── design/                 tokens.json (W3C DTCG) ⇄ tokens.ts, screens, families
+│   ├── components/             primitives · charts · layout — no business logic
+│   ├── features/               One folder per feature: timetable, item, social,
+│   │                           compose, recover, rebalance, notify, calendar…
 │   ├── lib/                    The model. No React in this directory.
-│   │   ├── load.ts             load = hours × dread, the five-area mix, bands
-│   │   ├── battery.ts          charge = 100 − load%, drains, labels
-│   │   ├── simulate.ts         What-If actions and the projection
-│   │   ├── forecast.ts         14-day strip, clustering detection
-│   │   ├── rebalance.ts        Trade generation and pricing
-│   │   ├── parser.ts           Plain-language capture, regex + keywords
-│   │   ├── priority.ts         What to do first, and what you could move
-│   │   ├── timetable.ts        Paste-import parser, attendance, class flags
-│   │   ├── drafter.ts          Three-tone decline messages
-│   │   ├── dates.ts            ISO/UTC helpers, deterministic
-│   │   └── types.ts            Domain types
-│   ├── data/seed.ts            The fictional semester. Built first, not last.
-│   ├── state/store.ts          Zustand store + plain selectors
-│   └── hooks/                  useReducedMotion
+│   │                           load, battery, forecast, priority, prep (sittings),
+│   │                           rebalance, together (free time), timetable, marking,
+│   │                           rest, notify, sharing — plus api.ts, social.ts,
+│   │                           ai.ts and report.ts, the only files that talk to the server
+│   ├── state/                  store.ts (Zustand), snapshot.ts (diff), sync.ts
+│   ├── hooks/                  useSync, useGate, useCalendarSync, usePopups…
+│   └── data/                   The sample week and the day filler
 │
-├── figma/
-│   ├── tokens.json             W3C DTCG. The source of truth for every value.
-│   └── canvas.html             Generated: 32 frames, one page, import-ready
-│
-└── scripts/                    Verification and build scripts, no build step
+└── scripts/                    The five checks, screenshots, judges:seed
 ```
 
-**The dependency rule is one-directional:** `app/` → `components/` → `lib/` →
-`design/`. `lib/` imports no React and touches no component, which is why the
-model can be checked by a plain Node script with no renderer
-(`scripts/check-model.mjs`).
+**The dependency rule is one-directional:** `app/` → `features/` →
+`components/` → `lib/` → `design/`. `lib/` imports no React, which is why the
+model can be checked by a plain Node script with no renderer. Only `lib/api.ts`
+knows there is a network; screens call `lib/social.ts` and the store, and never
+decide whether they are talking to the server or the sample week.
 
-**Data flow.** `seed.ts` → Zustand store → plain selector functions
-(`weekReading`, `itemsOnDay`, `movableIn`) → screens. Screens do arithmetic
-nowhere; they call `lib/`. Swapping the in-memory array for SQLite means changing
-`seedItems` and nothing else.
+**Data flow.** A tap writes to the Zustand store and renders at once. `useSync`
+photographs the syncable state (`snapshot.ts`), diffs it against the last
+photograph — key-order-insensitive, because Postgres hands jsonb back in its own
+order — and pushes only what changed to `/api/sync`, pulling everything newer in
+the same call. Friends, groups and plans are fetched, never synced: they are
+other people's data. Plans the server confirms move your week with them.
 
 ---
 
@@ -1447,145 +1473,94 @@ errands is exempt from that floor, because nothing is given up.
 
 ## Screens
 
-| # | Route | Source | What it does |
-|---|---|---|---|
-| 00 | `/welcome` | **new** | The intro. Teaches `load = hours × dread` by letting you feel it |
-| 01 | `/` | study p.3 | Battery, five areas, what's pulling you down, today |
-| 02 | `/add` | study p.4 | One box, plain language, guesses as fixable chips |
-| 03 | `/plan` | study p.5 | 14-day strip, clustering flag, 8 days of lead time |
-| 04 | `/rebalance` | study p.6 | Live battery, locked deadlines, protected recovery |
-| 05 | `/recover` | study p.7 | The ledger. Rest as a credit, in load units |
-| 06 | `/prescription` | study p.7 | Matched to the area that still has room |
-| 07 | `/decline/w11-birthday` | study p.8 | Three tones, and "Actually, I'm going" as a real button |
-| 08 | `/areas/social` | both | Contact gaps + circle bands + cohort context |
-| 09 | `/calm` | study p.10 | On the worst weeks, the interface gets simpler |
-| 10 | `/widget` | study p.10 | Lock screen, and the one tap that is the whole daily ask |
-| 11 | `/areas` | REBOOT | Five batteries, emptiest first |
-| 12 | `/actions` | REBOOT | **What if I…** — the simulator |
-| 13 | `/areas/mental` | REBOOT | Mood grid, contributing tags, recent check-ins |
-| 14 | `/areas/time` | REBOOT | Week grid with protected recovery blocks |
-| 15 | `/areas/physical` | REBOOT | Meals, steps, active minutes |
-| 16 | `/areas/errands` | REBOOT | Batched into Groceries, Admin, Academic |
-| 17 | `/foundations` | study p.11 | Bands, patterns, type scale — rendered from tokens |
+The four tabs and the pages behind them. Every one is reachable from a button,
+and every non-tab page carries a labelled way back.
 
-Home switches into calm mode on its own past `threshold.calmMode`. The seeded
-week sits below it, so `/calm` exists as a separate route to make it reviewable without
-having to make a student's week worse to see it.
+| Area | Routes | What they do |
+|---|---|---|
+| Start | `/welcome`, `/setup/[step]` | Sign up or in; timetable, tasks, friends, ready |
+| Home | `/`, `/battery`, `/update`, `/marked`, `/notifications`, `/calm` | Battery, the wall, do this next, what to mark |
+| Plan | `/plan`, `/add`, `/item/[id]`, `/item/[id]/sittings`, `/priority`, `/rebalance`, `/decline/[id]` | 14 days, capture, owing work, what first, lighten |
+| Timetable | `/timetable`, `/timetable/[step]`, `/module/[id]` | Week, modules, attendance, flags, paste import |
+| Friends | `/friends`, `/everyone`, `/friend/[id]`, `/find-friends`, `/plans`, `/plan-together`, `/group/…`, `/message` | Circle, plans, groups, messages |
+| You | `/you`, `/checkin`, `/recover`, `/prescription`, `/tonight/[step]`, `/profile`, `/settings`, `/sharing…`, `/calendar…`, `/password`, `/account` | Check in, rest, privacy, calendar, account |
+
+Home switches into calm mode on its own past `threshold.calmMode`. `/calm`
+renders it on demand, so it can be reviewed without making a week worse.
 
 ---
 
 ## Design system
 
-`figma/tokens.json` is the single source of truth — W3C DTCG format, importable
-by Tokens Studio. Three things read it and nothing else defines a value:
+`src/design/tokens.json` is the single source of truth — W3C DTCG format,
+importable by Tokens Studio. Nothing else defines a value:
 
 - `tailwind.config.js` parses it at config time, so Tailwind's theme *is* the
   token set. `theme`, not `theme.extend`: a class that is not a token does not
-  exist. No `text-[13px]`, no `bg-[#fff]`, no arbitrary values anywhere.
+  exist. No `text-[13px]`, no `bg-[#fff]`, no arbitrary values.
 - `src/design/tokens.ts` is the typed mirror for app code.
-- `npm run tokens:check` walks both and fails on drift — 73 scalar tokens.
+- `npm run tokens:check` walks both and fails on drift — 90 scalar tokens.
 
-**Contrast was computed, not eyeballed.** Every `ink` token clears 4.5:1 on both
-white and the sunken surface; every band fill clears 3:1 against the page. The
-one place that does not reach 3:1 is a busy or recovery bar against its own
-track — carried instead by the fill pattern and the numeric label beside it,
-which is the same "never colour alone" rule applied honestly rather than claimed.
+**Contrast was computed, not eyeballed, and then measured.** Muted text
+(`ink.subtle`, `#5D626B`) clears 5:1 on every tinted wash, and the steady green
+(`#2B7A5E`) carries off-white text at 4.8:1 — both darkened after a Lighthouse
+pass found 4.3:1 on a few tinted cards. Where a bar cannot reach 3:1 against its
+own track, the fill pattern and the number beside it carry the meaning.
 
 ---
 
-## Converting to Figma
+## Figma
 
-This was a design constraint on the code, not a step afterwards. Four rules,
-enforced throughout and documented in `src/design/figma.ts`:
-
-1. **Auto-layout only.** Every container is a `<Stack>` — a flex row or column
-   with `gap`, `pad`, `align`, `justify`, and nothing else. That is exactly the
-   property set of a Figma auto-layout frame. There is no absolute positioning,
-   no margin, no transform and no fixed height on text in the entire codebase.
-2. **No raw values.** Every colour, size, radius and type step is a token, so
-   each property in Figma binds to a variable instead of being typed in.
-3. **One name.** File name = export name = Figma component name.
-   `FIGMA_COMPONENTS` is the index.
-4. **One frame size.** Every screen renders inside 390×844, so nothing scales.
-
-### The path
-
-```bash
-cd ballast
-npm run figma:canvas          # writes figma/canvas.html — all 28 frames
-npx serve figma               # serve it (html.to.design needs a URL)
-```
-
-1. In Figma, run **Tokens Studio** → Settings → *Use DTCG format* → Import
-   `figma/tokens.json` → **Create variables**. You get the `Colour`, `Dimension`
-   and `Type` collections before any layers exist.
-2. Run **html.to.design** and point it at the served `canvas.html`. Each
-   `.artboard` arrives as a 390×844 frame, named `01 Home — battery and areas`
-   and so on. Every `Stack` lands as an auto-layout frame with its real padding and gap;
-   text stays editable; the band patterns arrive as vector fills, not bitmaps.
-3. Bind the imported hex values to the variables from step 1. They match exactly,
-   because both came out of the same file.
-4. `/foundations` is the last frame and doubles as the design file's cover page — every
-   band, pattern, type step and dread state rendered from the same tokens.
-
-`figma/canvas.html` is generated and safe to delete; regenerate it any time the
-app changes and the design file stays in step with the build.
+The app was written to convert into Figma mechanically — every container a
+`<Stack>` with gap and padding (an auto-layout frame), every value a token, one
+390×844 frame size. The tokens still import straight into Tokens Studio from
+`src/design/tokens.json`. The generated `figma/canvas.html` and its script were
+retired once the app outgrew the study; `npm run shots` now produces the
+up-to-date picture of every screen.
 
 ---
 
 ## Accessibility
 
-Tested against the study's own condition: a tired person, one-handed, on a bus,
-at 11pm, with a cracked screen.
+Tested against the study's own condition — a tired person, one-handed, on a bus,
+at 11pm, with a cracked screen — and measured: **Lighthouse accessibility 100 on
+every screen tested** (all 24 in a full pass, re-run after each fix).
 
 - **Never colour alone.** Four bands, each carrying a colour *and* a word *and* a
   fill pattern — flat, diagonal hatch, cross hatch, vertical rule, drawn as SVG
-  patterns in `BandPattern.tsx`. Print in greyscale and all four remain
-  distinguishable; `/foundations` renders that proof.
+  patterns. Print in greyscale and all four remain distinguishable.
 - **Charts that can be spoken.** Every visualisation carries a sentence, not a
-  label. VoiceOver reads the home chart as *"Mental, heavy, 65% of ceiling.
-  Time, busy, 82% of ceiling…"*, and `npm run render:check` asserts that sentence
-  is present in the output.
-- **Targets.** 44pt minimum on everything tappable, dread dots included — the
-  `Toggle` wraps a 30pt control in a 44pt target for that reason.
-- **Type that can grow.** No `numberOfLines`, no fixed heights, no text inside a
-  shape it can overflow. Rows reflow to two lines rather than truncating.
-- **Motion that can stop.** `useReducedMotion` is wired and respected; nothing
-  animates on its own.
+  label, and `render:check` asserts that sentence is in the output.
+- **Contrast.** AA everywhere, including muted text on tinted cards (see
+  *Design system*).
+- **Targets.** 44pt on native controls; on the web nothing is under 24 points —
+  the fourteen-day strip widens its section by a few points to keep that.
+- **Names and roles.** Every page has a title; tab switchers are real tab lists;
+  the strength dots on the priority page are announced as "2 of 3".
+- **Zoom stays on.** Pinch zoom is allowed; on iPhone, fields use 16px text so
+  Safari does not zoom in on its own when one is tapped.
+- **Motion that can stop.** `useReducedMotion` is wired and respected.
 - **Controls built, not installed.** The slider is draggable, tappable *and*
-  `accessibilityRole="adjustable"` with increment/decrement actions — the third
-  of those is what off-the-shelf sliders usually miss.
-- **One thumb.** Every primary action is in `Screen`'s `footer`, in the lower
-  half. Nothing that matters lives in a top corner.
-- **Three-state toggles.** `on` / `off` / `locked` / `protected`, each announced
-  differently, so a hard deadline and an unselected option are never confused.
+  `accessibilityRole="adjustable"` with increment/decrement actions.
+- **One thumb.** Every primary action is in `Screen`'s `footer`, in the lower half.
 
 ---
 
 ## What is real, what is seeded, what is cut
 
-**Real** — the load model with dread weighting, five buckets and their ceilings,
-the battery, the What-If simulator, the plain-language parser, the 14-day
-forecast with clustering detection, the rebalance sheet, recovery matching, the
-decline drafter, and every area screen's logging. Add a task on `/add` and the
-forecast changes; drag a slider on `/actions` and the projection moves.
+**Real** — accounts (email, guest, password change), sync across devices,
+friends by email or code, shared battery, notes and free time, groups, plans with
+answers that move everyone's week, Google Calendar import (read-only), Gemini
+drafts and advice, the whole load model, forecast, priority list, rebalancer,
+sittings, attendance, recovery, notifications in the app and as browser pop-ups.
 
-**Seeded, and the code says so** — sleep and step signals, meals, the circle's
-bands, the cohort average, the contact list and the week grid's blocks. Each
-needs other people, a health permission dialogue or a calendar grant, and demos
-identically either way. All of it lives in `src/data/seed.ts` with comments
-marking it as seeded.
+**Seeded, and the code says so** — the sample week behind the demo and preview
+links (`src/data/seed.ts`, with demo friends who answer by themselves), and the
+five judge accounts (`scripts/seed-judges.ts`), rebuilt around the current date.
 
-**Affordance, not integration** — the microphone buttons on the physical and
-errands screens are real controls with real accessibility labels, but they are
-wired to nothing. Dictation into the capture field is the supported path; voice
-capture with LLM categorisation is REBOOT's design and would need a speech API
-and a model call, both of which were cut for the offline guarantee.
-
-**Cut on purpose** — accounts and login, cloud sync, timetable integrations,
-notifications, settings, and persistence. State starts from the seed on every
-launch. The app genuinely works offline, which is a feature rather than a
-shortcut.
+**Cut** — App Store and Play Store builds (it installs from the link instead),
+push notifications while the app is closed, health data, and voice capture. The
+microphone affordances are on-device dictation into the capture field.
 
 ---
 
@@ -1608,32 +1583,32 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 398 strings against
-the rendered HTML of all thirty-one pages, and `npm run behaviour:check` asserts
-329 state changes behind the buttons.
+figures against the model, and `npm run render:check` asserts 681 strings against
+the rendered HTML of 53 pages, and `npm run behaviour:check` makes 844 checks of
+the state behind the buttons.
 
 ---
 
 ## Verification
 
-There are no unit tests, and that is a deliberate trade for a frontend study: the
-two scripts below check the things that would actually be wrong.
+About 1,100 checks, all runnable without a device, all in CI:
 
-- `scripts/check-model.mjs` — loads the real `seed.ts` and `load.ts` through
-  Node's native TypeScript stripping and asserts the study's numbers. It catches
-  a seed edit that silently moves Amira off her calibrated figures.
-- `scripts/check-behaviour.mjs` — drives the real Zustand store through the
-  actions the buttons call and asserts the state moved: 329 checks covering
-  booking, plan-committing, reconnecting, re-planning, ceiling recalibration,
-  capture with and without a time, the area logs, the time layer, scheduling,
-  errands and inviting people. Several assert that a slot is never offered
-  unless the gap genuinely fits — offering a time that does not exist is worse
-  than offering none — and a block of them presses the same button three times
-  to prove nothing accumulates.
-- `scripts/check-render.mjs` — statically renders every route, strips the HTML
-  (keeping `aria-label` values, since a spoken chart is rendered content too) and
-  asserts the figures reach the screen. It catches a component that hard-codes a
-  percentage the model never produced.
+- `scripts/check-model.mjs` (22) — loads the real `seed.ts` and `load.ts` through
+  Node's native TypeScript stripping and asserts the study's numbers.
+- `scripts/check-behaviour.mjs` (844) — drives the real Zustand store through the
+  actions the buttons call and asserts the state moved: booking, sittings,
+  marking, rebalancing, recalibration, capture, timetable and attendance, plans
+  from the server (answers in flight, called-off plans, going ahead), sync that
+  does not echo, notifications, and pressing the same button three times to prove
+  nothing piles up.
+- `scripts/check-render.mjs` (681 strings, 53 pages) — statically renders every
+  route and asserts the figures reach the screen, spoken labels included.
+- `scripts/verify-tokens.mjs` (90) and `npm run typecheck` complete the app set.
+- `../server/scripts/check-api.ts` (209) — the API against a real Postgres in
+  WebAssembly: the session gate, sync, friends, groups, plans, sharing, the AI
+  routes with a fake model, the calendar with a fake Google, error reports,
+  bearer tokens without cookies, and the deploy routing.
 
-Both run in CI without a device or a simulator. `npm run typecheck` and
-`npm run tokens:check` complete the set.
+After deploying, `../scripts/monitor.mjs` checks the live service from outside,
+and the monitor workflow repeats it every 30 minutes.
+

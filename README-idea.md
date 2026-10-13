@@ -1,3 +1,5 @@
+> **📌 This was the first-round submission (September 2026).** It is kept as the record of the idea and the prototype. For the app as it is now — live links, judge accounts and a guide to every feature — see **[README.md](README.md)**.
+
 <p align="center"><b>Team abc</b></p>
 <h1 align="center">Ballast</h1>
 <p align="center"><b>A stress and workload manager for students who are already too busy to manage their stress.</b></p>

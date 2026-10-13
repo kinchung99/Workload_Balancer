@@ -10,9 +10,15 @@ All notable changes to Ballast. Dates are when the change went live.
 - Crash screen with "Try again", plus error reports from the app to the API's logs (`/api/report`, no personal data).
 - `/health/db` checks that the database answers, separately from the cheap `/health`.
 - The app renders fresh behind its loading screen instead of hydrating, so the console stays clean (no React #418), and nobody sees the sample week flash before their own.
+- Lighthouse best practices 100: sign-in from the app uses only its bearer token (no third-party cookies), and a first visit no longer asks for a session it cannot have (no 401).
 
 **Accessibility**
-- Lighthouse accessibility 100 on all 24 screens tested: page titles, AA contrast on muted text and green chips, 24-point tap targets, pinch zoom allowed (with iOS inputs at 16px so Safari doesn't jump).
+- Lighthouse accessibility 100 on all 24 screens tested: page titles, AA contrast on muted text and green chips, 24-point tap targets, pinch zoom allowed (with iOS inputs at 16px so Safari doesn't jump), real tab lists, and spoken strength dots on the priority page.
+
+**Documentation**
+- README: status badges, "Built to be relied on", the architecture diagram, an updated developer guide and troubleshooting.
+- `ballast/README.md` brought up to date: the live links and how they deploy, tech stack, architecture and data flow, screens, design system, accessibility, what is real, and verification.
+- `README-idea.md` marked as the first-round submission.
 
 **Plans with friends**
 - Accepting an invite is reliable: an answer still on its way survives background refreshes, and a failed one rolls back with a message.
