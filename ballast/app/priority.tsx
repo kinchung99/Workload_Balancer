@@ -162,7 +162,7 @@ export default function Priority() {
         {top ? (
           <Hero
             row={top}
-            pushes={whyFirst(top, items, today, Math.max(...first.map(rowWeight), 1))}
+            pushes={whyFirst(top, items, today, Math.max(...first.map(rowWeight), 1), clockHour(today))}
             cost={batteryCost(items, top.item, ceilings)}
             fit={nextFit(top, items, today, nowHourFor(today))}
             needs={hoursNeeded(top, items)}
@@ -192,7 +192,7 @@ export default function Priority() {
 
         {/* Then: one card each, in the order they have to be started. */}
         {rest.length ? (
-          <Section family="focus" title="Then" meta={`${first.length} to do · by start day`}>
+          <Section family="focus" title="Then" meta="most urgent first">
             {shown.map((row, index) => (
               <Row
                 key={row.item.id}
@@ -213,7 +213,7 @@ export default function Priority() {
 
         {/* The other question: what are you allowed to move, and what would it give back? */}
         {couldMove.length ? (
-          <Section family="rest" title="Could move" sticker="scales" meta="least important first">
+          <Section family="rest" title="Could move" sticker="scales" meta="flexible · priorities can take it">
             {couldMove.slice(0, 4).map((row) => (
               <Stack key={row.item.id} gap={2} className="rounded-lg border-2 border-dashed bg-raised px-4 py-3" style={{ borderColor: color.band.busy.fill }}>
                 <Stack direction="row" gap={3} align="center">
@@ -234,7 +234,7 @@ export default function Priority() {
                 {/* Why this one, as keywords: what kind of promise, how much it matters, its day, a lighter spot. */}
                 <Stack direction="row" gap={1} wrap>
                   {(row.moveTags ?? []).map((tag) => (
-                    <Tag key={tag.label} emoji={tag.emoji} label={tag.label} tone={tag.emoji === '🪶' ? 'recovery' : 'plain'} />
+                    <Tag key={tag.label} emoji={tag.emoji} label={tag.label} tone={tag.emoji === '🎯' ? 'steady' : 'plain'} />
                   ))}
                 </Stack>
                 <Stack direction="row" gap={2} wrap>
@@ -270,13 +270,18 @@ const urgency = (row: Ranked, today: string): 'heavy' | 'busy' | 'plain' => {
 /** The reason, as a keyword: what the tag on number one says. */
 const pushWord = (push: Push, row: Ranked, today: string): string =>
   push.key === 'risk' ? 'Short on time'
-    : push.key === 'deadline' ? startLabel(row, today)
-      : push.key === 'size' ? (row.kind === 'owing' ? `${remaining(row.item)}h to go` : `${hoursWord(row.item.hours)} block`)
+    : push.key === 'size' ? (row.kind === 'owing' ? `${remaining(row.item)}h to go` : `${hoursWord(row.item.hours)} block`)
         : push.label;
 
 /** "Wed 12" - a day short enough for a tile. */
 const shortDay = (date: string, today: string): string =>
   date === today ? 'Today' : date === addDays(today, 1) ? 'Tomorrow' : `${WEEKDAY[dayIndex(date)]} ${parseISO(date).getUTCDate()}`;
+
+/** "Due today", "Due tomorrow", "Due Thu 13". */
+const dueTag = (due: string, today: string): string => {
+  const day = shortDay(due, today);
+  return day === 'Today' || day === 'Tomorrow' ? `Due ${day.toLowerCase()}` : `Due ${day}`;
+};
 
 /** A keyword with an emoji, on a soft wash: the page's building block instead of a sentence. */
 function Tag({ emoji, label, tone = 'plain' }: { emoji?: string; label: string; tone?: 'plain' | 'steady' | 'busy' | 'heavy' | 'recovery' }) {
@@ -527,13 +532,19 @@ function Row({
   const left = row.kind === 'owing' ? percentUndone(item) : null;
   const action = actionFor(row);
   const hot = urgency(row, today);
-  const start = row.startBy ? startLabel(row, today) : dayWord(item.date, today);
-  const size = row.kind === 'owing' ? `${remaining(item)}h` : hoursWord(item.hours);
+  const booked = row.kind === 'owing' && (row.need ?? 0) <= 0;
+  const size = row.kind === 'owing' ? `${remaining(item)}h left` : hoursWord(item.hours);
+  // Keywords that say why it sits here: its deadline (coloured by how soon it has to start) and its size.
+  const when = booked
+    ? { emoji: '✅', label: startLabel(row, today) }
+    : row.kind === 'owing'
+      ? { emoji: '⏰', label: dueTag(due, today) }
+      : { emoji: '📅', label: shortDay(item.date, today) };
   return (
     <View className="overflow-hidden rounded-lg border-2 border-line-hairline bg-raised">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Number ${rank}. ${item.title}. ${start}${row.kind === 'owing' ? `, due ${dayWord(due, today)}` : ''}, ${size}${left !== null ? `, ${left} percent left` : ''}.`}
+        accessibilityLabel={`Number ${rank}. ${item.title}. ${when.label}, ${size}${left !== null ? `, ${left} percent left` : ''}.`}
         onPress={onOpen}
         className="gap-2 px-4 pb-2 pt-3 active:opacity-70"
       >
@@ -559,8 +570,8 @@ function Row({
       </Pressable>
       <Stack direction="row" gap={2} align="center" className="px-4 pb-3">
         <Stack direction="row" gap={1} wrap className="flex-1">
-          <Tag emoji="▶" label={start} tone={hot} />
-          <Tag emoji="⏳" label={row.kind === 'owing' ? `${size} · due ${shortDay(due, today)}` : size} />
+          <Tag emoji={when.emoji} label={when.label} tone={booked ? 'steady' : hot} />
+          {booked ? <Tag emoji="⏰" label={dueTag(due, today)} /> : <Tag emoji="⏳" label={size} />}
         </Stack>
         <Pressable
           accessibilityRole="button"

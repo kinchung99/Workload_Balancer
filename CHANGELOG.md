@@ -2,12 +2,13 @@
 
 All notable changes to Ballast. Dates are when the change went live.
 
-## v1.0.0 · 2026-10-12 · Final submission
+## v1.0.0 · 2026-10-13 · Final submission
 
 **Reliability and operations**
 - Live monitoring: a GitHub Action every 30 minutes signs in like a judge and checks the API, database, app, demo, sync, friends and plans. A failure opens an issue, and the first green run closes it.
 - Automatic deploys after checks pass (API → Vercel, app → Expo hosting), followed by the same live checks. Active once the `EXPO_TOKEN` and `VERCEL_TOKEN` repository secrets are set.
 - Crash screen with "Try again", plus error reports from the app to the API's logs (`/api/report`, no personal data).
+- Signed in, a reload or an opened link waits behind the splash until your week and friends arrive, instead of showing an empty week or "not in your week" for a moment; `/account` no longer bounces to Home on a reload.
 - `/health/db` checks that the database answers, separately from the cheap `/health`.
 - The app renders fresh behind its loading screen instead of hydrating, so the console stays clean (no React #418), and nobody sees the sample week flash before their own.
 - Lighthouse best practices 100: sign-in from the app uses only its bearer token (no third-party cookies), and a first visit no longer asks for a session it cannot have (no 401).
@@ -29,16 +30,13 @@ All notable changes to Ballast. Dates are when the change went live.
 **Product**
 - "Can it move?" has four answers: 📌 Fixed (a set time that stays put), 🔒 Hard deadline, ↔️ Soft, 🙋 Self-imposed. Plans with friends are fixed; Google Calendar setup asks both questions.
 - "Want to be there?" became **How important is it?**, four picture tiles from 🍃 Optional to 🔥 Must, asked of everything and changeable on the item.
-- **What to do first** lists only owing work and tasks without a set time, sorted by the day each has to be **started** (walking back from the deadline through your real free time), so heavy work due later rises; importance decides within a day. Booked work shows its next sitting.
-- **Could move** lists only movable blocks at a set time, least important first, each with reasons and a lighter nearby slot; *Move it* opens the picker preset to that slot.
-- One way to pick a time everywhere (adding, moving, planning, booking rest, the marking sheet): this week and next with each day's load, or a calendar for any later date, plus the drag-along day slider.
-- Moving something is visual: *Change the time* / *Give it a time* show each day of this week and next with its battery load, and a ribbon of the chosen day to drag the block along.
-- **Swap this time** (`/swap/[id]`): *Move it* on a movable block opens three steps: pick what the time should go to from the sorted list (owing work gets its share, booked work brings its next sitting in), plan it, then re-home the block or drop it.
-- The time slider shows three colours: fixed (grey), **could give up (amber)**, and free. Sliding onto amber takes its place, then asks where the displaced block goes; the same happens when booking sittings.
-- **What to do first**, decluttered: keyword tags instead of sentences (why first, start day, hours, move reasons), ranks coloured by how soon they start, one needs-vs-free bar for the week, a one-line rest banner, and dashed amber cards for blocks that could move.
+- **What to do first** lists only owing work and tasks without a set time, most urgent first: by the day each has to be **started** (walking back from the deadline through your real free time), so heavy work due later rises; importance decides within a day.
+- It reads in keywords, not sentences: **why first** gives the real reasons (⏰ Due Wed · 3h free till then, 🤝 Hard deadline, ✅ next sitting) with strength dots; rows show due and hours, the rank coloured by how soon; one needs-vs-free bar for the week; a one-line rest banner.
+- **Could move** means *flexible*: your own and soft plans the list may take over, least important first, each saying the time it frees and which task could use it (🎯), spread down the list. Booked work can bring a later sitting forward.
+- **Swap this time** (`/swap/[id]`): *Move it* opens three steps: pick what takes the time (the 🎯 one first; owing work gets its share, booked work brings a sitting forward), plan it, then re-home the block or drop it.
+- One way to pick a time everywhere (adding, moving, planning, booking rest, the marking sheet): this week and next with each day's load, or a calendar for any later date, plus the drag-along day slider. It shows three colours: fixed (grey), **could give up (amber)**, and free; sliding onto amber takes its place, then asks where the displaced block goes.
 - **Cancel** on every task, the marking sheet and swaps, behind a second confirmation. Cancelled Google events stay out of the week; a cancelled plan is called off for friends, an accepted one is answered "Can't go".
-- "What to do first" ranks work and promises above your own routines.
-- Judge accounts rebuilt around the current week, with shared free evenings so plan-together finds green blocks.
+- Judge accounts rebuilt around the current week with Klang Valley student life: roti canai and nasi lemak, food court lunches, futsal, the pasar malam, teh tarik at the mamak, a family steamboat. Shifts, tutoring and meetings are 📌 Fixed, and Tuesday and Thursday evenings stay free so plan-together finds green blocks.
 - 12-page judges' guide (PDF) and a project thumbnail.
 
 ## Build phases V1–V13 · 2026-09-27 → 2026-10-12

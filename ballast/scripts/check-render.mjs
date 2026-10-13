@@ -425,20 +425,19 @@ const EXPECTATIONS = [
     'WHAT TO DO FIRST', 'Start with this',
     'START HERE', 'Emails I have been avoiding',        // number one: the work that has to start today
     'DUE', 'NEEDS', 'COSTS', 'battery',                 // three facts, as tiles
-    'WHY FIRST', 'Short on time', 'Start today', '4h to go',   // why, as keywords with strength dots
+    'WHY FIRST', 'Short on time', 'Due Wed \u00b7', 'free till then', '4h to go',   // why: the deadline and the free time before it
     'Plan the sittings',                                // when it can actually happen
     'Next 7 days', '\u2713 Fits', 'Needs', 'Free',      // the week, and whether the hours fit
     // Only owing work and tasks without a set time, in the order they have to be started.
-    'Then', 'by start day',
-    'Return the library books', '20m',
-    'Algorithms problem set', 'Start by Wed', '3h \u00b7 due Thu 13', '75%', 'left',
-    'Group presentation', '6h \u00b7 due Wed 19',
+    'Then', 'most urgent first',
+    'Return the library books', 'Today', '20m',
+    'Algorithms problem set', 'Due Thu 13', '3h left', '75%', 'left',
+    'Group presentation', 'Due Wed 19', '6h left',
     'Sittings', 'Plan time',                            // one button to act on each
-    // The blocks that could move: least important first, each with keywords and a lighter spot.
-    'Could move', 'least important first',
-    'Week 10 catch-up revision', 'Your idea',
-    'Heavy Mon', 'Lighter Sun 7am', '\u2194\ufe0f Move it',
-    'Soft', '\u2709\ufe0f Message',
+    // Flexible blocks whose time the list can take: what each frees, and what could use it.
+    'Could move', 'flexible \u00b7 priorities can take it',
+    'Week 10 catch-up revision', 'Your plan', 'Frees 5h', 'For Chapter 9 reading', '\u2194\ufe0f Move it',
+    'Flexible', '\u2709\ufe0f Message',
   ]],
   ['swap/revision.html', 'Swap', [
     'MAKE ROOM', 'Swap this time',                       // give a movable block to something that matters more

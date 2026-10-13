@@ -16,6 +16,7 @@ import { keepTokenIn } from '@/lib/api';
 import { reportError, reportUncaught } from '@/lib/report';
 import { Button, Mascot, Stack as Column, Text } from '@/components';
 import { useHydrated } from '@/hooks/useHydrated';
+import { useStore } from '@/state/store';
 
 /**
  * Root layout.
@@ -72,6 +73,8 @@ export default function RootLayout() {
   usePopups();
   useCalendarSync();
   const waiting = useWaitingForSession();
+  // Signed in, and the week is still on its way: the same splash, not an empty week.
+  const loadingWeek = useStore((state) => state.mode === 'live' && !state.weekLoaded);
   /*
    * Every page is prerendered from the sample week, because the build has no
    * account to render. The HTML shell covers it (see +html) until this
@@ -100,7 +103,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ animation: 'default' }} />
       </Stack>
       {/* Coming back signed in: a moment with the battery while the session is confirmed. */}
-      {waiting ? (
+      {waiting || loadingWeek ? (
         <View className="absolute inset-0 items-center justify-center bg-page">
           <Mascot charge={72} loadPercent={28} size={120} />
         </View>

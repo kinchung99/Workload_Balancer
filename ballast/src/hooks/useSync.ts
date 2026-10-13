@@ -48,6 +48,9 @@ export function useSync(): void {
       const sending = Object.values(queue.current);
       const res = await api.sync(cursor.current, sending);
       inFlight.current = false;
+      // The first answer, good or bad, lifts the splash: offline still opens the app.
+      const settle = () => { if (!useStore.getState().weekLoaded) useStore.getState().setWeekLoaded(); };
+      if (!res.ok) settle();
 
       if (!res.ok) {
         // A 401 is not a network problem: it means the session went. Retrying
@@ -112,6 +115,8 @@ export function useSync(): void {
         })));
       }
       if (pending.ok) useStore.getState().setRequests(pending.data.requests);
+      // Week and friends both in: the splash can go.
+      settle();
     };
 
     const schedule = (ms: number) => {

@@ -1158,7 +1158,10 @@ console.log('\nWhat to do first, answered in full');
   check('and the list reads in the order things have to be started', first.every((r, i) => i === 0 || first[i - 1].startBy <= r.startBy), true);
   const why = whyFirst(top, s().items, s().today, Math.max(...first.map(rowWeight)));
   check('why it is first, strongest first', why.every((p, i) => i === 0 || why[i - 1].strength >= p.strength), true);
-  check('and it says when to start', why.some((p) => p.label.startsWith('Start today')), true);
+  check('and it says why now: when it is due', why.some((p) => p.key === 'deadline' && p.label.startsWith('Due ')), true);
+  const owingRow = first.find((r) => r.kind === 'owing' && r.need > 0);
+  const owingWhy = whyFirst(owingRow, s().items, s().today, Math.max(...first.map(rowWeight)));
+  check('and for owing work, the free time before the deadline', owingWhy.some((p) => p.key === 'deadline' && /^Due \S+ · [\d.]+h free till then$/.test(p.label)), true);
   check('each with a strength out of three', why.every((p) => p.strength >= 1 && p.strength <= 3), true);
   const os2 = rank(s().items.find((i) => i.id === 'os-2'), s().items, s().today);
   check('something already at a time is booked, not fitted', nextFit(os2, s().items, s().today), { date: s().today, start: 13, hours: 4, booked: true });
@@ -1596,6 +1599,9 @@ console.log('\nSigned in, or a guest in a preview');
   check('and walks the setup like anyone new', s().onboarded, false);
   s().goLive({ id: 'u9', email: 'new@uni.edu', name: 'New', initials: 'N', phone: null, visibility: 'evenings' }, '2026-03-02');
   check('signing in is never a guest', s().guest, false);
+  check('a signed-in week waits behind the splash until the server answers', s().weekLoaded, false);
+  s().setWeekLoaded();
+  check('and the first answer lifts it', s().weekLoaded, true);
   s().endSession();
   check('signing out leaves no guest behind', [s().guest, s().account], [false, null]);
   process.env.EXPO_PUBLIC_API_URL = 'https://api.example.test';
@@ -2416,8 +2422,18 @@ console.log('\nWhat to do first, by when it has to start');
   check('a fixed plan is not something to do first', both.first.some((r) => r.item.id === 'fixed-dinner'), false);
   check('nor something offered to move', both.couldMove.some((r) => r.item.id === 'fixed-dinner'), false);
   check('every movable block says why', both.couldMove.every((r) => r.moveReasons.length >= 1), true);
-  const withSpot = both.couldMove.find((r) => r.suggest);
-  check('and where it would fit, a lighter day near it', !!withSpot && Math.abs(new Date(withSpot.suggest.date) - new Date(withSpot.item.date)) <= 3 * 864e5, true);
+  check('each says how much time it frees', both.couldMove.every((r) => r.moveTags.some((t) => t.label.startsWith('Frees '))), true);
+  const given = both.couldMove.find((r) => r.taker);
+  check('and which thing on the list could take its time', !!given && both.first.some((f) => f.item.id === given.taker.id), true);
+  check('never something due before the block happens', both.couldMove.every((r) => !r.taker || (() => { const t = both.first.find((f) => f.item.id === r.taker.id).item; return r.item.date <= (t.deadline ?? t.date); })()), true);
+  {
+    const essay = { id: 'tk-essay', title: 'Essay: final draft', bucket: 'mental', hours: 2, dread: 3, commitment: 'hard', date: addDaysISO(today, 5), deadline: addDaysISO(today, 5), prepHours: 2, prepDone: 0 };
+    const sitting = { id: 'tk-essay-s', title: 'Essay: final draft', bucket: 'mental', hours: 2, dread: 3, commitment: 'hard', date: addDaysISO(today, 3), startHour: 10, parentId: 'tk-essay' };
+    const nap = { id: 'tk-free', title: 'Free afternoon', bucket: 'mental', hours: 2, dread: 1, commitment: 'self', date: addDaysISO(today, 1), startHour: 14 };
+    const lists = prioritise([essay, sitting, nap], today, 7, undefined, 9);
+    check('fully booked work can still take a flexible slot before its next sitting', lists.couldMove.find((r) => r.item.id === 'tk-free')?.taker?.id, 'tk-essay');
+  }
+  check('a flexible block is not called heavy', both.couldMove.some((r) => r.moveReasons.some((x) => /heaviest|lighter day/.test(x))), false);
 
   // Importance, asked of everything, read from the older answer when that is all there is.
   check('four steps of importance', IMPORTANCE_LEVELS.map((l) => l.word), ['Optional', 'Normal', 'Important', 'Must']);

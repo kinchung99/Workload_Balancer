@@ -44,10 +44,10 @@ export interface Ranked {
   need?: number;
   /** Could-move rows: why this one, in a few words each. */
   moveReasons?: string[];
-  /** The same reasons as keywords, for a row of tags: 🙋 Your idea · 📈 Heavy Mon · 🪶 Sun 7am. */
+  /** The same reasons as keywords, for a row of tags: 🙋 Your plan · ⏱ Frees 3h · 🎯 For Assignment 3. */
   moveTags?: Array<{ emoji: string; label: string }>;
-  /** Could-move rows: a lighter slot it would fit, if there is one. */
-  suggest?: { date: string; startHour: number };
+  /** Could-move rows: the first thing on the list that could use this time, and how much of it. */
+  taker?: { id: string; title: string; hours: number };
 }
 
 /**
@@ -106,6 +106,20 @@ function workable(items: Item[], date: string, today: string, nowHour?: number):
   }, 0);
   return Math.min(DAILY_WORK, hours);
 }
+
+/** Free work hours between now and the day before it is due - what the start-by day is walked through. */
+export function freeBefore(due: string, items: Item[], today: string, nowHour?: number): number {
+  const last = due <= today ? today : addDays(due, -1);
+  let total = 0;
+  for (let offset = 0; offset <= daysBetween(today, last); offset += 1) total += workable(items, addDays(today, offset), today, nowHour);
+  return Math.round(total * 10) / 10;
+}
+
+/** "Due today", "Due tomorrow", "Due Wed" - the deadline as a tag. */
+export const dueWord = (due: string, today: string): string => {
+  const days = daysBetween(today, due);
+  return days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `Due ${weekdayOf(due)}`;
+};
 
 /**
  * The latest day you can start and still be done in time.
@@ -224,52 +238,71 @@ const isMovableBlock = (item: Item, today: string, nowHour?: number): boolean =>
   item.date >= today &&
   !(item.date === today && nowHour !== undefined && item.startHour! + item.hours <= nowHour);
 
+/** "FIT2004 Assignment 3: graph algorithms" → "FIT2004 Assignment 3" - short enough for a tag. */
+export const shortTitle = (title: string): string => {
+  const head = title.split(/:| - | – /)[0].trim();
+  return head.length > 22 ? `${head.slice(0, 21).trimEnd()}…` : head;
+};
+
 /**
- * Why a block is worth moving, and where it could go.
+ * Which thing on the list could use a block's time.
  *
- * Least important first, then heaviest, then the ones sitting on your heaviest
- * days - and for each, a lighter day it actually fits on, so "move it" comes
- * with an answer instead of a question.
+ * In list order, the first that still needs time, is not due before the block
+ * happens, and fits in it: owing work takes as much of the block as it needs,
+ * a task takes it only if it is no longer than the block.
  */
-function moveRow(item: Item, items: Item[], today: string, weights: Weights, horizonDays: number, nowHour?: number): Ranked {
+function takerFor(block: Item, first: Ranked[], items: Item[], taken: Set<string> = new Set()): Ranked['taker'] {
+  const after = (x: Item) => x.date > block.date || (x.date === block.date && (x.startHour ?? 0) > (block.startHour ?? 0));
+  // Something not yet offered a slot goes first, so the suggestions spread across the list.
+  const order = [...first.filter((row) => !taken.has(row.item.id)), ...first.filter((row) => taken.has(row.item.id))];
+  for (const row of order) {
+    const due = row.item.deadline ?? row.item.date;
+    if (row.kind === 'owing') {
+      if (block.date >= due) continue;
+      const need = row.need ?? 0;
+      if (need > 0) return { id: row.item.id, title: row.item.title, hours: Math.min(block.hours, need) };
+      // All of it booked: a sitting later than this block could be brought forward into it.
+      const later = sittingsOf(row.item, items).find((x) => !x.sessionDone && x.startHour !== undefined && after(x));
+      if (later) return { id: row.item.id, title: row.item.title, hours: Math.min(block.hours, later.hours) };
+      continue;
+    }
+    if (row.kind === 'loose' && row.item.hours <= block.hours + 0.01 && block.date <= due) {
+      return { id: row.item.id, title: row.item.title, hours: row.item.hours };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A block that can give way: flexible, so the list may take its time.
+ *
+ * Not "this day is heavy" - the point is that it is yours to move. Least
+ * important first, then the ones something on the list could actually use,
+ * then the most time they free.
+ */
+function moveRow(item: Item, today: string, weights: Weights, taker: Ranked['taker']): Ranked {
   const importance = importanceOf(item);
   const saves = Math.round(Math.abs(loadOf(item)) * 10) / 10;
-  const days = Array.from({ length: horizonDays + 1 }, (_, i) => addDays(today, i));
-  const loads = days.map((date) => loadOnDay(items, date));
-  const average = loads.reduce((t, l) => t + l, 0) / Math.max(1, loads.length);
-  const own = loadOnDay(items, item.date);
-  const heavy = own >= average * 1.25 && own > 0;
-
-  // The lightest other day this fits on, near enough to be the same week.
-  const others = items.filter((other) => other.id !== item.id);
-  const candidates = days
-    .filter((date) => date !== item.date)
-    .map((date) => ({ date, load: loadOnDay(others, date), start: bestStart(others, date, item.hours, date === today ? nowHour : undefined) }))
-    .filter((c) => c.start !== undefined && c.load < own && Math.abs(daysBetween(item.date, c.date)) <= 3)
-    // Lighter, and near: a day or two either side beats the emptiest day of the week.
-    .sort((x, y) =>
-      x.load + Math.abs(daysBetween(item.date, x.date)) * average * 0.35
-      - (y.load + Math.abs(daysBetween(item.date, y.date)) * average * 0.35));
-  const target = candidates[0];
+  const freed = item.hours < 1 ? `${Math.round(item.hours * 60)}m` : `${Math.round(item.hours * 10) / 10}h`;
 
   const moveReasons: string[] = [];
-  moveReasons.push(item.commitment === 'self' ? 'Your own idea' : 'Soft, can be rearranged');
-  if (importance === 1) moveReasons.push('Optional to you');
-  if (heavy) moveReasons.push(`${weekdayOf(item.date)} is one of your heaviest days`);
-  if (target) moveReasons.push(`Fits ${weekdayOf(target.date)} ${formatHour(target.start!)}, a lighter day`);
+  moveReasons.push(item.commitment === 'self' ? 'Your own plan, flexible' : 'Soft, can be rearranged');
+  if (importance <= 2) moveReasons.push(importance === 1 ? 'Optional to you' : 'Normal importance');
+  moveReasons.push(`Frees ${freed}`);
+  if (taker) moveReasons.push(`Room for ${taker.title}`);
+
   const moveTags = [
-    item.commitment === 'self' ? { emoji: '🙋', label: 'Your idea' } : { emoji: '↔️', label: 'Soft' },
-    ...(importance === 1 ? [{ emoji: '🍃', label: 'Optional' }] : []),
-    ...(heavy ? [{ emoji: '📈', label: `Heavy ${weekdayOf(item.date)}` }] : []),
-    ...(target ? [{ emoji: '🪶', label: `Lighter ${weekdayOf(target.date)} ${formatHour(target.start!)}` }] : []),
+    item.commitment === 'self' ? { emoji: '🙋', label: 'Your plan' } : { emoji: '↔️', label: 'Flexible' },
+    ...(importance === 1 ? [{ emoji: '🍃', label: 'Optional' }] : importance >= 3 ? [{ emoji: '⭐', label: importanceWord(importance) }] : []),
+    { emoji: '⏱', label: `Frees ${freed}` },
+    ...(taker ? [{ emoji: '🎯', label: `For ${shortTitle(taker.title)}` }] : []),
   ];
 
   const score =
     (4 - importance) * 10 * weights.importance +
-    saves * 1.5 +
-    (item.commitment === 'self' ? 4 : 2) +
-    (heavy ? 6 : 0) +
-    (target ? 3 : 0) -
+    (taker ? 8 : 0) +
+    item.hours * 1.5 +
+    (item.commitment === 'self' ? 4 : 2) -
     daysBetween(today, item.date) * 0.3;
 
   return {
@@ -280,7 +313,7 @@ function moveRow(item: Item, items: Item[], today: string, weights: Weights, hor
     saves,
     moveReasons,
     moveTags,
-    ...(target ? { suggest: { date: target.date, startHour: target.start! } } : {}),
+    ...(taker ? { taker } : {}),
   };
 }
 
@@ -312,11 +345,20 @@ export function prioritise(
     // The day you have to start comes first, always - so the list reads in order. Within a day, the score decides.
     .sort((a, b) => (a.startBy ?? today).localeCompare(b.startBy ?? today) || b.score - a.score);
 
-  const couldMove = items
+  const ranked = items
     .filter((item) => isMovableBlock(item, today, nowHour) && daysBetween(today, item.date) <= horizonDays)
-    .map((item) => moveRow(item, items, today, weights, horizonDays, nowHour))
+    .map((item) => moveRow(item, today, weights, takerFor(item, first, items)))
     .filter((row) => row.saves > 0)
     .sort((a, b) => b.score - a.score);
+  // In the order they are shown, each offers its time to something not offered one yet - so the
+  // suggestions spread down the list instead of all naming number one.
+  const taken = new Set<string>();
+  const couldMove = ranked.map((row) => {
+    if (!row.taker) return row;
+    const taker = takerFor(row.item, first, items, taken);
+    if (taker) taken.add(taker.id);
+    return moveRow(row.item, today, weights, taker);
+  });
 
   return { first, couldMove };
 }
@@ -343,7 +385,7 @@ export interface Push {
  * "Due today, three dots; hard deadline, three; four hours of work, two" - so
  * the order can be checked at a glance instead of taken on trust.
  */
-export function whyFirst(row: Ranked, items: Item[], today: string, biggest: number): Push[] {
+export function whyFirst(row: Ranked, items: Item[], today: string, biggest: number, nowHour?: number): Push[] {
   const { item } = row;
   const owing = row.kind === 'owing';
   const due = item.deadline ?? item.date;
@@ -356,8 +398,13 @@ export function whyFirst(row: Ranked, items: Item[], today: string, biggest: num
   if (row.startBy) {
     const startDays = Math.max(0, daysBetween(today, row.startBy));
     pushes.push({
-      key: 'deadline', emoji: '⏰',
-      label: `${startLabel(row, today)} · ${days <= 0 ? 'due today' : days === 1 ? 'due tomorrow' : `due in ${days} days`}`,
+      key: 'deadline', emoji: owing && (row.need ?? 0) <= 0 ? '✅' : '⏰',
+      // The real reason behind its place: the deadline, and how little free time stands before it.
+      label: owing && (row.need ?? 0) <= 0
+        ? startLabel(row, today)
+        : owing
+          ? `${dueWord(due, today)} · ${freeBefore(due, items, today, nowHour)}h free till then`
+          : dueWord(due, today),
       strength: startDays === 0 ? 3 : startDays <= 2 ? 2 : 1,
     });
   }

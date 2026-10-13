@@ -6,7 +6,8 @@
  *   npm run judges:seed              make them (or refresh them: they are rebuilt)
  *
  * Each is a believable Monash Malaysia student with a real timetable, coursework
- * with deadlines and hours of work, shifts, plans and a few moods. Their weeks
+ * with deadlines and hours of work, shifts, plans and a few moods - and days
+ * that look like Klang Valley: roti canai, futsal, the pasar malam, teh tarik. Their weeks
  * are built around *today*, so run this again whenever the dates go stale.
  * Rebuilding deletes the five accounts first (needs server/.env DATABASE_URL),
  * which also undoes anything the judges changed.
@@ -24,7 +25,7 @@ import { countedOnce } from '@/lib/prep';
 import { chargeOf } from '@/lib/battery';
 import { published, DEFAULT_SHARE_RULES } from '@/lib/sharing';
 import type { Item, Module, MoodCheckIn, RecoveryEntry, SessionKind } from '@/lib/types';
-import { bookSittings, fillDays } from '@/data/dayFiller';
+import { bookSittings, fillDays, type Filler } from '@/data/dayFiller';
 
 const API = process.env.API ?? 'https://ballast-ckc3.vercel.app';
 const ORIGIN = 'https://load-balancer-ballast.expo.app';
@@ -37,6 +38,47 @@ const W0 = startOfWeek(TODAY);
 const at = (week: number, day: number) => addDays(W0, week * 7 + day);
 /** Week 10 of 12 right now, so "week 10 of 12" reads true on every module. */
 const TERM_START = addDays(W0, -63);
+
+/* ------------------------------------------------------- a day in Klang Valley */
+
+const WEEKDAYS = [0, 1, 2, 3, 4];
+const WEEKEND = [5, 6];
+
+/**
+ * What fills a Monash Malaysia student's days around classes and shifts: roti
+ * canai before a 9am, the food court at lunch, futsal at night, a teh tarik
+ * that turns into two hours. Nothing anyone would think twice about showing.
+ */
+const KL_DAY: Filler[] = [
+  { title: 'Roti canai breakfast at the mamak', bucket: 'social', hours: 0.5, dread: 1, commitment: 'self', from: 7.5, to: 9.5, want: 4 },
+  { title: 'Nasi lemak and kopi before class', bucket: 'social', hours: 0.5, dread: 1, commitment: 'self', from: 7, to: 9, days: WEEKDAYS, want: 4 },
+  { title: 'Library study session', bucket: 'mental', hours: 2, dread: 3, commitment: 'self', from: 9, to: 17, days: WEEKDAYS },
+  { title: 'Group study, discussion room 4', bucket: 'mental', hours: 1.5, dread: 2, commitment: 'soft', from: 10, to: 17, days: WEEKDAYS },
+  { title: 'Study at the kopitiam, SS15', bucket: 'mental', hours: 2, dread: 2, commitment: 'self', from: 14, to: 19 },
+  { title: 'Review lecture notes', bucket: 'mental', hours: 1, dread: 2, commitment: 'self', from: 9, to: 21 },
+  { title: 'Chicken rice at the food court', bucket: 'social', hours: 1, dread: 1, commitment: 'soft', from: 12, to: 14, days: WEEKDAYS, want: 4 },
+  { title: 'Cendol break with coursemates', bucket: 'social', hours: 0.5, dread: 1, commitment: 'soft', from: 15, to: 18, want: 4 },
+  { title: 'Bubble tea run with housemates', bucket: 'social', hours: 0.5, dread: 1, commitment: 'soft', from: 15, to: 21, want: 4 },
+  { title: 'Teh tarik at the mamak', bucket: 'social', hours: 1.5, dread: 1, commitment: 'soft', from: 21, to: 23.5, days: [0, 2, 4, 5], want: 5 },
+  { title: 'Jog round Taman Tasik Sunway', bucket: 'physical', hours: 1, dread: 2, commitment: 'self', from: 6.5, to: 8.5 },
+  { title: 'Futsal with coursemates', bucket: 'physical', hours: 1.5, dread: 1, commitment: 'soft', from: 20, to: 23, days: [0, 2, 4], want: 5 },
+  { title: 'Gym at the campus', bucket: 'physical', hours: 1, dread: 2, commitment: 'self', from: 17, to: 21 },
+  { title: 'Evening walk round the lake', bucket: 'physical', hours: 0.5, dread: 1, commitment: 'self', from: 18, to: 21, isRecovery: true },
+  { title: 'Stretch and wind down', bucket: 'physical', hours: 0.5, dread: 1, commitment: 'self', from: 21, to: 23, isRecovery: true },
+  { title: 'Laundry at the dobi', bucket: 'errands', hours: 1, dread: 2, commitment: 'self', from: 10, to: 21, days: [2, 5, 6] },
+  { title: 'Collect Shopee parcels, guardhouse', bucket: 'errands', hours: 0.5, dread: 1, commitment: 'self', from: 12, to: 20 },
+  { title: 'Pasar malam run, SS2', bucket: 'errands', hours: 1, dread: 1, commitment: 'self', from: 19, to: 22, days: [0, 4], want: 4 },
+  { title: 'Groceries at the pasar pagi', bucket: 'errands', hours: 1, dread: 1, commitment: 'self', from: 8, to: 11, days: WEEKEND },
+  { title: 'Cook dinner with housemates', bucket: 'errands', hours: 1, dread: 1, commitment: 'self', from: 18, to: 20 },
+  { title: 'Tidy room', bucket: 'errands', hours: 0.5, dread: 2, commitment: 'self', from: 19, to: 22 },
+  { title: 'Society committee meeting', bucket: 'social', hours: 1.5, dread: 2, commitment: 'soft', from: 17, to: 20, days: [0, 2] },
+  { title: 'Call home', bucket: 'social', hours: 0.5, dread: 1, commitment: 'self', from: 20, to: 22.5, want: 5 },
+  { title: 'Read something fun', bucket: 'mental', hours: 1, dread: 1, commitment: 'self', from: 21, to: 23, isRecovery: true },
+  { title: 'Power nap', bucket: 'physical', hours: 0.5, dread: 1, commitment: 'self', from: 13, to: 16, isRecovery: true },
+  { title: 'Karaoke with the gang', bucket: 'social', hours: 2, dread: 1, commitment: 'soft', from: 19, to: 23, days: [5], want: 5 },
+  { title: 'Dim sum brunch with friends', bucket: 'social', hours: 1.5, dread: 1, commitment: 'soft', from: 9, to: 12, days: WEEKEND, want: 5 },
+  { title: 'Plan the week ahead', bucket: 'mental', hours: 0.5, dread: 1, commitment: 'self', from: 19, to: 22, days: [6] },
+];
 
 /* ------------------------------------------------------------ the people */
 
@@ -85,9 +127,9 @@ const PEOPLE: Persona[] = [
       { title: 'Algorithms practice problems', bucket: 'mental', hours: 3, dread: 4, commitment: 'self', day: 1, startHour: 13, repeats: true },
       { title: 'OS lecture catch-up', bucket: 'mental', hours: 2, dread: 3, commitment: 'self', day: 2, startHour: 19, repeats: true },
       { title: 'Theory of Computation readings', bucket: 'mental', hours: 3, dread: 4, commitment: 'self', day: 4, startHour: 14, repeats: true },
-      { title: 'Commute, LRT to campus', bucket: 'time', hours: 5, dread: 2, commitment: 'hard', day: 0, repeats: true, spread: true },
-      { title: 'Tutoring, SPM maths', bucket: 'time', hours: 2, dread: 2, commitment: 'hard', day: 1, startHour: 18, repeats: true },
-      { title: 'Tutoring, SPM maths', bucket: 'time', hours: 3, dread: 2, commitment: 'hard', day: 5, startHour: 10, repeats: true },
+      { title: 'Commute, LRT to campus', bucket: 'time', hours: 5, dread: 2, commitment: 'fixed', day: 0, repeats: true, spread: true },
+      { title: 'Tutoring, SPM maths', bucket: 'time', hours: 2, dread: 2, commitment: 'fixed', day: 1, startHour: 18, repeats: true },
+      { title: 'Tutoring, SPM maths', bucket: 'time', hours: 3, dread: 2, commitment: 'fixed', day: 5, startHour: 10, repeats: true },
       { title: 'Gym at Sunway campus', bucket: 'physical', hours: 1, dread: 2, commitment: 'self', day: 0, startHour: 19, repeats: true },
       { title: 'Laundry and groceries', bucket: 'errands', hours: 1.5, dread: 2, commitment: 'self', day: 6, startHour: 10, repeats: true },
       { title: 'Call mum', bucket: 'social', hours: 1, dread: 1, commitment: 'self', day: 6, startHour: 20, repeats: true },
@@ -96,9 +138,9 @@ const PEOPLE: Persona[] = [
       { title: 'FIT2004 Assignment 3: graph algorithms', bucket: 'mental', hours: 12, dread: 4, commitment: 'hard', week: 1, day: 3, due: true, prepHours: 12, prepDone: 7, importance: 3, moduleId: 'fit2004' },
       { title: 'FIT2100 Assignment 2: process scheduler', bucket: 'mental', hours: 10, dread: 4, commitment: 'hard', week: 1, day: 2, due: true, prepHours: 10, prepDone: 6, importance: 3, moduleId: 'fit2100' },
       { title: 'FIT2014 Problem set 8', bucket: 'mental', hours: 4, dread: 3, commitment: 'soft', week: 1, day: 4, due: true, prepHours: 4, prepDone: 0, importance: 2, moduleId: 'fit2014' },
-      { title: 'FIT2099 Sprint review with the team', bucket: 'social', hours: 2, dread: 3, commitment: 'hard', week: 1, day: 1, startHour: 15 },
+      { title: 'FIT2099 Sprint review with the team', bucket: 'social', hours: 2, dread: 3, commitment: 'fixed', week: 1, day: 1, startHour: 15 },
       { title: 'Mamak with Daniel and Mei Ling', bucket: 'social', hours: 2, dread: 1, commitment: 'soft', week: 0, day: 5, startHour: 21, want: 5 },
-      { title: 'Renew student pass, photos', bucket: 'errands', hours: 1, dread: 3, commitment: 'hard', week: 1, day: 0, startHour: 12, place: 'in Sunway' },
+      { title: 'Renew student pass, photos', bucket: 'errands', hours: 1, dread: 3, commitment: 'fixed', week: 1, day: 0, startHour: 12, place: 'in Sunway' },
       { title: 'Swim, Wednesday morning', bucket: 'physical', hours: 1, dread: 2, commitment: 'self', week: 1, day: 2, startHour: 7, isRecovery: true },
       { title: 'Exam revision plan', bucket: 'mental', hours: 3, dread: 3, commitment: 'self', week: 2, day: 5, startHour: 10 },
       // Next week's movable things - what Rebalance can actually offer her.
@@ -107,6 +149,10 @@ const PEOPLE: Persona[] = [
       { title: 'CS society games night', bucket: 'social', hours: 3, dread: 2, commitment: 'soft', week: 1, day: 2, startHour: 20, want: 3 },
       { title: 'Post office, parcel home', bucket: 'errands', hours: 1, dread: 2, commitment: 'self', week: 1, day: 1, startHour: 12, place: 'in Sunway' },
       { title: 'Bank, update my card', bucket: 'errands', hours: 1, dread: 3, commitment: 'self', week: 1, day: 3, startHour: 12, place: 'in Sunway' },
+      { title: 'PTPTN loan form, get it certified', bucket: 'errands', hours: 1, dread: 4, commitment: 'hard', week: 1, day: 4, due: true, importance: 3 },
+      { title: "Kak Long's engagement lunch, Shah Alam", bucket: 'social', hours: 3, dread: 1, commitment: 'fixed', week: 0, day: 6, startHour: 12, want: 5, importance: 4 },
+      { title: 'Batik painting workshop, campus fair', bucket: 'social', hours: 2, dread: 1, commitment: 'self', week: 1, day: 5, startHour: 10, want: 4, importance: 1 },
+      { title: 'Watch Harimau Malaya with housemates', bucket: 'social', hours: 2, dread: 1, commitment: 'self', week: 0, day: 4, startHour: 20.5, want: 5, importance: 1 },
     ],
     moods: [
       { daysAgo: 1, quadrant: 'high-unpleasant', tags: ['Academics'] },
@@ -138,8 +184,8 @@ const PEOPLE: Persona[] = [
     weekly: [
       { title: 'Finance readings', bucket: 'mental', hours: 2, dread: 2, commitment: 'self', day: 2, startHour: 19, repeats: true },
       { title: 'Group project catch-up', bucket: 'social', hours: 1.5, dread: 2, commitment: 'soft', day: 3, startHour: 16, repeats: true },
-      { title: 'Barista shift, Sunway Pyramid', bucket: 'time', hours: 5, dread: 2, commitment: 'hard', day: 4, startHour: 18, repeats: true },
-      { title: 'Barista shift, Sunway Pyramid', bucket: 'time', hours: 6, dread: 2, commitment: 'hard', day: 6, startHour: 9, repeats: true },
+      { title: 'Barista shift, Sunway Pyramid', bucket: 'time', hours: 5, dread: 2, commitment: 'fixed', day: 4, startHour: 18, repeats: true },
+      { title: 'Barista shift, Sunway Pyramid', bucket: 'time', hours: 6, dread: 2, commitment: 'fixed', day: 6, startHour: 9, repeats: true },
       { title: 'Badminton with the club', bucket: 'physical', hours: 2, dread: 1, commitment: 'self', day: 1, startHour: 20, repeats: true, want: 5 },
       { title: 'Groceries at Jaya Grocer', bucket: 'errands', hours: 1, dread: 1, commitment: 'self', day: 5, startHour: 11, repeats: true },
     ],
@@ -149,7 +195,10 @@ const PEOPLE: Persona[] = [
       { title: 'MKT2150 Survey analysis', bucket: 'mental', hours: 6, dread: 2, commitment: 'soft', week: 2, day: 0, due: true, prepHours: 6, prepDone: 0, importance: 2, moduleId: 'mkt2150' },
       { title: 'Internship application, Big 4', bucket: 'mental', hours: 4, dread: 3, commitment: 'self', week: 2, day: 4, due: true, prepHours: 4, prepDone: 1, importance: 3 },
       { title: 'Mamak with Aisyah and Mei Ling', bucket: 'social', hours: 2, dread: 1, commitment: 'soft', week: 0, day: 5, startHour: 21, want: 5 },
-      { title: 'Family dinner', bucket: 'social', hours: 2, dread: 1, commitment: 'soft', week: 0, day: 6, startHour: 19, want: 5 },
+      { title: 'Family steamboat dinner, Puchong', bucket: 'social', hours: 2, dread: 1, commitment: 'fixed', week: 0, day: 6, startHour: 19, want: 5, importance: 4 },
+      { title: 'Investment society talk: Bursa basics', bucket: 'mental', hours: 1.5, dread: 2, commitment: 'self', week: 1, day: 1, startHour: 18, want: 4, importance: 2 },
+      { title: 'Car wash and petrol', bucket: 'errands', hours: 1, dread: 2, commitment: 'self', week: 1, day: 5, startHour: 15 },
+      { title: 'Durian trip to Karak with cousins', bucket: 'social', hours: 4, dread: 1, commitment: 'soft', week: 2, day: 5, startHour: 9, want: 5, importance: 2 },
     ],
     moods: [
       { daysAgo: 1, quadrant: 'high-pleasant', tags: ['Social'] },
@@ -180,22 +229,25 @@ const PEOPLE: Persona[] = [
     ],
     weekly: [
       { title: 'Neurobiology lecture review', bucket: 'mental', hours: 3, dread: 4, commitment: 'self', day: 0, startHour: 19, repeats: true },
-      { title: 'Lab prep and pre-lab quiz', bucket: 'mental', hours: 2, dread: 4, commitment: 'hard', day: 1, startHour: 19, repeats: true },
+      { title: 'Lab prep and pre-lab quiz', bucket: 'mental', hours: 2, dread: 4, commitment: 'fixed', day: 1, startHour: 19, repeats: true },
       { title: 'Bioinformatics coding practice', bucket: 'mental', hours: 3, dread: 5, commitment: 'self', day: 3, startHour: 19, repeats: true },
       { title: 'Cell biology flashcards', bucket: 'mental', hours: 2, dread: 3, commitment: 'self', day: 4, startHour: 16, repeats: true },
-      { title: 'Commute, bus from Subang', bucket: 'time', hours: 8, dread: 3, commitment: 'hard', day: 0, repeats: true, spread: true },
+      { title: 'Commute, bus from Subang', bucket: 'time', hours: 8, dread: 3, commitment: 'fixed', day: 0, repeats: true, spread: true },
       { title: 'Volunteering, Sunway Medical Centre', bucket: 'time', hours: 4, dread: 2, commitment: 'soft', day: 5, startHour: 9, repeats: true },
       { title: 'Yoga', bucket: 'physical', hours: 1, dread: 1, commitment: 'self', day: 2, startHour: 19, repeats: true, isRecovery: true },
       { title: 'Laundry', bucket: 'errands', hours: 1, dread: 2, commitment: 'self', day: 6, startHour: 11, repeats: true },
     ],
     once: [
       { title: 'BMS2042 Lab report: PCR and gel', bucket: 'mental', hours: 8, dread: 4, commitment: 'hard', week: 0, day: 6, due: true, prepHours: 8, prepDone: 4, importance: 3, moduleId: 'bms2042' },
-      { title: 'BMS2031 Online quiz 3', bucket: 'mental', hours: 2, dread: 4, commitment: 'hard', week: 0, day: 3, startHour: 21 },
+      { title: 'BMS2031 Online quiz 3', bucket: 'mental', hours: 2, dread: 4, commitment: 'fixed', week: 0, day: 3, startHour: 21 },
       { title: 'Extra volunteering shift, covering a friend', bucket: 'time', hours: 5, dread: 3, commitment: 'soft', week: 0, day: 2, startHour: 17, want: 2 },
       { title: 'BMS2021 Mid-semester exam revision', bucket: 'mental', hours: 10, dread: 5, commitment: 'hard', week: 1, day: 0, due: true, prepHours: 10, prepDone: 2, importance: 3, moduleId: 'bms2021' },
       { title: 'BMS2062 Python practical 5', bucket: 'mental', hours: 4, dread: 4, commitment: 'soft', week: 1, day: 3, due: true, prepHours: 4, prepDone: 0, importance: 2, moduleId: 'bms2062' },
       { title: 'Journal summary for bioinformatics', bucket: 'mental', hours: 3, dread: 2, commitment: 'self', week: 2, day: 2, due: true, prepHours: 3, prepDone: 0, importance: 1, moduleId: 'bms2062' },
       { title: 'Movie night with housemates', bucket: 'social', hours: 3, dread: 1, commitment: 'soft', week: 1, day: 4, startHour: 20, want: 4 },
+      { title: 'Banana leaf lunch in Brickfields', bucket: 'social', hours: 1.5, dread: 1, commitment: 'self', week: 0, day: 5, startHour: 13, want: 5, importance: 2 },
+      { title: 'Blood donation drive, student centre', bucket: 'time', hours: 1, dread: 2, commitment: 'soft', week: 1, day: 2, startHour: 11, importance: 2 },
+      { title: 'Grandma\'s 70th, family dinner in Klang', bucket: 'social', hours: 3, dread: 1, commitment: 'fixed', week: 2, day: 6, startHour: 18, want: 5, importance: 4 },
     ],
     moods: [
       { daysAgo: 1, quadrant: 'low-unpleasant', tags: ['Academics'] },
@@ -227,8 +279,8 @@ const PEOPLE: Persona[] = [
     weekly: [
       { title: 'Engineering maths problem sheets', bucket: 'mental', hours: 3, dread: 4, commitment: 'self', day: 1, startHour: 14, repeats: true },
       { title: 'Design project drafting', bucket: 'mental', hours: 3, dread: 3, commitment: 'soft', day: 4, startHour: 14, repeats: true },
-      { title: 'Commute, drive from Klang', bucket: 'time', hours: 6, dread: 3, commitment: 'hard', day: 0, repeats: true, spread: true },
-      { title: 'Site survey assistant (part-time)', bucket: 'time', hours: 5, dread: 3, commitment: 'hard', day: 5, startHour: 8, repeats: true },
+      { title: 'Commute, drive from Klang', bucket: 'time', hours: 6, dread: 3, commitment: 'fixed', day: 0, repeats: true, spread: true },
+      { title: 'Site survey assistant (part-time)', bucket: 'time', hours: 5, dread: 3, commitment: 'fixed', day: 5, startHour: 8, repeats: true },
       { title: 'Futsal, Thursday league', bucket: 'physical', hours: 2, dread: 1, commitment: 'soft', day: 3, startHour: 21, repeats: true, want: 5 },
       { title: 'Kitchen duty, shared house', bucket: 'errands', hours: 1, dread: 2, commitment: 'soft', day: 1, startHour: 19, repeats: true },
     ],
@@ -236,8 +288,11 @@ const PEOPLE: Persona[] = [
       { title: 'CIV3221 Design project: steel frame (group)', bucket: 'mental', hours: 14, dread: 4, commitment: 'hard', week: 1, day: 2, due: true, prepHours: 14, prepDone: 5, importance: 3, moduleId: 'civ3221' },
       { title: 'ENG2005 Assignment 3', bucket: 'mental', hours: 5, dread: 4, commitment: 'hard', week: 1, day: 0, due: true, prepHours: 5, prepDone: 1, importance: 3, moduleId: 'eng2005' },
       { title: 'CIV3248 Field trip report', bucket: 'mental', hours: 6, dread: 3, commitment: 'soft', week: 2, day: 1, due: true, prepHours: 6, prepDone: 0, importance: 2, moduleId: 'civ3248' },
-      { title: 'Design project group meeting', bucket: 'social', hours: 2, dread: 3, commitment: 'hard', week: 1, day: 0, startHour: 16 },
+      { title: 'Design project group meeting', bucket: 'social', hours: 2, dread: 3, commitment: 'fixed', week: 1, day: 0, startHour: 16 },
       { title: 'My birthday dinner 🎂', bucket: 'social', hours: 2.5, dread: 1, commitment: 'soft', week: 1, day: 3, startHour: 18.5, want: 5 },
+      { title: 'Satay night in Kajang with cousins', bucket: 'social', hours: 2.5, dread: 1, commitment: 'soft', week: 0, day: 5, startHour: 19.5, want: 5, importance: 2 },
+      { title: 'Car service, Klang workshop', bucket: 'errands', hours: 2, dread: 3, commitment: 'self', week: 1, day: 5, startHour: 14 },
+      { title: 'IEM site visit, MRT station works', bucket: 'mental', hours: 3, dread: 2, commitment: 'fixed', week: 2, day: 2, startHour: 9, importance: 3 },
     ],
     moods: [
       { daysAgo: 1, quadrant: 'high-unpleasant', tags: ['Academics'] },
@@ -268,7 +323,7 @@ const PEOPLE: Persona[] = [
     ],
     weekly: [
       { title: 'Studio sketchbook', bucket: 'mental', hours: 2, dread: 1, commitment: 'self', day: 1, startHour: 10, repeats: true },
-      { title: 'Retail shift, Uniqlo', bucket: 'time', hours: 6, dread: 2, commitment: 'hard', day: 5, startHour: 12, repeats: true },
+      { title: 'Retail shift, Sunway Pyramid', bucket: 'time', hours: 6, dread: 2, commitment: 'fixed', day: 5, startHour: 12, repeats: true },
       { title: 'Sketching at the lake', bucket: 'physical', hours: 2, dread: 1, commitment: 'self', day: 6, startHour: 16, repeats: true, isRecovery: true },
     ],
     once: [
@@ -277,6 +332,10 @@ const PEOPLE: Persona[] = [
       { title: 'Digital Imaging portfolio', bucket: 'mental', hours: 5, dread: 2, commitment: 'soft', week: 2, day: 3, due: true, prepHours: 5, prepDone: 0, importance: 2, moduleId: 'des1110' },
       { title: 'Mamak with Aisyah and Daniel', bucket: 'social', hours: 2, dread: 1, commitment: 'soft', week: 0, day: 5, startHour: 21, want: 5 },
       { title: 'K-drama night', bucket: 'social', hours: 2, dread: 1, commitment: 'self', week: 1, day: 2, startHour: 20, want: 4 },
+      { title: 'Sketch walk at Petaling Street', bucket: 'physical', hours: 2.5, dread: 1, commitment: 'self', week: 0, day: 6, startHour: 9, want: 5, isRecovery: true },
+      { title: 'Art market stall at Publika', bucket: 'time', hours: 5, dread: 2, commitment: 'fixed', week: 1, day: 6, startHour: 11, want: 4, importance: 3 },
+      { title: 'Comic con volunteer briefing', bucket: 'social', hours: 1.5, dread: 2, commitment: 'soft', week: 1, day: 1, startHour: 17, importance: 2 },
+      { title: 'Print posters at the copy shop', bucket: 'errands', hours: 1, dread: 2, commitment: 'self', week: 0, day: 4, startHour: 15, importance: 3 },
     ],
     moods: [
       { daysAgo: 1, quadrant: 'high-pleasant', tags: ['Social'] },
@@ -322,7 +381,7 @@ function weekOf(p: Persona): { items: Item[]; modules: Module[]; moods: MoodChec
   const kept = days.filter((d) => dayIndex(d) === 1 || dayIndex(d) === 3).map((d) => ({
     id: `hold-${d}`, title: 'Evening kept free', bucket: 'time', hours: 3.5, dread: 1, commitment: 'self', date: d, startHour: 19,
   }) as Item);
-  items.push(...fillDays([...items, ...kept], days, p.key));
+  items.push(...fillDays([...items, ...kept], days, p.key, KL_DAY));
   items.push(...bookSittings([...items, ...kept], TODAY, now.getHours() + now.getMinutes() / 60, p.key));
   const moods: MoodCheckIn[] = p.moods.map((m, i) => ({
     id: `${p.key}-mood-${i}`, date: addDays(TODAY, -m.daysAgo), at: `${m.daysAgo === 1 ? 'Yesterday' : `${m.daysAgo} days ago`} 9:00 PM`,

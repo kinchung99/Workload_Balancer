@@ -43,7 +43,7 @@ export default function Swap() {
   const items = useItemsWithLogs();
   const block = items.find((candidate) => candidate.id === id);
   const weights = useMemo(() => weightsFrom(dayReports), [dayReports]);
-  const { first } = useMemo(() => prioritise(items, today, 7, weights, clockHour(today)), [items, today, weights]);
+  const { first, couldMove } = useMemo(() => prioritise(items, today, 7, weights, clockHour(today)), [items, today, weights]);
 
   const [step, setStep] = useState(0);
   const [chosen, setChosen] = useState<Ranked | null>(null);
@@ -63,6 +63,7 @@ export default function Swap() {
 
   const slot = { date: block.date, startHour: block.startHour, hours: block.hours };
   /** How much of this slot a task would get - or why it does not fit. */
+  const after = (x: Item) => x.date > slot.date || (x.date === slot.date && (x.startHour ?? 0) > slot.startHour);
   const give = (row: Ranked): { hours: number; fits: boolean; label: string; sitting?: Item } => {
     if (row.kind === 'owing') {
       if ((row.need ?? 0) > 0) {
@@ -72,14 +73,19 @@ export default function Swap() {
       // All of it is booked: bring its next sitting into this time instead.
       const sitting = sittingsOf(row.item, items)
         .filter((x) => !x.sessionDone && x.startHour !== undefined && x.date >= today && !(x.date === slot.date && x.startHour === slot.startHour))
-        .sort((a, b) => a.date.localeCompare(b.date) || a.startHour! - b.startHour!)[0];
+        // A sitting after this time comes forward into it; failing that, the next one there is.
+        .sort((a, b) => Number(after(b)) - Number(after(a)) || a.date.localeCompare(b.date) || a.startHour! - b.startHour!)[0];
       if (!sitting) return { hours: 0, fits: false, label: 'all done' };
       const hours = Math.min(slot.hours, sitting.hours);
-      return { hours, fits: true, label: `moves its ${WEEKDAY[dayIndex(sitting.date)]} sitting`, sitting };
+      return { hours, fits: true, label: after(sitting) ? `brings its ${WEEKDAY[dayIndex(sitting.date)]} sitting forward` : `moves its ${WEEKDAY[dayIndex(sitting.date)]} sitting`, sitting };
     }
     return { hours: row.item.hours, fits: row.item.hours <= slot.hours + 0.01, label: row.item.hours <= slot.hours + 0.01 ? `gets ${hoursWord(row.item.hours)}` : `needs ${hoursWord(row.item.hours)}` };
   };
-  const options = first.filter((row) => row.item.id !== block.id && give(row).label !== 'all done');
+  // The one the priority page pointed at for this time comes first, marked.
+  const taker = couldMove.find((row) => row.item.id === block.id)?.taker?.id;
+  const options = first
+    .filter((row) => row.item.id !== block.id && give(row).label !== 'all done')
+    .sort((a, b) => Number(b.item.id === taker) - Number(a.item.id === taker));
 
   const plan = () => {
     if (!chosen) return;
@@ -157,6 +163,7 @@ export default function Swap() {
                   </View>
                   <Stack gap={0} grow>
                     <Text variant="body" weight="semibold">{row.item.title}</Text>
+                    {row.item.id === taker ? <Text variant="micro" weight="bold" tone="steady">🎯 Best fit for this time</Text> : null}
                     <Text variant="micro" tone="subtle">▶ {startLabel(row, today)}{row.kind === 'owing' && (row.need ?? 0) > 0 ? ` · ${row.need}h to plan` : ''}</Text>
                   </Stack>
                   <View className="rounded-pill px-3 py-1" style={{ backgroundColor: share.fits ? color.band.steady.wash : color.surface.sunken }}>

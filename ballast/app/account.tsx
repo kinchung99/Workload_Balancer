@@ -25,7 +25,7 @@ import { useStore } from '@/state/store';
  */
 export default function Account() {
   const router = useRouter();
-  const { account, setAccount, goLive, endSession, mode: dataMode } = useStore();
+  const { account, setAccount, goLive, endSession, mode: dataMode, sessionChecked } = useStore();
 
   /** Which form is showing. Distinct from the store's demo/live `mode`. */
   const [form, setForm] = useState<'in' | 'up'>('in');
@@ -188,7 +188,8 @@ export default function Account() {
   /* --------------------------------------------------------- signed out */
 
   // Signing in and making an account live on the welcome screen now.
-  if (!account) return <Redirect href="/welcome" />;
+  // A reload is not a sign-out: wait for the saved session to be asked about before sending anyone away.
+  if (!account) return sessionChecked ? <Redirect href="/welcome" /> : null;
 
   const ready = email.includes('@') && password.length >= 8 && (form === 'in' || name.trim().length > 0);
 

@@ -38,19 +38,19 @@ Ballast installs straight from the link. It gets a home-screen icon and opens fu
 
 ## 🔑 Judge accounts
 
-Five real accounts on the live app. They're Monash Malaysia students with a real timetable, coursework, shifts, moods and plans, and every day is planned: study sessions booked for each assignment, plus lunches, the gym, society meetings and downtime. **They're all friends with each other.** Sign in as two of them on two phones (or a phone and a laptop), and invitations, answers and batteries pass between them within a minute.
+Five real accounts on the live app. They're Monash Malaysia students with a real timetable, coursework, shifts, moods and plans, and every day is planned: study sessions booked for each assignment, and Klang Valley student life around them: roti canai before class, chicken rice at the food court, futsal, the pasar malam, teh tarik at the mamak, a family steamboat. **They're all friends with each other.** Sign in as two of them on two phones (or a phone and a laptop), and invitations, answers and batteries pass between them within a minute.
 
-*Battery numbers below are from Mon 12 Oct. They move as the week goes, just as a real week would.*
+*Battery numbers below are from Tue 13 Oct. They move as the week goes, just as a real week would.*
 
 **Password for all five: `BallastDemo2026`**
 
 | Student | Email | Their week | Try this as them |
 |---|---|---|---|
-| 💻 **Aisyah Rahman**<br>Computer Science, Y2 | `aisyah.ballast@example.com` | 52% this week, but **next week is a wall**: two assignments and a birthday dinner, Wednesday to Friday | Tap the red **wall** warning, then **Lighten next week**. Answer Daniel's **Mamak supper** invite. Add the confirmed **Study session** to your week. |
-| 🧪 **Priya Nair**<br>Biomedical Science, Y2 | `priya.ballast@example.com` | **29%, running on empty**: lab report due, 5.8h of sleep, heavy for 6 days | **Check in**, then open **Recovery** to book something that helps. Her friends get a nudge to check on her. |
-| 📊 **Daniel Lim**<br>Business, Y3 | `daniel.ballast@example.com` | 75%, steady, barista shifts | Open **Plans → Sent**: see who has said yes to his Mamak supper. **Plan something** with Mei Ling: Thursday evening lights up green. |
-| 🏗️ **Hafiz Ismail**<br>Civil Engineering, Y3 | `hafiz.ballast@example.com` | 46%, design project crunch | His **birthday dinner** plan has every kind of answer: yes, no, and still waiting. |
-| 🎨 **Mei Ling Tan**<br>Communication Design, Y1 | `meiling.ballast@example.com` | 83%, the calm one | Answer the **Badminton club** group invitation and Priya's **Movie night** from the 🔔 bell. |
+| 💻 **Aisyah Rahman**<br>Computer Science, Y2 | `aisyah.ballast@example.com` | 44% this week, but **next week is a wall**: two assignments and a birthday dinner, Wednesday to Friday | Tap the red **wall** warning, then **Lighten next week**. Answer Daniel's **Mamak supper** invite. Add the confirmed **Study session** to your week. |
+| 🧪 **Priya Nair**<br>Biomedical Science, Y2 | `priya.ballast@example.com` | **24%, running on empty**: lab report due, 5.8h of sleep, heavy for 6 days | **Check in**, then open **Recovery** to book something that helps. Her friends get a nudge to check on her. |
+| 📊 **Daniel Lim**<br>Business, Y3 | `daniel.ballast@example.com` | 72%, steady, barista shifts | Open **Plans → Sent**: see who has said yes to his Mamak supper. **Plan something** with Mei Ling: Thursday evening lights up green. |
+| 🏗️ **Hafiz Ismail**<br>Civil Engineering, Y3 | `hafiz.ballast@example.com` | 41%, design project crunch | His **birthday dinner** plan has every kind of answer: yes, no, and still waiting. |
+| 🎨 **Mei Ling Tan**<br>Communication Design, Y1 | `meiling.ballast@example.com` | 79%, the calm one | Answer the **Badminton club** group invitation and Priya's **Movie night** from the 🔔 bell. |
 
 > [!WARNING]
 > **These accounts are shared by every judge. Please play, but don't wreck them.**
@@ -67,7 +67,7 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 1. Sign in as **Aisyah** and look at **Home**: one battery, one next thing, one warning.
 2. Tap the red **"…is a wall"** card, then **Lighten next week**. Take things off one at a time; for anything involving someone else, it offers to write the message first.
 3. Open **Plan** and tap a day: see the hours, and the battery each block costs.
-4. Go to **Friends** and tap **Priya** (28%). Her week is heavy, her free evenings are shared, and **Text something** writes the message for you.
+4. Go to **Friends** and tap **Priya** (24%). Her week is heavy, her free evenings are shared, and **Text something** writes the message for you.
 5. **Plan something together**: pick **Daniel** and **Mei Ling**, then **Dinner**. The **green block** (Thursday, 7pm) is when all three of you are free.
 6. Tap the 🔔 **bell** and answer an invitation right there.
 
@@ -242,11 +242,11 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 **What to do first**
 
 1. **Start here**: due, needs and costs as three tiles, and the next time it fits.
-2. **Why first**: keyword tags (🚨 Short on time · ⏰ Start today · 📦 4h to go), each with 1–3 strength dots.
+2. **Why first**: the real reasons as tags, each with 1–3 strength dots: 🚨 Short on time · ⏰ Due Wed · 3h free till then · 🤝 Hard deadline · 📦 4h to go.
 3. **Next 7 days**: free hours per day, and one bar of hours needed against hours free.
-4. **Then**: only owing work and tasks without a set time, in the order you have to **start** them. Each row is tags (▶ start day, ⏳ hours · due), with the rank coloured by how soon: red today, amber within two days. Heavy work due later rises above light work due sooner; importance decides within a day.
-5. **Could move**: blocks at a set time you're allowed to move, least important first, tagged 🙋 Your idea · 📈 Heavy Mon · 🪶 Lighter Sun 7am. Fixed plans and hard deadlines never appear.
-6. **Move it → Swap this time**, in three steps: **pick** what the time should go to (the same sorted list, each saying how much of the slot it gets), **plan** it into the slot, then **move** the block that was there to a new time, or drop it.
+4. **Then**: only owing work and tasks without a set time, most urgent first (by the day each has to be started, walking back from the deadline through your free time). Each row is tags (⏰ due, ⏳ hours left, or ✅ next sitting), with the rank coloured by how soon: red today, amber within two days. Heavy work due later rises above light work due sooner; importance decides within a day.
+5. **Could move**: flexible blocks your priorities can take over: your own plans and soft ones, least important first. Each says how much time it frees and which task could use it (🙋 Your plan · ⏱ Frees 2h · 🎯 For FIT2100 Assignment 2). Fixed plans and hard deadlines never appear.
+6. **Move it → Swap this time**, in three steps: **pick** what the time should go to (the same sorted list, the 🎯 best fit first, each saying how much of the slot it gets or which booked sitting it brings forward), **plan** it into the slot, then **move** the block that was there to a new time, or drop it.
 
 *Every time you pick a time in Ballast, it's the same picker: this week and next with how full each day is (or a calendar for later dates), then drag the block along the day. On the slider, 🟧 amber blocks are things you could give up: slide onto one to take its place, and Ballast asks where it goes next.*
 

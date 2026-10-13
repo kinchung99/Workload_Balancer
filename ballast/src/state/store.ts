@@ -175,6 +175,12 @@ interface State {
   /** The saved session has been asked about. Until then nobody is sent to sign in. */
   sessionChecked: boolean;
   /**
+   * A signed-in week has had its first answer from the server. Until then the
+   * splash stays up, so nobody sees an empty week, or "not in your week" for a
+   * link they opened, while their own rows are on the way.
+   */
+  weekLoaded: boolean;
+  /**
    * Who was signed in on this device last time, kept across reloads. Only a
    * hint: it is why a reload waits for the server instead of flashing the
    * sign-in screen, and the server's answer is what counts.
@@ -302,6 +308,7 @@ interface State {
   /** Signed out, or a guest leaving: back to the sign-in screen. */
   endSession: () => void;
   setSessionChecked: () => void;
+  setWeekLoaded: () => void;
   importTimetable: (items: Item[], modules: Module[]) => void;
   /** A module made by hand, ready for its classes. Returns its id. */
   addModule: (module: Pick<Module, 'name' | 'code' | 'emoji' | 'weeks' | 'startDate' | 'requiredAttendance'> & { dread?: Dread }) => string;
@@ -402,6 +409,7 @@ export const useStore = create<State>()(
   marksSnoozed: false,
   guest: false,
   sessionChecked: false,
+  weekLoaded: true,
   lastAccountId: null,
 
   addItem: (item) =>
@@ -536,7 +544,7 @@ export const useStore = create<State>()(
    */
   goLive: (account, today) =>
     set((state) => ({
-      mode: 'live', account, today, guest: false, lastAccountId: account.id,
+      mode: 'live', account, today, guest: false, lastAccountId: account.id, weekLoaded: false,
       // Your picture comes with your account; a different account starts without this phone's.
       pic: account.pic ?? (state.lastAccountId === account.id ? state.pic : null),
       // Your note is yours: coming back to the same account keeps it.
@@ -1098,6 +1106,7 @@ export const useStore = create<State>()(
     set({ guest: false, lastAccountId: null });
   },
   setSessionChecked: () => set({ sessionChecked: true }),
+  setWeekLoaded: () => set({ weekLoaded: true }),
 
   /** Replace the timetable wholesale. A paste is an import, not an append. */
   importTimetable: (items, modules) =>

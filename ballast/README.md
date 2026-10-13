@@ -57,8 +57,8 @@ npm run preflight        # everything below, in order — what `deploy` runs fir
 npm run typecheck        # tsc --noEmit, strict
 npm run tokens:check     # tokens.json and tokens.ts have not drifted (90 scalars)
 npm run model:check      # the load model reproduces the study's stated figures
-npm run behaviour:check  # every button actually changes the state it claims to (844 checks)
-npm run render:check     # 681 expected strings reach 53 prerendered pages
+npm run behaviour:check  # every button actually changes the state it claims to (884 checks)
+npm run render:check     # 662 expected strings reach 53 prerendered pages
 npm run shots            # re-photograph every screen into docs/shots/
 npm run judges:seed      # rebuild the five judge accounts around today's date
 ```
@@ -990,40 +990,36 @@ have quietly halved the coverage.
 Every other screen answers "how is my week". `/priority` answers the one a
 student actually asks at 9am: *of all of this, what do I start with?*
 
-`src/lib/priority.ts` scores everything in the next seven days on one scale:
+`src/lib/priority.ts` answers it in two lists that never share an item.
+
+**What to do first** holds only owing work and tasks without a set time,
+sorted by the **start-by day**: walk back from the deadline (the day before,
+for coursework) through the hours you could really work - free, 9am to 9pm, at
+most four a day - until they cover what is still owed. Twelve hours due next
+week with three free hours a day starts before one hour due tomorrow, which is
+why heavy work far off rises. Within a day:
 
 ```
-score = size
-      x urgency(days)        3.0 today -> 2.2 tomorrow -> 0.35 past a week
-      x commitment           hard 1.6 | soft 1.2 | self 1.0
-      x importance           3 -> 1.35 | 2 -> 1.0 | 1 -> 0.8
-      + 40 if it can no longer be finished in the time left
+score = 100 - 12 x days until start-by
+      + 6 x (importance - 2)          Optional 1 ... Must 4
+      + 4 hard | 2 soft               a promise to someone
+      + 5 x need / free hours         how tight it is
+      + 40 if it cannot be finished in the time left
 ```
 
-**Size** is hours still owed for work with preparation, and load for everything
-else. That difference matters: a six-hour assignment five days out should sit
-near the top, and a six-load errand on Saturday should not.
+Each row says why in tags, not sentences: the deadline and the free time
+before it (*Due Wed · 3h free till then*), or the next booked sitting. The AI
+adds a one-line reason; the order is always the model's.
 
-### The urgency curve has to fall below one
+### Could move: time the list may take
 
-The first version bottomed out at 1.0, and it was wrong in a way that only
-showed up once the screen existed: a nine-load job six days away outranked a
-three-load job due tomorrow. Size won every argument.
-
-For anything with a fixed date that is exactly backwards — Saturday's errand is
-not something you can do today, however big it is. So the curve now decays past
-1.0 rather than flattening at it. Work with preparation stays near the top
-anyway, because its size is the hours you still owe.
-
-`urgencyFactor` is asserted directly in `behaviour:check`, curve shape included,
-because the shape *is* the model.
-
-### The half nobody asks
-
-The same ranking, turned around: of everything here, what are you actually
-allowed to move, and what does each one give back? Sorted by saving, and **hard
-deadlines and flagged lectures can never appear in it** — the app does not offer
-you something it would then refuse to do.
+The other half: blocks at a set time that are **flexible** - your own plans
+and soft ones, never fixed plans, hard deadlines, classes or sittings
+(`lib/replace` decides). Least important first. Each says how much time it
+frees and which task on the list could use it (*🎯 For FIT2100 Assignment 2*),
+spread down the list so the slots don't all name number one; booked work can
+bring a later sitting forward. *Move it* opens `/swap/[id]`: pick what takes
+the time (the 🎯 one first), plan it, then give the block a new time or drop it.
 
 ---
 
@@ -1221,8 +1217,8 @@ The things most likely to break, and where they are handled:
 | Risk | Handling |
 |---|---|
 | Tokens drift between the JSON and the code | `tokens:check` compares both files, 90 scalars |
-| A component hard-codes a number | `render:check` asserts 681 strings against real output |
-| A button silently stops working | `behaviour:check` drives the store through 844 checks |
+| A component hard-codes a number | `render:check` asserts 662 strings against real output |
+| A button silently stops working | `behaviour:check` drives the store through 884 checks |
 | The API changes shape under the app | Both import `shared/contract.ts`; the API suite parses every route |
 | A fix cannot reach devices holding old data | `SCHEMA_VERSION` drops incompatible saves on next load |
 | A screen becomes a dead end | `render:check` asserts every non-tab route carries an exit |
@@ -1583,8 +1579,8 @@ the code is internally consistent and this section says why.
    uses Monday and Friday and the capture chip reads *"Mon and Fri"*.
 
 Everything else matches. `npm run model:check` asserts thirteen of the study's
-figures against the model, and `npm run render:check` asserts 681 strings against
-the rendered HTML of 53 pages, and `npm run behaviour:check` makes 844 checks of
+figures against the model, and `npm run render:check` asserts 662 strings against
+the rendered HTML of 53 pages, and `npm run behaviour:check` makes 884 checks of
 the state behind the buttons.
 
 ---
@@ -1595,13 +1591,13 @@ About 1,100 checks, all runnable without a device, all in CI:
 
 - `scripts/check-model.mjs` (22) — loads the real `seed.ts` and `load.ts` through
   Node's native TypeScript stripping and asserts the study's numbers.
-- `scripts/check-behaviour.mjs` (844) — drives the real Zustand store through the
+- `scripts/check-behaviour.mjs` (884) — drives the real Zustand store through the
   actions the buttons call and asserts the state moved: booking, sittings,
   marking, rebalancing, recalibration, capture, timetable and attendance, plans
   from the server (answers in flight, called-off plans, going ahead), sync that
   does not echo, notifications, and pressing the same button three times to prove
   nothing piles up.
-- `scripts/check-render.mjs` (681 strings, 53 pages) — statically renders every
+- `scripts/check-render.mjs` (662 strings, 53 pages) — statically renders every
   route and asserts the figures reach the screen, spoken labels included.
 - `scripts/verify-tokens.mjs` (90) and `npm run typecheck` complete the app set.
 - `../server/scripts/check-api.ts` (209) — the API against a real Postgres in
