@@ -7,7 +7,8 @@ import { KIND, KINDS, itemFrom, moduleFor, repeatOf, templateFor, whenOf } from 
 import { costLabel, drainCosts, withDrain } from '@/lib/drain';
 import { addDays, formatShort } from '@/lib/dates';
 import { COMMITMENT_LABEL } from '@/lib/load';
-import { WANT_CHOICES } from '@/lib/swap';
+import { importanceOf, wantFor } from '@/lib/importance';
+import { CommitmentPicker, ImportancePicker } from '@/features/add/Traits';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import type { CalTemplate, CommitmentKind, Dread } from '@/lib/types';
 import { useStore } from '@/state/store';
@@ -16,7 +17,6 @@ import { CalendarDot, KIND_STICKER, KIND_WASH } from '@/features/calendar/EventC
 
 const PREP_OPTIONS = [2, 4, 6, 9, 12, 16, 20];
 const FINISH: Array<[number, string]> = [[0, 'On the day'], [1, 'Day before'], [2, '2 days before'], [7, 'A week before']];
-const IMPORTANCE: Array<[1 | 2 | 3, string]> = [[1, 'Nice to do'], [2, 'Normal'], [3, 'Really matters']];
 const EMPTY = { mental: 0, time: 0, physical: 0, social: 0, errands: 0 };
 
 /**
@@ -185,11 +185,8 @@ export default function CalendarSetup() {
                 <Chip key={days} label={word} tone={days === prep.daysBefore ? 'selected' : 'plain'} onPress={() => { tapFeedback(); update({ prep: { ...prep, daysBefore: days } }); }} />
               ))}
             </Stack>
-            <Stack direction="row" gap={2} wrap>
-              {IMPORTANCE.map(([value, word]) => (
-                <Chip key={value} label={word} tone={value === prep.importance ? 'selected' : 'plain'} onPress={() => { tapFeedback(); update({ prep: { ...prep, importance: value } }); }} />
-              ))}
-            </Stack>
+            <Text variant="heading">How important is it?</Text>
+            <ImportancePicker value={prep.importance} onChange={(value) => update({ prep: { ...prep, importance: value } })} />
           </Card>
         ) : null}
 
@@ -208,24 +205,14 @@ export default function CalendarSetup() {
           <Card gap={4}>
             <Stack gap={3}>
               <Text variant="heading">Can it move?</Text>
-              <Stack direction="row" gap={2} wrap>
-                {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
-                  <Chip
-                    key={option}
-                    label={`${{ hard: '🔒', soft: '↔️', self: '🙋' }[option]} ${COMMITMENT_LABEL[option]}`}
-                    tone={option === template.commitment ? 'selected' : 'plain'}
-                    onPress={() => { tapFeedback(); update({ commitment: option }); }}
-                  />
-                ))}
-              </Stack>
+              <CommitmentPicker value={template.commitment} onChange={(option) => update({ commitment: option })} />
             </Stack>
             <Stack gap={3}>
-              <Text variant="heading">Want to be there?</Text>
-              <Stack direction="row" gap={2} wrap>
-                {WANT_CHOICES.map(([value, word]) => (
-                  <Chip key={value} label={word} tone={value === template.want ? 'selected' : 'plain'} onPress={() => { tapFeedback(); update({ want: value }); }} />
-                ))}
-              </Stack>
+              <Text variant="heading">How important is it?</Text>
+              <ImportancePicker
+                value={template.importance ?? importanceOf({ want: template.want })}
+                onChange={(value) => update({ importance: value, want: wantFor(value) })}
+              />
             </Stack>
           </Card>
         ) : null}

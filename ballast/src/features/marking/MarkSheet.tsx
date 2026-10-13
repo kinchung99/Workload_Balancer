@@ -8,7 +8,8 @@
  * asks how draining it was. Big buttons, one tap each - the whole point is that
  * answering is quicker than ignoring.
  */
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, MarkBadge, Stack, Text } from '@/components';
 import { DrainFace } from '@/components/primitives/AreaDial';
@@ -24,6 +25,7 @@ import {
 } from '@/lib/marking';
 import { useStore } from '@/state/store';
 import { ProgressPicker } from './ProgressPicker';
+import { MoveItem } from '@/features/item/MoveItem';
 import type { Dread, Item, Outcome } from '@/lib/types';
 
 
@@ -42,7 +44,8 @@ export function MarkSheet({ itemId, onClose }: { itemId: string | null; onClose:
           style={[StyleSheet.absoluteFill, { backgroundColor: color.ink.default, opacity: 0.35 }]}
         />
         {item ? (
-          <View className="mt-auto w-full max-w-frame self-center bg-page px-5 pb-8 pt-3" style={{ borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }}>
+          <View className="mt-auto w-full max-w-frame self-center bg-page" style={{ borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '92%' }}>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 12 }}>
             <Body
               item={item}
               parent={item.parentId ? items.find((candidate) => candidate.id === item.parentId) : undefined}
@@ -55,7 +58,9 @@ export function MarkSheet({ itemId, onClose }: { itemId: string | null; onClose:
               onPlan={(hour) => { scheduleItem(item.id, hour); successFeedback(); onClose(); }}
               onDetails={() => { onClose(); router.push(`/item/${item.parentId ?? item.id}`); }}
               onClose={onClose}
+              onMoved={() => { markItem(item.id, undefined); onClose(); }}
             />
+            </ScrollView>
           </View>
         ) : null}
       </View>
@@ -72,8 +77,10 @@ const attendanceRateOf = (modules: ReturnType<typeof useStore.getState>['modules
 };
 
 function Body({
-  item, parent, moduleRate, today, onMark, onDread, onMove, onDetails, onClose, times, onPlan,
+  item, parent, moduleRate, today, onMark, onDread, onMove, onDetails, onClose, times, onPlan, onMoved,
 }: {
+  /** It was given a new day or time in the picker. */
+  onMoved: () => void;
   item: Item;
   parent?: Item;
   moduleRate: string | null;
@@ -90,6 +97,7 @@ function Body({
   const kind = markKind(item);
   const info = KIND[kind];
   const hour = clockHour(today);
+  const [moving, setMoving] = useState(false);
   const status = markStatus(item, today, hour);
   const outcome = outcomeOf(item);
   const open = canMark(item, today, hour);
@@ -121,39 +129,8 @@ function Body({
       {unplanned ? (
         <Stack gap={3}>
           <Text variant="title">When will you do it?</Text>
-          {times.length ? (
-            <Stack direction="row" gap={2} wrap>
-              {times.map((hour) => (
-                <Pressable
-                  key={hour}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Plan it for ${formatHour(hour)}`}
-                  onPress={() => onPlan(hour)}
-                  className="min-h-min items-center justify-center rounded-pill border-2 border-line-hairline bg-raised px-4 py-2 active:opacity-70"
-                >
-                  <Text variant="callout" weight="semibold">🕒 {formatHour(hour)}</Text>
-                </Pressable>
-              ))}
-            </Stack>
-          ) : (
-            <Text variant="footnote" tone="muted">No free time left {item.date === today ? 'today' : `on ${formatShort(item.date)}`}.</Text>
-          )}
-          <Stack direction="row" gap={2} wrap>
-            {[1, 2, 3].map((offset) => {
-              const date = addDays(item.date > today ? item.date : today, offset);
-              return (
-                <Pressable
-                  key={date}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move it to ${formatShort(date)}`}
-                  onPress={() => onMove(date)}
-                  className="min-h-min flex-row items-center gap-1 rounded-pill bg-sunken px-4 py-2 active:opacity-70"
-                >
-                  <Text variant="callout" tone="muted">↪ {offset === 1 ? 'Tomorrow' : formatShort(date).slice(0, 3)}</Text>
-                </Pressable>
-              );
-            })}
-          </Stack>
+          {/* The same picker as everywhere: the days with their load, then the day to drag along. */}
+          <MoveItem item={item} onDone={onMoved} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Done without planning"
@@ -201,23 +178,18 @@ function Body({
 
         {/* An errand that did not happen goes to another day, not into a void. */}
         {open && info.answer === 'errand' && outcome !== 'done' ? (
-          <Stack direction="row" gap={2} wrap>
-            {[1, 2, 3].map((offset) => {
-              const date = addDays(item.date > today ? item.date : today, offset);
-              return (
-                <Pressable
-                  key={date}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move it to ${formatShort(date)}`}
-                  onPress={() => onMove(date)}
-                  className="min-h-min flex-row items-center gap-1 rounded-pill border-2 border-line-hairline bg-raised px-4 py-2 active:opacity-70"
-                >
-                  <Text variant="callout">↪</Text>
-                  <Text variant="callout" weight="semibold">{offset === 1 ? 'Tomorrow' : formatShort(date).slice(0, 3)}</Text>
-                </Pressable>
-              );
-            })}
-          </Stack>
+          moving ? (
+            <MoveItem item={item} onDone={onMoved} />
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Move it to another day"
+              onPress={() => setMoving(true)}
+              className="min-h-min flex-row items-center justify-center gap-2 rounded-pill border-2 border-line-hairline bg-raised px-4 py-2 active:opacity-70"
+            >
+              <Text variant="callout" weight="semibold">↪ Move it to another day</Text>
+            </Pressable>
+          )
         ) : null}
 
         {/* What the answer moved. */}

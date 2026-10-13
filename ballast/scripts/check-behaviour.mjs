@@ -41,6 +41,7 @@ for (const [from, to] of [
   ['src/lib/priority.ts', 'priority.ts'],
   ['src/lib/circle.ts', 'circle.ts'],
   ['src/lib/swap.ts', 'swap.ts'],
+  ['src/lib/importance.ts', 'importance.ts'],
   ['src/lib/sharing.ts', 'sharing.ts'],
   ['src/lib/review.ts', 'review.ts'],
   ['src/lib/api.ts', 'api.ts'],
@@ -138,7 +139,8 @@ const { CATALOGUE, rankRest, fromSeed, fromIdea, hoursFor } = await import(join(
 const { wireVisibility, DEFAULT_SHARE_RULES } = await import(join(tmp, 'sharing.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
-const { prioritise, rank, urgencyFactor, whyFirst, rowWeight, nextFit, weekAhead, hoursNeeded } = await import(join(tmp, 'priority.ts'));
+const { prioritise, rank, urgencyFactor, whyFirst, rowWeight, nextFit, weekAhead, hoursNeeded, startByFor, startWord, startLabel } = await import(join(tmp, 'priority.ts'));
+const { importanceOf, wantFor, IMPORTANCE_LEVELS } = await import(join(tmp, 'importance.ts'));
 const { DRAIN, LEVELS, drainCosts, costLabel, withDrain, toggleArea, batteryCost } = await import(join(tmp, 'drain.ts'));
 const { circleOrder, isStale, lastSeen, updatedToday, worthANudge, STALE_AFTER_MINS, frequentFriends, searchPeople, byLetter } = await import(join(tmp, 'circle.ts'));
 const { bestSwap, findSwap, firstRefusal, skippable, wantOf, whyNoSwap, DEFAULT_WANT, WANT_CHOICES } = await import(join(tmp, 'swap.ts'));
@@ -575,9 +577,10 @@ console.log('\nWhat happened, once its time came');
   check('what was answered is left alone', rolled.items.find((i) => i.id === 'sun-cook').outcome, 'missed');
 
   // Marking a thing done takes it off what to do first.
-  check('the afternoon block is first', prioritise(s().items, today).first[0].item.id, 'os-2');
-  s().markItem('os-2', 'done');
-  check('and done, it is not', prioritise(s().items, today).first.some((r) => r.item.id === 'os-2'), false);
+  const topId = prioritise(s().items, today).first[0].item.id;
+  check('something is first', typeof topId, 'string');
+  s().markItem(topId, 'done');
+  check('and done, it is not', prioritise(s().items, today).first.some((r) => r.item.id === topId), false);
 }
 
 console.log('\nA sitting moves its work by what it actually did');
@@ -1148,18 +1151,22 @@ console.log('\nWhat to do first, answered in full');
   s().reset();
   const { first } = prioritise(s().items, s().today, 7);
   const top = first[0];
-  check('the top is the hard deadline due today', top.item.id, 'os-2');
+  check('the top is something to start today', top.startBy, s().today);
+  check('a block at a set time with no deadline is not something to do first', first.some((r) => r.item.id === 'os-2'), false);
+  check('and the list reads in the order things have to be started', first.every((r, i) => i === 0 || first[i - 1].startBy <= r.startBy), true);
   const why = whyFirst(top, s().items, s().today, Math.max(...first.map(rowWeight)));
-  check('why it is first, strongest first', why.map((p) => p.label), ['Due today', 'Hard deadline', 'A 4h block']);
+  check('why it is first, strongest first', why.every((p, i) => i === 0 || why[i - 1].strength >= p.strength), true);
+  check('and it says when to start', why.some((p) => p.label.startsWith('Start today')), true);
   check('each with a strength out of three', why.every((p) => p.strength >= 1 && p.strength <= 3), true);
-  check('something already at a time is booked, not fitted', nextFit(top, s().items, s().today), { date: s().today, start: 13, hours: 4, booked: true });
+  const os2 = rank(s().items.find((i) => i.id === 'os-2'), s().items, s().today);
+  check('something already at a time is booked, not fitted', nextFit(os2, s().items, s().today), { date: s().today, start: 13, hours: 4, booked: true });
 
   const algo = first.find((r) => r.item.id === 'algo-set');
   const fit = nextFit(algo, s().items, s().today);
   check('owing work fits in working hours before it is due', fit.start >= 9 && fit.start + fit.hours <= 21 && fit.date < algo.item.deadline, true);
   check('and a sitting is at most two hours', fit.hours, 2);
   check('it needs what is neither done nor booked', hoursNeeded(algo, s().items), 3);
-  check('something at a time needs no more', hoursNeeded(top, s().items), 0);
+  check('something at a time needs no more', hoursNeeded(os2, s().items), 0);
   // Book every loose hour, and the answer becomes the next booked sitting - not "no gap".
   s().scheduleSessions('algo-set', planSessions(algo.item, s().items, s().today, 9));
   const bookedFit = nextFit(algo, s().items, s().today, 9);
@@ -1388,7 +1395,7 @@ console.log('\nWhat to do first');
   const { first, couldMove } = prioritise(items, s().today);
 
   check('the list is not empty', first.length > 0, true);
-  check('it is sorted worst-first', first.every((row, i) => i === 0 || first[i - 1].score >= row.score), true);
+  check('it is sorted by the day to start, then by score', first.every((row, i) => i === 0 || first[i - 1].startBy < row.startBy || (first[i - 1].startBy === row.startBy && first[i - 1].score >= row.score)), true);
   check('every row can say why it is there', first.every((row) => row.reasons.length > 0), true);
 
   // The shape of the urgency curve is the model, so assert the curve itself.
@@ -1423,7 +1430,10 @@ console.log('\nWhat to do first');
   check('there is something you could move', couldMove.length > 0, true);
   check('nothing locked is ever offered', couldMove.every((row) => row.item.commitment !== 'hard'), true);
   check('nor the lecture that gives the hints', couldMove.every((row) => !isProtectedClass(row.item)), true);
-  check('and it is ordered by what it gives back', couldMove.every((row, i) => i === 0 || couldMove[i - 1].saves >= row.saves), true);
+  check('and it is ordered least important first', couldMove.every((row, i) => i === 0 || couldMove[i - 1].score >= row.score), true);
+  check('every block says why it could move', couldMove.every((row) => (row.moveReasons ?? []).length >= 1), true);
+  check('a fixed time is never offered', couldMove.every((row) => row.item.commitment !== 'fixed'), true);
+  check('and the two halves never share a thing', couldMove.every((row) => !first.some((f) => f.item.id === row.item.id)), true);
 
   // Background load is not a choice, so it is not on the list.
   check('the timetable is not something to prioritise', first.every((row) => !row.item.moduleId || row.item.date >= s().today), true);
@@ -2377,6 +2387,54 @@ console.log('\nPlans, from the server');
   s().goDemo();
 }
 
+console.log('\nWhat to do first, by when it has to start');
+{
+  s().reset();
+  const today = s().today;
+  const base = { bucket: 'mental', dread: 3, commitment: 'soft', prepDone: 0 };
+  const light = { ...base, id: 'light', title: 'Light, due in two days', hours: 1, prepHours: 1, date: addDaysISO(today, 2), deadline: addDaysISO(today, 2) };
+  const heavy = { ...base, id: 'heavy', title: 'Heavy, due in six days', hours: 18, prepHours: 18, date: addDaysISO(today, 6), deadline: addDaysISO(today, 6) };
+  const week = [...s().items, light, heavy];
+  const rows = prioritise(week, today, 7, undefined, 9).first;
+  const at = (id) => rows.findIndex((r) => r.item.id === id);
+  check('heavy work due later starts sooner than light work due sooner', at('heavy') < at('light'), true);
+  check('because it has to be started earlier', rows[at('heavy')].startBy <= rows[at('light')].startBy, true);
+  check('and the row says so', rows[at('heavy')].reasons.some((r) => r.startsWith('Start')), true);
+  check('a deadline is finished the day before when it can be', startByFor(1, addDaysISO(today, 3), [], today, 9).date, addDaysISO(today, 2));
+  check('with no time left it starts today, and says how short', startByFor(200, addDaysISO(today, 1), s().items, today, 9).short > 0, true);
+  check('start words read the way people say them', [startWord(today, today), startWord(addDaysISO(today, 1), today)], ['Start today', 'Start tomorrow']);
+  // Work whose hours are all booked already leads with its next sitting, not a start date.
+  s().scheduleSessions('algo-set', planSessions(s().items.find((i) => i.id === 'algo-set'), s().items, today, 9));
+  const booked = prioritise(s().items, today, 7, undefined, 9).first.find((r) => r.item.id === 'algo-set');
+  check('fully booked work says when its next sitting is', startLabel(booked, today).startsWith('Next sitting'), true);
+  s().reset();
+
+  const fixed = { id: 'fixed-dinner', title: 'Dinner with Ravi', bucket: 'social', hours: 2, dread: 1, commitment: 'fixed', date: addDaysISO(today, 1), startHour: 19 };
+  const both = prioritise([...s().items, fixed], today, 7, undefined, 9);
+  check('a fixed plan is not something to do first', both.first.some((r) => r.item.id === 'fixed-dinner'), false);
+  check('nor something offered to move', both.couldMove.some((r) => r.item.id === 'fixed-dinner'), false);
+  check('every movable block says why', both.couldMove.every((r) => r.moveReasons.length >= 1), true);
+  const withSpot = both.couldMove.find((r) => r.suggest);
+  check('and where it would fit, a lighter day near it', !!withSpot && Math.abs(new Date(withSpot.suggest.date) - new Date(withSpot.item.date)) <= 3 * 864e5, true);
+
+  // Importance, asked of everything, read from the older answer when that is all there is.
+  check('four steps of importance', IMPORTANCE_LEVELS.map((l) => l.word), ['Optional', 'Normal', 'Important', 'Must']);
+  check('an old "really want to" reads as a must', importanceOf({ want: 5 }), 4);
+  check('an old "rather not" reads as optional', importanceOf({ want: 1 }), 1);
+  check('and the trade logic still gets a want', wantFor(3), 4);
+  const optional = { id: 'opt', title: 'Optional walk', bucket: 'physical', hours: 1, dread: 1, commitment: 'self', importance: 1, date: addDaysISO(today, 1), startHour: 12 };
+  const must = { ...optional, id: 'must', title: 'Must-do walk', importance: 4 };
+  const move = prioritise([...s().items, optional, must], today, 7, undefined, 9).couldMove;
+  check('the least important is offered to move first', move.findIndex((r) => r.item.id === 'opt') < move.findIndex((r) => r.item.id === 'must'), true);
+
+  // A plan you said yes to is fixed; and both answers can be changed later.
+  s().answerReceived(s().received[0].id, true);
+  check('a plan with friends lands as fixed', s().items.find((i) => i.id === `going-${s().received[0].id}`).commitment, 'fixed');
+  s().setItemTraits('books', { commitment: 'fixed', importance: 4 });
+  const books = s().items.find((i) => i.id === 'books');
+  check('can it move and how important, changed on the item', [books.commitment, books.importance, books.want], ['fixed', 4, 5]);
+}
+
 console.log('\nSync does not echo');
 {
   const a = { items: { x: { id: 'x', title: 'Run', hours: 1 } } };
@@ -2469,7 +2527,7 @@ console.log('\nGoogle Calendar, set up in a tap');
   check('a tutorial is a tutorial', os.sessionKind, 'tutorial');
   const essay = guessFor({ title: 'Ethics essay due' });
   check('a deadline asks for hours of work, not an hour on the day', [!!essay.prep, essay.prep?.hours], [true, 6]);
-  check('a dentist appointment cannot move', guessFor({ title: 'Dentist appointment' }).commitment, 'hard');
+  check('a dentist appointment cannot move', guessFor({ title: 'Dentist appointment' }).commitment, 'fixed');
   check('the guessed drain is the loudest part of the mix', Math.max(...Object.values(essay.mix)), essay.dread);
 
   const dto = {

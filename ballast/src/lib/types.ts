@@ -7,7 +7,15 @@ export type BucketKey = 'mental' | 'time' | 'physical' | 'social' | 'errands';
  * Tagged at capture, one tap. This is what lets the app suggest what to move
  * without ever suggesting you skip the exam.
  */
-export type CommitmentKind = 'hard' | 'soft' | 'self';
+/**
+ * Can it move? Fixed: a set time that does not move (a plan with friends, a
+ * shift). Hard: a deadline someone else set. Soft: a promise that can be
+ * renegotiated. Self: your own idea.
+ */
+export type CommitmentKind = 'fixed' | 'hard' | 'soft' | 'self';
+
+/** How much it matters: optional, normal, important, must. */
+export type Importance = 1 | 2 | 3 | 4;
 
 /** How much are you dreading this, one to five. The one thing a calendar cannot know. */
 export type Dread = 1 | 2 | 3 | 4 | 5;
@@ -86,8 +94,8 @@ export interface Item {
   prepHours?: number;
   /** Hours done so far. It stays on every day's list until this reaches prepHours. */
   prepDone?: number;
-  /** 1 low, 2 normal, 3 high. Used to order what gets scheduled first. */
-  importance?: 1 | 2 | 3;
+  /** 1 optional, 2 normal, 3 important, 4 must. What to do first leans on it; what could move offers the least first. */
+  importance?: Importance;
   /**
    * How much you want to be there, 1 to 5.
    *
@@ -637,7 +645,8 @@ export interface CalTemplate {
   commitment: CommitmentKind;
   want?: 1 | 2 | 3 | 4 | 5;
   /** Work before the day, for assignments and exams. */
-  prep?: { hours: number; importance: 1 | 2 | 3; daysBefore: number };
+  importance?: Importance;
+  prep?: { hours: number; importance: Importance; daysBefore: number };
   moduleId?: string;
   sessionKind?: SessionKind;
 }

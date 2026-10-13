@@ -42,7 +42,7 @@ const EXPECTATIONS = [
     'WEEK 10', 'Good ',                       // a greeting under a drawing
     '48%', 'Doing fine',                      // the hero: a face, a number, a word
     'used', 'to come', 'left', 'Where it goes',  // and where it went, as one bar
-    'DO THIS NEXT', 'Operating systems, part 2',   // one next thing, not a list
+    'DO THIS NEXT', 'Emails I have been avoiding',   // one next thing, not a list: the work that has to start today
     'Tuesday to Thursday next week is a wall',     // the one warning worth interrupting for
     'Quick update', 'to mark', 'to confirm', 'check in',   // what needs you, in one strip
     'left today', 'Next ', 'asking you', 'rest owed', '11h', 'Not checked in',  // a glance at Plan, Friends and You
@@ -153,12 +153,12 @@ const EXPECTATIONS = [
   ]],
   ['add/when.html', 'Add · when', [
     'STEP 4 OF 4 \u00b7 WHEN',
-    'Which day', 'Today', 'Tomorrow',         // any day, in view, not behind a chip
-    'Anytime that day',                       // "no time" stays a real answer
-    'Can it move?', 'Hard deadline',
-    // The one thing the app cannot derive, asked once, in three words, next to
-    // the question it belongs with.
-    'Want to be there?', 'Rather not', "Don't mind", 'Really want to',
+    // The same picker as everywhere: two weeks with each day's load, a calendar, the day to drag along.
+    'DAY \u00b7 HOW FULL EACH ONE IS', '\ud83d\udcc5 Another date', 'THIS WEEK', 'NEXT WEEK', '13%', 'TIME \u00b7 DRAG TO MOVE',
+    'Any time that day',                      // "no time" stays a real answer
+    // Can it move - fixed first - and how much it matters, as tiles.
+    'Can it move?', 'Fixed', 'Set time, stays put', 'Hard deadline', 'Self-imposed',
+    'How important is it?', 'Optional', 'Normal', 'Important', 'Must',
     'YOUR WEEK RIGHT NOW', 'Before you add anything',   // the battery, before you commit
     '48%', 'Busy week',                       // and it is the real reading, not a mock
   ]],
@@ -185,8 +185,8 @@ const EXPECTATIONS = [
   ['prescription/when.html', 'Prescription · when', [
     'STEP 2 OF 2 \u00b7 WHEN',
     'When does it go?',
-    'WHICH DAY', 'Today', 'Tomorrow',         // recovery is no longer today-only
-    'WHAT TIME \u00b7 2 GAPS ON TODAY',
+    'DAY \u00b7 HOW FULL EACH ONE IS', 'NEXT WEEK',   // recovery uses the same picker, two weeks ahead
+    'TIME \u00b7 DRAG TO MOVE', 'GAP 12pm\u20131pm',
     'Pick a slot',
     'IF YOU BOOK IT', 'Where it lands', 'Today 12pm\u20131pm',   // battery and timeline before committing
     'Book Today at 12pm',                     // defaults into the window a walk belongs in
@@ -423,18 +423,22 @@ const EXPECTATIONS = [
   ]],
   ['priority.html', 'Priority', [
     'WHAT TO DO FIRST', 'Start with this',
-    'START HERE', 'Operating systems, part 2',          // number one, answered in full
+    'START HERE', 'Emails I have been avoiding',        // number one: the work that has to start today
     'DUE', 'NEEDS', 'COSTS', 'of the week',             // three facts, as tiles
-    'WHY IT\u2019S FIRST', 'Due today', 'Hard deadline', 'A 4h block',
-    'Booked today at 1pm\u20135pm', 'Open that day',     // when it can actually happen
+    'WHY IT\u2019S FIRST', 'Not enough free time left to finish', 'Start today \u00b7 due in 2 days', '4h of work to go',
+    'Plan the sittings',                                // when it can actually happen
     'Your next 7 days', '\u2713 It fits', 'still needs a slot',   // the week, and whether it fits
-    'Then', '6 of 32 \u00b7 next 7 days', 'Show the other 26',
-    'Algorithms problem set', '3h to go', '75%', 'left',   // how much of owing work is left
-    'Tomorrow \u00b7 10am\u20133pm',                        // when a fixed thing happens
-    'Plan sittings', 'Change time', 'Open day',            // one button to act on each
-    'Could move', 'back',                     // the half no planner asks about
-    'Write the message', 'Move it',
-    'BEFORE ANY OF IT',                       // at 13%, rest stops being a reward
+    // Only owing work and tasks without a set time, in the order they have to be started.
+    'Then', '6 of 6 \u00b7 next 7 days',
+    'Return the library books', '\u25b6 Start today \u00b7 no time yet \u00b7 20m',
+    'Algorithms problem set', '\u25b6 Start by Wed \u00b7 due Thu 13 Nov \u00b7 3h to go', '75%', 'left',
+    'Group presentation', '\u25b6 Start by Sun \u00b7 due Wed 19 Nov \u00b7 6h to go',
+    'Plan sittings', 'Plan time',                       // one button to act on each
+    // The blocks that could move: least important first, each with why and where it would fit.
+    'Could move', 'least important first', 'back',
+    'Week 10 catch-up revision', 'Your own idea',
+    'Mon is one of your heaviest days', 'Fits Sun 7am, a lighter day', 'Move it \u00b7 Sun 7am',
+    'Soft, can be rearranged', 'Write the message',
   ]],
 ];
 

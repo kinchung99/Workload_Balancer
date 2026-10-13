@@ -9,6 +9,7 @@
 import { addDays, formatShort } from './dates';
 import { formatHour } from './schedule';
 import { percentUndone, remaining } from './prep';
+import { wireCommitment } from './load';
 import type { PriorityContext, RebalanceContext } from '@shared/contract';
 import type { Ranked } from './priority';
 import type { Item, Trade } from './types';
@@ -34,7 +35,7 @@ export function priorityContext(rows: Ranked[], today: string, hour: number, cha
       hoursLeft: Math.min(300, kind === 'owing' ? remaining(item) : item.hours),
       ...(kind === 'owing' ? { percentLeft: percentUndone(item) } : {}),
       dread: dread(item.dread),
-      hardness: item.commitment,
+      hardness: wireCommitment(item.commitment),
     })),
   };
 }

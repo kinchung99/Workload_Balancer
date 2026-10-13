@@ -8,7 +8,7 @@ import { Composer } from '@/features/compose/Composer';
 import { recipientOf } from '@/lib/compose';
 import { daysBetween, formatShort } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
-import { costPercent, isMovable, loadOf } from '@/lib/load';
+import { costPercent, isMovable, loadOf, wireCommitment } from '@/lib/load';
 import { formatHour } from '@/lib/schedule';
 import { useStore, weekReading } from '@/state/store';
 import type { ComposeContext } from '@shared/contract';
@@ -65,7 +65,7 @@ export default function Decline() {
       subject: item.title,
       to: recipientOf(item.title) ?? (coursework ? 'my lecturer' : 'them'),
       when: `${formatShort(item.deadline ?? item.date)}${item.startHour !== undefined ? `, ${formatHour(item.startHour)}` : ''}`,
-      commitment: item.commitment,
+      commitment: wireCommitment(item.commitment),
       pressure: pressureNear(items, item),
       weekPercent: weekReading(items, item.date, ceilings).overall,
       dread: item.dread,

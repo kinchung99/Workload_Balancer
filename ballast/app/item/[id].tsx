@@ -4,10 +4,12 @@ import {
   AreaIcon, Button, Chip, Disclosure, Door, PageHeader, Screen, Section, Stack, Sticker, Text,
 } from '@/components';
 import { color } from '@design/tokens';
-import { BUCKET_LABEL, COMMITMENT_LABEL, costPercent } from '@/lib/load';
+import { BUCKET_LABEL, COMMITMENT_EMOJI, COMMITMENT_LABEL, costPercent } from '@/lib/load';
+import { IMPORTANCE_LEVELS, importanceOf, importanceWord } from '@/lib/importance';
+import { CommitmentPicker, ImportancePicker } from '@/features/add/Traits';
 import { daysLeft, needsPrep, remaining, sittingsOf } from '@/lib/prep';
-import { formatHour, startOptions } from '@/lib/schedule';
-import { addDays, formatShort } from '@/lib/dates';
+import { formatHour } from '@/lib/schedule';
+import { formatShort } from '@/lib/dates';
 import { successFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 import { useItemsWithLogs } from '@/state/selectors';
@@ -15,6 +17,7 @@ import { flagInfo, isProtectedClass } from '@/lib/timetable';
 import { LogTime, OwingSummary } from '@/features/item/Owing';
 import { SittingsPreview } from '@/features/item/Sittings';
 import { DrainDisclosure } from '@/features/item/Dread';
+import { MoveItem } from '@/features/item/MoveItem';
 
 /**
  * Two real items, so `/item/...` renders in the static export rather than the
@@ -38,7 +41,7 @@ export async function generateStaticParams() {
 export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { today, scheduleItem, moveItem, customFlags, ceilings } = useStore();
+  const { today, scheduleItem, customFlags, ceilings, setItemTraits } = useStore();
   const items = useItemsWithLogs();
 
   const item = items.find((candidate) => candidate.id === id);
@@ -56,8 +59,7 @@ export default function ItemDetail() {
   /** Work that had preparation and has none left. Worth saying so, once. */
   const finished = !!item.prepHours && remaining(item) === 0;
   const ticked = sittingsOf(item, items).filter((s) => s.sessionDone).length;
-  const slots = startOptions(items, item.date, item.hours);
-  const locked = isProtectedClass(item) || item.commitment === 'hard';
+  const locked = isProtectedClass(item) || item.commitment === 'hard' || item.commitment === 'fixed';
   const left = daysLeft(item, today);
 
   return (
@@ -83,7 +85,7 @@ export default function ItemDetail() {
               <Text variant="micro">{BUCKET_LABEL[item.bucket]}</Text>
             </View>
             <Chip label={`🔋 −${Math.max(1, Math.round(costPercent(item, ceilings)))}% of your week`} tone="busy" readOnly />
-            <Chip label={COMMITMENT_LABEL[item.commitment]} tone={item.commitment === 'hard' ? 'heavy' : 'plain'} readOnly />
+            <Chip label={`${COMMITMENT_EMOJI[item.commitment]} ${COMMITMENT_LABEL[item.commitment]}`} tone={item.commitment === 'hard' || item.commitment === 'fixed' ? 'heavy' : 'plain'} readOnly />
             {item.room ? <Chip label={item.room} readOnly /> : null}
             {item.startHour !== undefined ? (
               <Chip label={`${formatHour(item.startHour)}–${formatHour(item.startHour + item.hours)}`} readOnly />
@@ -98,7 +100,7 @@ export default function ItemDetail() {
           {locked ? (
             <Stack direction="row" gap={3} align="center" className="rounded-md bg-heavy-wash px-3 py-2">
               <Sticker name="wall" size={22} />
-              <Text variant="micro" tone="heavy" className="flex-1">Locked · never suggested for moving</Text>
+              <Text variant="micro" tone="heavy" className="flex-1">{item.commitment === 'fixed' ? 'Fixed time · never suggested for moving' : 'Locked · never suggested for moving'}</Text>
             </Stack>
           ) : null}
         </Stack>
@@ -133,38 +135,34 @@ export default function ItemDetail() {
           </Section>
         ) : null}
 
-        {/* Anything with a slot, or wanting one. */}
+        {/* Anything with a slot, or wanting one: the days, how full each is, and the day itself to drag along. */}
         {!owing && !finished && !locked && !item.repeats ? (
           <Section family="week" title={item.startHour === undefined ? 'Give it a time' : 'Move it'} sticker="clock">
-            {slots.length ? (
-              <Stack direction="row" gap={2} wrap>
-                {slots.map((hour) => (
-                  <Chip
-                    key={hour}
-                    label={formatHour(hour)}
-                    tone={hour === item.startHour ? 'selected' : 'plain'}
-                    onPress={() => { scheduleItem(item.id, hour); successFeedback(); }}
-                  />
-                ))}
-              </Stack>
-            ) : (
-              <Text variant="footnote" tone="muted">No {item.hours}h gap on {formatShort(item.date)}.</Text>
-            )}
-            <Stack direction="row" gap={2} wrap>
-              {item.startHour !== undefined ? (
-                <Chip label="Take the time away" onPress={() => { scheduleItem(item.id, undefined); successFeedback(); }} />
-              ) : null}
-              {Array.from({ length: 3 }, (_, offset) => addDays(today, offset + 1)).map((date) => (
-                <Chip key={date} label={`Move to ${formatShort(date)}`} onPress={() => { moveItem(item.id, date); successFeedback(); }} />
-              ))}
-            </Stack>
+            <MoveItem key={`${item.date}-${item.startHour}`} item={item} />
+            {item.startHour !== undefined ? (
+              <Chip label="Take the time away" onPress={() => { scheduleItem(item.id, undefined); successFeedback(); }} />
+            ) : null}
           </Section>
+        ) : null}
+
+        {/* The two answers the lists sort on: can it move, and how much it matters. Folded until you want them. */}
+        {!item.moduleId && !item.isLog && !item.parentId ? (
+          <Disclosure
+            lead={COMMITMENT_EMOJI[item.commitment]}
+            title="Can it move · how important"
+            summary={`${COMMITMENT_LABEL[item.commitment]} · ${IMPORTANCE_LEVELS.find((l) => l.value === importanceOf(item))!.emoji} ${importanceWord(importanceOf(item))}`}
+          >
+            <Stack gap={3}>
+              <CommitmentPicker value={item.commitment} onChange={(commitment) => { setItemTraits(item.id, { commitment }); successFeedback(); }} />
+              <ImportancePicker value={importanceOf(item)} onChange={(importance) => { setItemTraits(item.id, { importance }); successFeedback(); }} />
+            </Stack>
+          </Disclosure>
         ) : null}
 
         {/* How much you mind it — folded to one row until you want to change it. */}
         {!item.isRecovery && !item.isLog ? <DrainDisclosure item={item} items={items} /> : null}
 
-        {!locked && item.commitment !== 'hard' && !item.repeats && !item.moduleId ? (
+        {!locked && !item.repeats && !item.moduleId ? (
           <Door
             family="people"
             sticker="chat"

@@ -35,13 +35,13 @@ export function buildTrades(week: Item[]): Trade[] {
   // b. Hard deadlines are locked, not just discouraged. The app will never
   //    propose skipping the presentation, so a student can trust every
   //    suggestion on the list without reading it defensively.
-  const hardest = week.filter((i) => i.commitment === 'hard' && !i.repeats).sort(byLoad)[0];
+  const hardest = week.filter((i) => (i.commitment === 'hard' || i.commitment === 'fixed') && !i.repeats).sort(byLoad)[0];
   if (hardest) {
     trades.push({
       id: `lock-${hardest.id}`,
       itemId: hardest.id,
       title: `${hardest.title}${hardest.when ? `, ${hardest.when}` : ''}`,
-      detail: 'Hard deadline. Never suggested for moving.',
+      detail: hardest.commitment === 'fixed' ? 'Fixed time. Never suggested for moving.' : 'Hard deadline. Never suggested for moving.',
       saves: 0,
       locked: true,
       selected: false,

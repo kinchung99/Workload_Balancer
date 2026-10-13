@@ -8,7 +8,7 @@ import { color, radius } from '@design/tokens';
 import { FAMILY } from '@design/families';
 import { BUCKET_LABEL, bandFor } from '@/lib/load';
 import {
-  hoursNeeded, nextFit, prioritise, rowWeight, weekAhead, whyFirst, type Push, type Ranked,
+  hoursNeeded, nextFit, prioritise, rowWeight, weekAhead, whyFirst, type Push, type Ranked, startLabel,
 } from '@/lib/priority';
 import { weightsFrom } from '@/lib/review';
 import { DAY_LETTER, addDays, dayIndex, daysBetween, formatShort, parseISO } from '@/lib/dates';
@@ -25,6 +25,7 @@ import { api } from '@/lib/api';
 import { priorityContext } from '@/lib/coach';
 import { clockHour } from '@/lib/marking';
 import { useAiAnswer } from '@/lib/ai';
+import { MoveSheet } from '@/features/item/MoveItem';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
@@ -79,10 +80,12 @@ export default function Priority() {
   const reading = useReading();
 
   const weights = useMemo(() => weightsFrom(dayReports), [dayReports]);
-  const { first, couldMove } = useMemo(() => prioritise(items, today, 7, weights), [items, today, weights]);
+  const { first, couldMove } = useMemo(() => prioritise(items, today, 7, weights, clockHour(today)), [items, today, weights]);
   const ahead = useMemo(() => weekAhead(first, items, today), [first, items, today]);
 
   const [showAll, setShowAll] = useState(false);
+  // Which "Could move" row has its move sheet open.
+  const [moving, setMoving] = useState<{ id: string; suggest?: { date: string; startHour: number } } | null>(null);
   const top = first[0];
   const rest = first.slice(1);
   const shown = showAll ? rest : rest.slice(0, 5);
@@ -190,7 +193,7 @@ export default function Priority() {
                 key={row.item.id}
                 row={row}
                 rank={index + 2}
-                pressure={top ? row.score / top.score : 0}
+                pressure={row.startBy ? 1 - Math.min(7, daysBetween(today, row.startBy)) / 8 : 0.2}
                 today={today}
                 why={aiWhy(row.item.id)}
                 onOpen={() => { tapFeedback(); router.push(`/item/${row.item.id}` as Href); }}
@@ -206,8 +209,8 @@ export default function Priority() {
 
         {/* The half nobody asks: what are you allowed to move, and what would it give back? */}
         {couldMove.length ? (
-          <Section family="rest" title="Could move" sticker="scales" meta="battery back">
-            {couldMove.slice(0, 3).map((row) => (
+          <Section family="rest" title="Could move" sticker="scales" meta="least important first">
+            {couldMove.slice(0, 4).map((row) => (
               <Stack key={row.item.id} gap={3} className="rounded-lg border border-line-hairline bg-raised px-4 py-3">
                 <Stack direction="row" gap={3} align="center">
                   <View
@@ -219,23 +222,36 @@ export default function Priority() {
                   <Stack gap={1} grow>
                     <Text variant="body" weight="semibold">{row.item.title}</Text>
                     <Text variant="micro" tone="subtle">
-                      {dayWord(row.item.date, today)} · {row.item.commitment === 'self' ? 'your own idea' : 'soft, can move'}
+                      {dayWord(row.item.date, today)} · {formatHour(row.item.startHour ?? 0)}–{formatHour((row.item.startHour ?? 0) + row.item.hours)}
                     </Text>
                   </Stack>
                   <Chip label={`+${Math.max(1, batteryCost(items, row.item, ceilings))}% back`} tone="recovery" readOnly />
                 </Stack>
+                {/* Why this one: what kind of promise it is, how much it matters, the day it sits on, and where it would fit. */}
+                <Stack gap={1}>
+                  {(row.moveReasons ?? []).map((reason) => (
+                    <Text key={reason} variant="micro" tone="muted">· {reason}</Text>
+                  ))}
+                </Stack>
                 <Stack direction="row" gap={2} wrap>
-                  <Chip label="Write the message" onPress={() => router.push(`/decline/${row.item.id}`)} />
-                  <Chip label="Move it" onPress={() => router.push(`/plan?day=${row.item.date}`)} />
+                  <Chip
+                    label={row.suggest ? `Move it · ${formatShort(row.suggest.date).slice(0, 3)} ${formatHour(row.suggest.startHour)}` : 'Move it'}
+                    tone="selected"
+                    onPress={() => { tapFeedback(); setMoving({ id: row.item.id, suggest: row.suggest }); }}
+                  />
+                  {/* Only somebody else's plans need a message; your own idea just moves. */}
+                  {row.item.commitment === 'soft' ? (
+                    <Chip label="Write the message" onPress={() => router.push(`/decline/${row.item.id}`)} />
+                  ) : null}
                 </Stack>
               </Stack>
             ))}
           </Section>
         ) : null}
 
-
         <View className="h-2" />
       </Stack>
+      <MoveSheet itemId={moving?.id ?? null} suggest={moving?.suggest} onClose={() => setMoving(null)} />
     </Screen>
   );
 }
@@ -459,11 +475,13 @@ function Row({
   const due = item.deadline ?? item.date;
   const left = row.kind === 'owing' ? percentUndone(item) : null;
   const action = actionFor(row);
+  // Every row leads with the day it has to start - the order the list is in.
+  const start = row.startBy ? startLabel(row, today) : null;
   const when = row.kind === 'fixed'
     ? `🕒 ${dayWord(item.date, today)} · ${formatHour(item.startHour ?? 0)}–${formatHour((item.startHour ?? 0) + item.hours)}`
     : row.kind === 'loose'
-      ? `🕒 ${dayWord(item.date, today)} · no time yet · ${hoursWord(item.hours)}`
-      : `⏰ Due ${dayWord(due, today)} · ${remaining(item)}h to go`;
+      ? `▶ ${start ?? dayWord(item.date, today)} · no time yet · ${hoursWord(item.hours)}`
+      : `▶ ${start ?? ''} · due ${dayWord(due, today)} · ${remaining(item)}h to go`;
   return (
     <View className="overflow-hidden rounded-lg border-2 border-line-hairline bg-raised">
       <Pressable

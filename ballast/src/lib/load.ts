@@ -21,6 +21,7 @@ export const BUCKET_LABEL: Record<BucketKey, string> = {
 };
 
 export const COMMITMENT_LABEL: Record<Item['commitment'], string> = {
+  fixed: 'Fixed',
   hard: 'Hard deadline',
   soft: 'Soft',
   self: 'Self-imposed',
@@ -251,7 +252,24 @@ export const BAND_LABEL: Record<BandName, string> = {
 export const isCalm = (percent: number): boolean => percent >= threshold.calmMode;
 
 /** Hard deadlines are locked. The app will never propose skipping the presentation. */
-export const isMovable = (item: Item): boolean => item.commitment !== 'hard';
+export const isMovable = (item: Item): boolean => item.commitment !== 'hard' && item.commitment !== 'fixed';
+
+/** The emoji for each answer to "can it move?", the same everywhere. */
+export const COMMITMENT_EMOJI: Record<Item['commitment'], string> = { fixed: '📌', hard: '🔒', soft: '↔️', self: '🙋' };
+
+/** One line under each answer, so the four are told apart without a manual. */
+export const COMMITMENT_NOTE: Record<Item['commitment'], string> = {
+  fixed: 'Set time, stays put',
+  hard: 'Someone set the date',
+  soft: 'Others, but can move',
+  self: 'Your own idea',
+};
+
+/** The four answers in the order they are offered: the firmest first. */
+export const COMMITMENTS: Array<Item['commitment']> = ['fixed', 'hard', 'soft', 'self'];
+
+/** For anything outside the app that only knows three kinds: fixed is as firm as hard. */
+export const wireCommitment = (kind: Item['commitment']): 'hard' | 'soft' | 'self' => (kind === 'fixed' ? 'hard' : kind);
 
 /**
  * Charts that can be spoken. Every visualisation has a written equivalent, not

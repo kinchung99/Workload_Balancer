@@ -1480,7 +1480,7 @@ and every non-tab page carries a labelled way back.
 |---|---|---|
 | Start | `/welcome`, `/setup/[step]` | Sign up or in; timetable, tasks, friends, ready |
 | Home | `/`, `/battery`, `/update`, `/marked`, `/notifications`, `/calm` | Battery, the wall, do this next, what to mark |
-| Plan | `/plan`, `/add`, `/item/[id]`, `/item/[id]/sittings`, `/priority`, `/rebalance`, `/decline/[id]` | 14 days, capture, owing work, what first, lighten |
+| Plan | `/plan`, `/add`, `/item/[id]`, `/item/[id]/sittings`, `/priority`, `/rebalance`, `/decline/[id]` | 14 days, capture, owing work, what first (sorted by start-by day, `lib/priority`), could move, lighten. Every time choice uses one picker (`features/item/SittingEditor`): two weeks with each day's load or a calendar, then a ribbon to drag along |
 | Timetable | `/timetable`, `/timetable/[step]`, `/module/[id]` | Week, modules, attendance, flags, paste import |
 | Friends | `/friends`, `/everyone`, `/friend/[id]`, `/find-friends`, `/plans`, `/plan-together`, `/group/…`, `/message` | Circle, plans, groups, messages |
 | You | `/you`, `/checkin`, `/recover`, `/prescription`, `/tonight/[step]`, `/profile`, `/settings`, `/sharing…`, `/calendar…`, `/password`, `/account` | Check in, rest, privacy, calendar, account |

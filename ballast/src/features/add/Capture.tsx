@@ -8,15 +8,18 @@ import {
 import { color } from '@design/tokens';
 import { parse, titleFrom } from '@/lib/parser';
 import {
-  BAND_LABEL, BUCKET_LABEL, COMMITMENT_LABEL,
+  BAND_LABEL, BUCKET_LABEL,
   bandFor, capacityOf, dominantArea, dreadFromMix, loadOf,
 } from '@/lib/load';
 import { addDays, formatShort } from '@/lib/dates';
-import { formatHour, startOptions } from '@/lib/schedule';
+import { formatHour } from '@/lib/schedule';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
-import type { BucketKey, CommitmentKind, Item, Mix } from '@/lib/types';
+import type { Importance, BucketKey, CommitmentKind, Item, Mix } from '@/lib/types';
 import { useStore } from '@/state/store';
-import { WANT_CHOICES } from '@/lib/swap';
+import { wantFor } from '@/lib/importance';
+import { clockHour } from '@/lib/marking';
+import { SittingEditor } from '@/features/item/SittingEditor';
+import { CommitmentPicker, ImportancePicker } from './Traits';
 import { drainCosts, withDrain } from '@/lib/drain';
 import { readingFrom, useItemsWithLogs, useReading } from '@/state/selectors';
 import { useCalendar } from '@/features/calendar/useCalendar';
@@ -28,7 +31,6 @@ const STEPS = ['What', 'How big', 'How draining', 'When'];
 
 /** The four pages, as URL segments. `/add/takes` opens straight on the dials. */
 export const STEP_SLUGS = ['what', 'size', 'takes', 'when'] as const;
-const IMPORTANCE: Array<[1 | 2 | 3, string]> = [[1, 'Nice to do'], [2, 'Normal'], [3, 'Really matters']];
 const EMPTY_MIX: Record<BucketKey, number> = { mental: 0, time: 0, physical: 0, social: 0, errands: 0 };
 
 /**
@@ -100,20 +102,13 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const [prepTouched, setPrepTouched] = useState(false);
   const [hours, setHours] = useState<number | null>(null);
   const [prepHours, setPrepHours] = useState(4);
-  const [importance, setImportance] = useState<1 | 2 | 3>(2);
+  const [importance, setImportance] = useState<Importance>(2);
   const [commitment, setCommitment] = useState<CommitmentKind | null>(null);
   const [date, setDate] = useState<string | null>(params.date ?? null);
   const [time, setTime] = useState<number | null>(params.start ? Number(params.start) : null);
   const [deadline, setDeadline] = useState<string | null>(null);
-  /**
-   * The one thing the app cannot work out for itself.
-   *
-   * Everything else a swap needs is already here or derivable - hours, dread,
-   * whether it can move, and for a class whether the attendance arithmetic says
-   * you can afford to miss it. Whether you *want* to be there is not in any of
-   * that, so it is asked once, in three words, and never asked again.
-   */
-  const [want, setWant] = useState<Item['want']>(3);
+  // How much it matters, asked of everything; the older "want" follows from it for the trade logic.
+  const want = wantFor(importance);
 
   /**
    * The parser's guess, as a mix: everything it found, in the one area it
@@ -140,7 +135,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
   const due = deadline ?? parsed.date ?? addDays(today, 3);
   const day = date ?? parsed.date ?? today;
   const commit = commitment ?? parsed.commitment;
-  const timeOptions = startOptions(scheduleItems, day, spentHours);
   const ready = text.trim().length > 0;
 
   /** What the week's battery becomes with this in it. Nothing is written yet. */
@@ -197,7 +191,7 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
         bucket, dread, commitment: commit, date: day,
         hours: spentHours,
         ...(time === null ? {} : { startHour: time }),
-        mix: liveMix, want,
+        mix: liveMix, want, importance,
       });
     }
     successFeedback();
@@ -397,22 +391,6 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
               ) : null}
             </Card>
 
-            {needsPrep ? (
-              <Card gap={3}>
-                <Text variant="heading">How much it matters</Text>
-                <Stack direction="row" gap={2} wrap>
-                  {IMPORTANCE.map(([value, text2]) => (
-                    <Chip
-                      key={value}
-                      label={text2}
-                      tone={value === importance ? 'selected' : 'plain'}
-                      onPress={() => { tapFeedback(); setImportance(value); }}
-                    />
-                  ))}
-                </Stack>
-                <Text variant="footnote" tone="subtle">Decides what gets a slot first when the week is full.</Text>
-              </Card>
-            ) : null}
 
           </Stack>
         ) : null}
@@ -446,72 +424,36 @@ export function Capture({ initialStep = 0 }: { initialStep?: number }) {
                 <DatePicker value={due} min={addDays(today, 1)} onChange={setDeadline} />
               </Card>
             ) : (
-              <Card gap={4}>
-                <Text variant="heading">Which day</Text>
-                <Stack direction="row" gap={2} wrap>
-                  {Array.from({ length: 7 }, (_, offset) => addDays(today, offset)).map((option) => (
-                    <Chip
-                      key={option}
-                      label={label(option, today)}
-                      tone={option === day ? 'selected' : 'plain'}
-                      onPress={() => { tapFeedback(); setDate(option); setTime(null); }}
-                    />
-                  ))}
-                </Stack>
-
-                <Stack gap={2}>
-                  <Text variant="micro" tone="subtle">
-                    WHAT TIME · {timeOptions.length} FREE ON {label(day, today).toUpperCase()}
-                  </Text>
-                  <Stack direction="row" gap={2} wrap>
-                    <Chip label="Anytime that day" tone={time === null ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setTime(null); }} />
-                    {timeOptions.map((option) => (
-                      <Chip key={option} label={formatHour(option)} tone={option === time ? 'selected' : 'plain'} onPress={() => { tapFeedback(); setTime(option); }} />
-                    ))}
-                  </Stack>
-                  {timeOptions.length === 0 ? (
-                    <Text variant="footnote" tone="muted">
-                      No gap on {label(day, today).toLowerCase()} is {fmtHours(spentHours)} long. Leave it anytime, or
-                      make it work-first and have the sittings spread.
-                    </Text>
-                  ) : null}
-                </Stack>
+              <Card gap={3}>
+                <Text variant="heading">When</Text>
+                {/* The same picker as everywhere: two weeks with each day's load, a calendar for later, and the day to drag along. */}
+                <SittingEditor
+                  mode="item"
+                  item={{ id: 'preview-add', title: titleFrom(text) || 'This', bucket, hours: spentHours, dread, commitment: commit, date: day }}
+                  busy={scheduleItems}
+                  base={scheduleItems}
+                  today={today}
+                  nowHour={clockHour(today)}
+                  value={{ date: day, hours: spentHours, ...(time === null ? {} : { startHour: time }) }}
+                  maxHours={spentHours}
+                  onChange={(next) => { setDate(next.date); setTime(next.startHour ?? null); }}
+                  calendar
+                  anytime
+                />
               </Card>
             )}
 
             <Card gap={5}>
               <Stack gap={3}>
                 <Text variant="heading">Can it move?</Text>
-                <Stack direction="row" gap={2} wrap>
-                  {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
-                    <Chip
-                      key={option}
-                      label={`${{ hard: '🔒', soft: '↔️', self: '🙋' }[option]} ${COMMITMENT_LABEL[option]}`}
-                      tone={option === commit ? 'selected' : 'plain'}
-                      onPress={() => { tapFeedback(); setCommitment(option); }}
-                    />
-                  ))}
-                </Stack>
+                <CommitmentPicker value={commit} onChange={setCommitment} />
               </Stack>
 
-              {/* Asked next to "can it move" on purpose: together they are what
-                  turns a full day into a decision instead of a list. Only for
-                  something you turn up to - nobody "wants to be at" an essay. */}
-              {needsPrep ? null : (
-                <Stack gap={3}>
-                  <Text variant="heading">Want to be there?</Text>
-                  <Stack direction="row" gap={2} wrap>
-                    {WANT_CHOICES.map(([value, word]) => (
-                      <Chip
-                        key={value}
-                        label={word}
-                        tone={value === want ? 'selected' : 'plain'}
-                        onPress={() => { tapFeedback(); setWant(value); }}
-                      />
-                    ))}
-                  </Stack>
-                </Stack>
-              )}
+              {/* Asked of everything: what to do first leans on it, and what could move offers the least important first. */}
+              <Stack gap={3}>
+                <Text variant="heading">How important is it?</Text>
+                <ImportancePicker value={importance} onChange={setImportance} />
+              </Stack>
             </Card>
 
             {/* What it does to you, before you commit to it. With nothing typed

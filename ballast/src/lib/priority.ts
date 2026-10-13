@@ -14,9 +14,10 @@
  * where it is.
  */
 import { BUCKET_LABEL, isMovable, loadOf } from './load';
-import { MAX_SESSION, MIN_SESSION, STUDY_WINDOW, daysLeft, isAtRisk, needsPrep, remaining, sittingStarts, sittingsOf, unplanned, workDays } from './prep';
+import { importanceOf, importanceWord } from './importance';
+import { MAX_SESSION, MIN_SESSION, STUDY_WINDOW, bestStart, loadOnDay, needsPrep, remaining, sittingStarts, sittingsOf, unplanned, workDays } from './prep';
 import { addDays, daysBetween } from './dates';
-import { freeSlots, slotHours } from './schedule';
+import { formatHour, freeSlots, slotHours } from './schedule';
 import { isProtectedClass } from './timetable';
 import { wantOf } from './swap';
 import { DEFAULT_WEIGHTS } from './review';
@@ -33,19 +34,22 @@ export interface Ranked {
   kind: 'owing' | 'fixed' | 'loose';
   /** Hours it would give you back if you moved or dropped it. */
   saves: number;
+  /**
+   * The latest day to start and still finish, given the free time you really
+   * have. What the list is sorted by, so every row can say it.
+   */
+  startBy?: string;
+  /** Hours that still need doing (owing work) or the block's length. */
+  need?: number;
+  /** Could-move rows: why this one, in a few words each. */
+  moveReasons?: string[];
+  /** Could-move rows: a lighter slot it would fit, if there is one. */
+  suggest?: { date: string; startHour: number };
 }
 
 /**
- * How much closer a deadline makes something.
- *
- * The curve has to fall below 1, not merely flatten. With a floor of 1, size
- * won every argument: a nine-load job six days away outranked a three-load job
- * due tomorrow, which is exactly backwards for anything with a fixed date -
- * Saturday's errand is not something you can do today, however big it is.
- *
- * So it is steep at the near end and genuinely small at the far end. Work with
- * preparation stays near the top anyway, because its size is the hours still
- * owed rather than its load, and six hours owed is a big number.
+ * How much closer a deadline makes something. Kept for the "why it's first"
+ * dots and for anything that still asks how pressing a date is on its own.
  */
 export const urgencyFactor = (days: number): number => {
   if (days <= 0) return 3;
@@ -57,87 +61,137 @@ export const urgencyFactor = (days: number): number => {
   return 0.35;
 };
 
-/** A promise to somebody else outranks a promise to yourself. */
-const COMMITMENT_FACTOR = { hard: 1.6, soft: 1.2, self: 1 } as const;
+/** Hours of work a day can carry on top of everything already in it. */
+export const DAILY_WORK = 4;
 
-/** Set on capture, for exactly this moment. */
-const IMPORTANCE_FACTOR = { 1: 0.8, 2: 1, 3: 1.35 } as const;
-
-/**
- * Wanting to be somewhere, as a factor.
- *
- * Deliberately the gentlest of the three. Wanting to be at something is not on
- * its own a reason to do it first, and a planner that put the fun thing at the
- * top would deserve to be ignored. It is here so that the evening question has
- * something to pull on when a student keeps saying their days were too full: the
- * fix for a week of nothing but obligations is not a better sort of obligations.
- */
-const WANT_FACTOR = [1, 0.9, 0.95, 1, 1.08, 1.15] as const;
-
-/** How much a self-imposed routine counts against real work. */
-const ROUTINE_FACTOR = 0.2;
-
-/** Not being able to finish it in the time left is the loudest signal there is. */
-const AT_RISK_BONUS = 40;
+/** How far ahead owing work is looked at, so a heavy job due later can still surface now. */
+const LOOKAHEAD_DAYS = 28;
 
 const dueLabel = (days: number): string =>
   days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `${days} days left`;
 
+const WEEKDAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const weekdayOf = (date: string): string => WEEKDAY[(new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7];
+
+/** "Start today", "Start tomorrow", "Start by Thu". */
+export const startWord = (startBy: string, today: string): string => {
+  const days = daysBetween(today, startBy);
+  return days <= 0 ? 'Start today' : days === 1 ? 'Start tomorrow' : `Start by ${weekdayOf(startBy)}`;
+};
+
 /**
- * One score, and the reasons it is that score.
+ * The start line a row leads with: when to start it, or - for owing work whose
+ * hours are all booked already - when its next sitting is.
+ */
+export const startLabel = (row: Ranked, today: string): string => {
+  if (!row.startBy) return '';
+  if (row.kind === 'owing' && (row.need ?? 0) <= 0) {
+    const days = daysBetween(today, row.startBy);
+    return `Next sitting ${days <= 0 ? 'today' : days === 1 ? 'tomorrow' : weekdayOf(row.startBy)}`;
+  }
+  return startWord(row.startBy, today);
+};
+
+/** Hours on a day you could really work: free, inside the study window, not already gone, and at most a day's worth. */
+function workable(items: Item[], date: string, today: string, nowHour?: number): number {
+  const [from, to] = STUDY_WINDOW;
+  const floor = date === today && nowHour !== undefined ? Math.max(from, nowHour) : from;
+  const hours = freeSlots(items, date, 0.5).reduce((total, slot) => {
+    const start = Math.max(slot.start, floor);
+    const end = Math.min(slot.end, to);
+    return total + Math.max(0, end - start);
+  }, 0);
+  return Math.min(DAILY_WORK, hours);
+}
+
+/**
+ * The latest day you can start and still be done in time.
  *
- * `weight` is the size of the thing: hours still owed for work with preparation,
- * its load otherwise. Everything else multiplies it.
+ * Walk back from the due day, adding up the hours each day can really take,
+ * until they cover what is still needed. A two-hour job due Friday starts by
+ * Friday; twelve hours due Friday with three free hours a day starts Tuesday -
+ * which is why heavy work far from its deadline still rises to the top. If even
+ * today is not enough, it starts today and it is short.
+ */
+export function startByFor(
+  need: number, due: string, items: Item[], today: string, nowHour?: number,
+): { date: string; short: number; available: number } {
+  if (need <= 0) return { date: due < today ? today : due, short: 0, available: 0 };
+  // Finished the day before it is due, when there is a day before: a deadline is usually a morning.
+  const last = due <= today ? today : addDays(due, -1);
+  let total = 0;
+  let date = last;
+  for (let offset = daysBetween(today, last); offset >= 0; offset -= 1) {
+    date = addDays(today, offset);
+    total += workable(items, date, today, nowHour);
+    if (total >= need) return { date, short: 0, available: total };
+  }
+  return { date: today, short: Math.round((need - total) * 10) / 10, available: total };
+}
+
+/**
+ * One row of "what to do first": its start-by day, and the score that keeps the
+ * list in that order.
+ *
+ * The start-by day carries most of the weight - twelve points a day - so the
+ * list reads in the order you would have to start things. Inside a day,
+ * importance (six points a level), a promise to someone else, and how much of
+ * your free time it needs decide; being short of time outranks everything.
+ * Weights tuned by the evening review stretch the day term or the importance
+ * term, and leave the order alone until somebody asks for that.
  */
 export function rank(
   item: Item,
   items: Item[],
   today: string,
   weights: Weights = DEFAULT_WEIGHTS,
+  nowHour?: number,
 ): Ranked {
   const owing = needsPrep(item);
-  const days = owing ? daysLeft(item, today) : Math.max(0, daysBetween(today, item.date));
-  const weight = owing ? remaining(item) * 3 : Math.abs(loadOf(item));
-  const risk = owing && isAtRisk(item, items, today);
+  const due = owing ? item.deadline ?? item.date : item.deadline ?? item.date;
+  const dueDays = Math.max(0, daysBetween(today, due));
+  const need = owing ? unplanned(item, items) : item.hours;
+  const nextSitting = owing && need <= 0
+    ? sittingsOf(item, items).filter((s) => !s.sessionDone && s.date >= today).sort((x, y) => x.date.localeCompare(y.date))[0]
+    : undefined;
+  // A task without hours of work behind it starts on its own day; only owing work is walked back through your free time.
+  const plan = nextSitting
+    ? { date: nextSitting.date, short: 0, available: 0 }
+    : owing
+      ? startByFor(need, due, items, today, nowHour)
+      : { date: due < today ? today : due, short: 0, available: 0 };
+  const startDays = Math.max(0, daysBetween(today, plan.date));
+  const importance = importanceOf(item);
+  const pressure = !owing ? 0 : plan.available > 0 ? Math.min(2, need / plan.available) : need > 0 ? 2 : 0;
 
-  /*
-   * Weights as exponents, not multipliers.
-   *
-   * A weight of 1 leaves a factor exactly as designed, which is what makes the
-   * untuned app identical to the app before any of this existed. Above 1 it
-   * stretches the spread between near and far deadlines; below 1 it flattens it.
-   * A multiplier would instead scale everything equally and change nothing about
-   * the order, which is the whole thing being tuned.
-   */
   const score =
-    weight *
-      // A routine of your own - the gym, breakfast, tidying - happens at its
-      // time; it is not something to start first. Only work, deadlines and
-      // promises to other people should be able to top this list.
-      (!owing && item.commitment === 'self' && item.deadline === undefined ? ROUTINE_FACTOR : 1) *
-      urgencyFactor(days) ** weights.urgency *
-      COMMITMENT_FACTOR[item.commitment] *
-      IMPORTANCE_FACTOR[item.importance ?? 2] ** weights.importance *
-      WANT_FACTOR[wantOf(item)] ** weights.want +
-    (risk ? AT_RISK_BONUS : 0);
+    100 -
+    startDays * 12 * weights.urgency +
+    (importance - 2) * 6 * weights.importance +
+    (item.commitment === 'hard' ? 4 : item.commitment === 'soft' ? 2 : 0) +
+    pressure * 5 +
+    // Only once the evening review has said days are too full does wanting something pull it up.
+    (wantOf(item) - 3) * (weights.want - 1) * 8 +
+    (plan.short > 0 ? 40 : 0) -
+    dueDays * 0.5;
 
   const reasons: string[] = [];
-  if (risk) reasons.push('Not enough time left');
-  if (days <= 2) reasons.push(dueLabel(days));
-  if (item.commitment === 'hard') reasons.push('Hard deadline');
-  if ((item.importance ?? 2) === 3) reasons.push('Really matters');
-  // Only worth saying when the student has tuned the app towards it.
-  if (weights.want > 1 && wantOf(item) >= 4) reasons.push('You want this');
+  if (plan.short > 0) reasons.push('Not enough time left');
+  reasons.push(nextSitting ? `Next sitting ${startDays === 0 ? 'today' : startDays === 1 ? 'tomorrow' : weekdayOf(plan.date)}` : startWord(plan.date, today));
+  reasons.push(owing || item.deadline ? dueLabel(dueDays) : dueDays === 0 ? 'Today' : `On ${weekdayOf(due)}`);
   if (owing) reasons.push(`${remaining(item)}h to go`);
-  if (!owing && item.startHour === undefined) reasons.push('No time yet');
-  if (reasons.length === 0) reasons.push(dueLabel(days));
+  if (importance >= 3) reasons.push(importanceWord(importance));
+  if (item.commitment === 'hard') reasons.push('Hard deadline');
+  if (weights.want > 1 && wantOf(item) >= 4) reasons.push('You want this');
 
   return {
     item,
     score: Math.round(score * 10) / 10,
-    reasons: reasons.slice(0, 3),
+    reasons: reasons.slice(0, 5),
     kind: owing ? 'owing' : item.startHour === undefined ? 'loose' : 'fixed',
     saves: Math.round(Math.abs(loadOf(item)) * 10) / 10,
+    startBy: plan.date,
+    need,
   };
 }
 
@@ -154,32 +208,120 @@ const isActionable = (item: Item, today: string): boolean =>
   (needsPrep(item) || (item.date >= today && (item.deadline === undefined || needsPrep(item))));
 
 /**
- * The list, in two halves.
+ * Something you *do*, rather than somewhere you are: owing work, or a task with
+ * no set time. A dinner at seven with friends is not something to do first,
+ * and neither is anything fixed.
+ */
+const isTask = (item: Item): boolean =>
+  item.commitment !== 'fixed' && (needsPrep(item) || item.startHour === undefined || item.deadline !== undefined);
+
+/**
+ * A block with a time that you are allowed to move: not fixed, not a hard
+ * deadline, not a class, not rest you booked on purpose.
+ */
+const isMovableBlock = (item: Item, today: string, nowHour?: number): boolean =>
+  !needsPrep(item) &&
+  item.startHour !== undefined &&
+  item.deadline === undefined &&
+  isMovable(item) &&
+  !isProtectedClass(item) &&
+  !item.moduleId &&
+  !item.repeats &&
+  !item.isLog &&
+  !item.isRecovery &&
+  !item.parentId &&
+  !item.outcome &&
+  item.date >= today &&
+  !(item.date === today && nowHour !== undefined && item.startHour + item.hours <= nowHour);
+
+/**
+ * Why a block is worth moving, and where it could go.
  *
- * `first` is what to start with. `couldMove` is the other half of the same
- * question and the one no planner asks: of everything here, which are you
- * actually allowed to move, and what would it give you back? Hard deadlines and
- * the lectures where hints get given never appear in it.
+ * Least important first, then heaviest, then the ones sitting on your heaviest
+ * days - and for each, a lighter day it actually fits on, so "move it" comes
+ * with an answer instead of a question.
+ */
+function moveRow(item: Item, items: Item[], today: string, weights: Weights, horizonDays: number, nowHour?: number): Ranked {
+  const importance = importanceOf(item);
+  const saves = Math.round(Math.abs(loadOf(item)) * 10) / 10;
+  const days = Array.from({ length: horizonDays + 1 }, (_, i) => addDays(today, i));
+  const loads = days.map((date) => loadOnDay(items, date));
+  const average = loads.reduce((t, l) => t + l, 0) / Math.max(1, loads.length);
+  const own = loadOnDay(items, item.date);
+  const heavy = own >= average * 1.25 && own > 0;
+
+  // The lightest other day this fits on, near enough to be the same week.
+  const others = items.filter((other) => other.id !== item.id);
+  const candidates = days
+    .filter((date) => date !== item.date)
+    .map((date) => ({ date, load: loadOnDay(others, date), start: bestStart(others, date, item.hours, date === today ? nowHour : undefined) }))
+    .filter((c) => c.start !== undefined && c.load < own && Math.abs(daysBetween(item.date, c.date)) <= 3)
+    // Lighter, and near: a day or two either side beats the emptiest day of the week.
+    .sort((x, y) =>
+      x.load + Math.abs(daysBetween(item.date, x.date)) * average * 0.35
+      - (y.load + Math.abs(daysBetween(item.date, y.date)) * average * 0.35));
+  const target = candidates[0];
+
+  const moveReasons: string[] = [];
+  moveReasons.push(item.commitment === 'self' ? 'Your own idea' : 'Soft, can be rearranged');
+  if (importance === 1) moveReasons.push('Optional to you');
+  if (heavy) moveReasons.push(`${weekdayOf(item.date)} is one of your heaviest days`);
+  if (target) moveReasons.push(`Fits ${weekdayOf(target.date)} ${formatHour(target.start!)}, a lighter day`);
+
+  const score =
+    (4 - importance) * 10 * weights.importance +
+    saves * 1.5 +
+    (item.commitment === 'self' ? 4 : 2) +
+    (heavy ? 6 : 0) +
+    (target ? 3 : 0) -
+    daysBetween(today, item.date) * 0.3;
+
+  return {
+    item,
+    score: Math.round(score * 10) / 10,
+    reasons: moveReasons.slice(0, 3),
+    kind: 'fixed',
+    saves,
+    moveReasons,
+    ...(target ? { suggest: { date: target.date, startHour: target.start! } } : {}),
+  };
+}
+
+/**
+ * The list, in two halves that never overlap.
+ *
+ * `first` is what to start with: owing work and tasks without a set time,
+ * sorted by the day each has to be started. `couldMove` is the other question:
+ * of the blocks already at a time, which are you allowed to move and which
+ * would you miss least? Fixed times and hard deadlines are in neither - there
+ * is nothing to decide about them.
  */
 export function prioritise(
   items: Item[],
   today: string,
   horizonDays = 7,
   weights: Weights = DEFAULT_WEIGHTS,
+  nowHour?: number,
 ): { first: Ranked[]; couldMove: Ranked[] } {
-  const horizon = items.filter((item) => {
-    if (!isActionable(item, today)) return false;
-    const days = needsPrep(item) ? daysLeft(item, today) : daysBetween(today, item.date);
-    return days >= 0 && days <= horizonDays;
-  });
+  const first = items
+    .filter((item) => isActionable(item, today) && isTask(item))
+    .filter((item) => {
+      const due = item.deadline ?? item.date;
+      return needsPrep(item) ? daysBetween(today, due) <= LOOKAHEAD_DAYS : daysBetween(today, due) <= horizonDays;
+    })
+    .map((item) => rank(item, items, today, weights, nowHour))
+    // Owing work due later only belongs here once it has to be started inside the week.
+    .filter((row) => daysBetween(today, row.startBy ?? today) <= horizonDays)
+    // The day you have to start comes first, always - so the list reads in order. Within a day, the score decides.
+    .sort((a, b) => (a.startBy ?? today).localeCompare(b.startBy ?? today) || b.score - a.score);
 
-  const ranked = horizon.map((item) => rank(item, items, today, weights)).sort((a, b) => b.score - a.score);
+  const couldMove = items
+    .filter((item) => isMovableBlock(item, today, nowHour) && daysBetween(today, item.date) <= horizonDays)
+    .map((item) => moveRow(item, items, today, weights, horizonDays, nowHour))
+    .filter((row) => row.saves > 0)
+    .sort((a, b) => b.score - a.score);
 
-  const couldMove = ranked
-    .filter((row) => isMovable(row.item) && !isProtectedClass(row.item) && row.saves > 0)
-    .sort((a, b) => b.saves - a.saves);
-
-  return { first: ranked, couldMove };
+  return { first, couldMove };
 }
 
 /** "Mental · 8 load" — the one line under a title. */
@@ -207,23 +349,25 @@ export interface Push {
 export function whyFirst(row: Ranked, items: Item[], today: string, biggest: number): Push[] {
   const { item } = row;
   const owing = row.kind === 'owing';
-  const days = owing ? daysLeft(item, today) : Math.max(0, daysBetween(today, item.date));
+  const due = item.deadline ?? item.date;
+  const days = Math.max(0, daysBetween(today, due));
   const pushes: Push[] = [];
 
   if (row.reasons.includes('Not enough time left')) {
     pushes.push({ key: 'risk', emoji: '🚨', label: 'Not enough free time left to finish', strength: 3 });
   }
-  const urgency = urgencyFactor(days);
-  if (urgency >= 0.8) {
+  if (row.startBy) {
+    const startDays = Math.max(0, daysBetween(today, row.startBy));
     pushes.push({
       key: 'deadline', emoji: '⏰',
-      label: days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `Due in ${days} days`,
-      strength: urgency >= 2.2 ? 3 : urgency >= 1.15 ? 2 : 1,
+      label: `${startLabel(row, today)} · ${days <= 0 ? 'due today' : days === 1 ? 'due tomorrow' : `due in ${days} days`}`,
+      strength: startDays === 0 ? 3 : startDays <= 2 ? 2 : 1,
     });
   }
   if (item.commitment === 'hard') pushes.push({ key: 'promise', emoji: '🤝', label: 'Hard deadline', strength: 3 });
   else if (item.commitment === 'soft') pushes.push({ key: 'promise', emoji: '🤝', label: 'Others expect it', strength: 1 });
-  if ((item.importance ?? 2) === 3) pushes.push({ key: 'matters', emoji: '⭐', label: 'Really matters', strength: 3 });
+  const importance = importanceOf(item);
+  if (importance >= 3) pushes.push({ key: 'matters', emoji: importance === 4 ? '🔥' : '⭐', label: importanceWord(importance), strength: importance === 4 ? 3 : 2 });
 
   const weight = owing ? remaining(item) * 3 : Math.abs(loadOf(item));
   const share = biggest > 0 ? weight / biggest : 0;

@@ -114,7 +114,7 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 2. **Due**: pick the exact day on the calendar, or type it (`14/11`).
 3. **Hours**: type them, or nudge with − / +.
 4. **How draining?** Each face shows what it will cost your battery.
-5. **Can it move?** Hard deadlines are never suggested for moving.
+5. **Can it move?** 📌 Fixed, 🔒 Hard deadline, ↔️ Soft or 🙋 Self-imposed. **How important?** 🍃 Optional to 🔥 Must. Fixed things and hard deadlines are never suggested for moving.
 
 </td>
 </tr>
@@ -241,10 +241,13 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 
 **What to do first**
 
-1. **Start here**: due date, hours needed, and what it costs. Work and promises come first; your own routines (the gym, breakfast) never jump the queue.
+1. **Start here**: due date, hours needed, and what it costs.
 2. **Why it's first**, in plain reasons.
-3. **When it happens**: already booked, or the next real gap in your day.
-4. **Your next 7 days**: how many hours the list needs against the free time you have.
+3. **Your next 7 days**: how many hours the list needs against the free time you have.
+4. **Then**: only owing work and tasks without a set time, in the order you have to **start** them. Heavy work due later rises above light work due sooner; importance decides within a day. Booked work shows its next sitting.
+5. **Could move**: blocks at a set time that you're allowed to move, least important first, each with why and a lighter slot it fits. **Move it** opens the day-and-time picker right there. Fixed plans and hard deadlines never appear.
+
+*Every time you pick a time in Ballast, it's the same picker: this week and next with how full each day is (or a calendar for later dates), then drag the block along the day.*
 
 </td>
 </tr>
@@ -334,7 +337,7 @@ Want a blank slate instead? **Create your own account** on the same link and go 
 1. **Received · Sent · Confirmed**.
 2. Who's asking, and who else is going (✓ or ✕ on their faces).
 3. **How full that day already is**, before you say yes.
-4. **Accept**, **Decline**, or **See** that day. **Accept** puts it in your week on every device you use. If the host moves it, it moves; if they call it off, it leaves and you're told.
+4. **Accept**, **Decline**, or **See** that day. **Accept** puts it in your week as a 📌 fixed plan, on every device you use. If the host moves it, it moves; if they call it off, it leaves and you're told.
 
 </td>
 </tr>

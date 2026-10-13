@@ -8,6 +8,8 @@ import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { BUCKETS, BUCKET_LABEL, REST_LOAD_PER_HOUR, bandFor, capacityOf } from '@/lib/load';
 import { formatHour, freeSlots, placeIn, startOptions } from '@/lib/schedule';
+import { SittingEditor } from '@/features/item/SittingEditor';
+import { clockHour } from '@/lib/marking';
 import { addDays, formatShort } from '@/lib/dates';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { api } from '@/lib/api';
@@ -330,37 +332,21 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
         {step === 1 ? (
         <Stack gap={5}>
         <Section family="week" title="Pick a slot" sticker="clock">
-          <Text variant="micro" tone="subtle">WHICH DAY</Text>
-          <Stack direction="row" gap={2} wrap>
-            {dayOptions.map((option) => (
-              <Chip
-                key={option}
-                label={dayLabel(option, today)}
-                tone={option === day ? 'selected' : 'plain'}
-                onPress={() => { setDay(option); setStart(null); }}
-              />
-            ))}
-          </Stack>
-          <Text variant="micro" tone="subtle">
-            WHAT TIME · {gaps.length} GAP{gaps.length === 1 ? '' : 'S'} ON {dayLabel(day, today).toUpperCase()}
-          </Text>
-          {starts.length ? (
-            <Stack direction="row" gap={2} wrap>
-              {starts.map((option) => (
-                <Chip
-                  key={option}
-                  label={formatHour(option)}
-                  tone={option === slot ? 'selected' : 'plain'}
-                  onPress={() => setStart(option)}
-                />
-              ))}
-            </Stack>
-          ) : (
-            <Text variant="footnote" tone="heavy">
-              No gap on {formatShort(day)} is {hours < 1 ? `${hours * 60} minutes` : `${hours} hours`} long. Try a
-              shorter block, or another day.
-            </Text>
-          )}
+          {/* The same picker as everywhere: the days with how full each is, then the day to drag along. */}
+          {chosen ? (
+            <SittingEditor
+              mode="item"
+              item={{ id: 'preview-recovery', title: chosen.title, bucket: chosen.refills, hours, dread: 1, commitment: 'self', date: day, isRecovery: true }}
+              busy={items}
+              base={items}
+              today={today}
+              nowHour={clockHour(today)}
+              value={{ date: day, hours, ...(slot === null ? {} : { startHour: slot }) }}
+              maxHours={hours}
+              onChange={(next) => { setDay(next.date); setStart(next.startHour ?? null); }}
+              calendar
+            />
+          ) : null}
         </Section>
 
         {/* The answer to "what does this cost me", before anything is written. */}

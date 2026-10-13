@@ -32,7 +32,7 @@ const DREAD_PHRASES: Array<[RegExp, Dread]> = [
 /** Things you work on before the day, not things you turn up to. */
 const PREP_WORDS = /\b(assignment|essay|report|coursework|revision|revise|dissertation|thesis|problem set|project|homework|draft|write[- ]?up|portfolio|presentation prep)\b/i;
 
-const HARD_WORDS = /\bdue\b|\bdeadline\b|\bexam\b|\bhand ?in\b|\bsubmit\b|\bshift\b|\bappointment\b/i;
+const HARD_WORDS = /\bdue\b|\bdeadline\b|\bexam\b|\bhand ?in\b|\bsubmit\b/i;
 const SELF_WORDS = /\bshould\b|\bwant to\b|\bmaybe\b|\btry to\b|\bif i can\b|\bat some point\b/i;
 
 const DAY_WORDS: Array<[RegExp, number]> = [
@@ -82,8 +82,15 @@ function parseDread(text: string): Dread {
   return 3;
 }
 
+/**
+ * A plan with somebody at a set occasion: dinner with Amin, a film with the
+ * flat, a shift, an appointment. Fixed - the time is agreed, not yours to shuffle.
+ */
+const FIXED_WORDS = /\b(dinner|lunch|brunch|supper|film|movie|cinema|party|birthday|wedding|gig|concert|match|shift|appointment|dentist|doctor|interview|flight|train)\b.*\bwith\b|\b(shift|appointment|dentist|doctor|interview|flight)\b/i;
+
 function parseCommitment(text: string): CommitmentKind {
   if (HARD_WORDS.test(text)) return 'hard';
+  if (FIXED_WORDS.test(text)) return 'fixed';
   if (SELF_WORDS.test(text)) return 'self';
   return 'soft';
 }

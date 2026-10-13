@@ -15,6 +15,7 @@
  *    already has is not offered again.
  *  - **Time follows Google.** Move it there and it moves here, with a note.
  */
+import { importanceOf } from './importance';
 import { addDays, dayIndex, formatShort } from './dates';
 import { withDrain } from './drain';
 import { formatHour } from './schedule';
@@ -60,9 +61,9 @@ export const KIND: Record<CalKind, KindInfo> = {
   class:      { label: 'Class',      emoji: '🎓', bucket: 'mental',   mix: { mental: 3, time: 2 },               dread: 3, commitment: 'hard', want: 3 },
   assignment: { label: 'Deadline',   emoji: '📝', bucket: 'mental',   mix: { mental: 3, time: 2 },               dread: 3, commitment: 'hard', want: 3, prep: { hours: 6, importance: 2 } },
   exam:       { label: 'Exam',       emoji: '✍️', bucket: 'mental',   mix: { mental: 4, time: 2 },               dread: 4, commitment: 'hard', want: 3, prep: { hours: 10, importance: 3 } },
-  shift:      { label: 'Shift',      emoji: '💼', bucket: 'time',     mix: { time: 3, physical: 2, social: 1 },  dread: 3, commitment: 'hard', want: 3 },
+  shift:      { label: 'Shift',      emoji: '💼', bucket: 'time',     mix: { time: 3, physical: 2, social: 1 },  dread: 3, commitment: 'fixed', want: 3 },
   exercise:   { label: 'Exercise',   emoji: '🏃', bucket: 'physical', mix: { physical: 2 },                      dread: 2, commitment: 'self', want: 3 },
-  people:     { label: 'See people', emoji: '👥', bucket: 'social',   mix: { social: 2, time: 1 },               dread: 2, commitment: 'soft', want: 5 },
+  people:     { label: 'See people', emoji: '👥', bucket: 'social',   mix: { social: 2, time: 1 },               dread: 2, commitment: 'fixed', want: 5 },
   chore:      { label: 'Errand',     emoji: '🧺', bucket: 'errands',  mix: { errands: 2, time: 1 },              dread: 2, commitment: 'soft', want: 1 },
   other:      { label: 'Other',      emoji: '📌', bucket: 'time',     mix: { time: 2 },                          dread: 2, commitment: 'soft', want: 3 },
 };
@@ -111,7 +112,7 @@ export function templateFor(kind: CalKind, title: string, module?: Module): CalT
     bucket: info.bucket,
     mix: withDrain({ mental: 0, time: 0, physical: 0, social: 0, errands: 0, ...info.mix }, dread, info.bucket),
     dread,
-    commitment: kind === 'chore' && FIXED_APPOINTMENT.test(title) ? 'hard' : info.commitment,
+    commitment: kind === 'chore' && FIXED_APPOINTMENT.test(title) ? 'fixed' : info.commitment,
     want: info.want,
     ...(info.prep ? { prep: { hours: info.prep.hours, importance: module?.importance ?? info.prep.importance, daysBefore: 0 } } : {}),
     ...(module && (kind === 'class' || kind === 'exam' || kind === 'assignment') ? { moduleId: module.id } : {}),
@@ -245,6 +246,7 @@ export function itemFrom(event: CalendarEvent, template: CalTemplate): Item {
     mix: template.mix,
     dread: template.dread,
     commitment: template.commitment,
+    importance: template.importance ?? importanceOf({ want: template.want }),
     source: { kind: 'google' as const, eventId: event.id, seriesId: event.seriesId },
     ...(template.moduleId ? { moduleId: template.moduleId } : {}),
   };

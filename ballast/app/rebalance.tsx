@@ -359,7 +359,7 @@ function Decision({
 
       {/* What the app knows about it, as chips. */}
       <Stack direction="row" gap={2} wrap>
-        {item ? <Chip label={`${{ hard: '🔒 Hard', soft: '↔️ Can move', self: '🙋 Your own goal' }[item.commitment]}`} readOnly /> : null}
+        {item ? <Chip label={`${{ fixed: '📌 Fixed', hard: '🔒 Hard', soft: '↔️ Can move', self: '🙋 Your own goal' }[item.commitment]}`} readOnly /> : null}
         {shouldTell ? <Chip label={`✉️ ${ask.tell} should hear first`} tone="busy" readOnly /> : null}
         {item?.want ? <Chip label={item.want >= 4 ? '💛 You want to be there' : item.want <= 2 ? '🤷 You don’t mind missing it' : '😐 Either way'} readOnly /> : null}
         {suggest ? <Chip label={suggest.take ? '✨ Worth putting down' : '✨ Worth keeping'} tone={suggest.take ? 'steady' : 'plain'} readOnly /> : null}

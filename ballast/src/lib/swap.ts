@@ -107,6 +107,7 @@ export function skippable(item: Item, modules: Module[]): Skip {
   }
 
   if (item.commitment === 'hard') return { canSkip: false, reason: 'Hard deadline' };
+  if (item.commitment === 'fixed') return { canSkip: false, reason: 'Fixed time' };
 
   if (item.repeats) return { canSkip: false, reason: 'Happens every week' };
   if (item.deadline) return { canSkip: false, reason: 'Has a deadline' };

@@ -9,8 +9,10 @@ import { color, radius } from '@design/tokens';
 import { addDays, formatShort, startOfWeek } from '@/lib/dates';
 import { frequentFriends } from '@/lib/circle';
 import { VISIBILITY } from '@/lib/sharing';
-import { COMMITMENT_LABEL } from '@/lib/load';
-import type { CommitmentKind, Dread } from '@/lib/types';
+import { COMMITMENT_EMOJI, COMMITMENT_LABEL } from '@/lib/load';
+import { wantFor } from '@/lib/importance';
+import { CommitmentPicker, ImportancePicker } from '@/features/add/Traits';
+import type { Importance, CommitmentKind, Dread } from '@/lib/types';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useStore } from '@/state/store';
 import { ClassBuilder } from '@/features/timetable/ClassBuilder';
@@ -89,7 +91,7 @@ function TimetableStep() {
 /* ------------------------------------------------------------------- tasks */
 
 /** Whether it can move, at a glance. */
-const MOVE_EMOJI: Record<CommitmentKind, string> = { hard: '🔒', soft: '↔️', self: '🙋' };
+const MOVE_EMOJI: Record<CommitmentKind, string> = COMMITMENT_EMOJI;
 /** How far one tap of − or + moves the hours: an hour of work, a quarter-hour of errand. */
 const STEP = { owing: 1, errand: 0.25 } as const;
 const LEAST = { owing: 0.5, errand: 0.25 } as const;
@@ -105,6 +107,7 @@ function TasksStep() {
   const [typed, setTyped] = useState('4');
   const [dread, setDread] = useState<Dread>(3);
   const [commitment, setCommitment] = useState<CommitmentKind>('soft');
+  const [importance, setImportance] = useState<Importance>(2);
   const setBoth = (next: number) => { const h = tidy(Math.max(LEAST[kind], Math.min(200, next))); setHours(h); setTyped(String(h)); };
 
   const owing = items.filter((item) => item.prepHours && !item.parentId && (item.deadline ?? item.date) >= today);
@@ -116,10 +119,10 @@ function TasksStep() {
     if (kind === 'owing') {
       addItem({
         title: name, bucket: 'mental', hours, dread, commitment,
-        date, deadline: date, prepHours: hours, prepDone: 0, importance: commitment === 'hard' ? 3 : 2,
+        date, deadline: date, prepHours: hours, prepDone: 0, importance, want: wantFor(importance),
       });
     } else {
-      addItem({ title: name, bucket: 'errands', hours, dread, commitment, date });
+      addItem({ title: name, bucket: 'errands', hours, dread, commitment, date, importance, want: wantFor(importance) });
     }
     successFeedback();
     setTitle('');
@@ -191,16 +194,9 @@ function TasksStep() {
         <Text variant="micro" tone="subtle">HOW DRAINING</Text>
         <DrainPicker compact value={dread} onChange={(next) => { setDread(next); }} />
         <Text variant="micro" tone="subtle">CAN IT MOVE?</Text>
-        <Stack direction="row" gap={2} wrap>
-          {(['hard', 'soft', 'self'] as CommitmentKind[]).map((option) => (
-            <Chip
-              key={option}
-              label={`${MOVE_EMOJI[option]} ${COMMITMENT_LABEL[option]}`}
-              tone={commitment === option ? 'selected' : 'plain'}
-              onPress={() => { tapFeedback(); setCommitment(option); }}
-            />
-          ))}
-        </Stack>
+        <CommitmentPicker value={commitment} onChange={setCommitment} />
+        <Text variant="micro" tone="subtle">HOW IMPORTANT</Text>
+        <ImportancePicker value={importance} onChange={setImportance} />
         <Button label={title.trim() ? `Add “${title.trim()}”` : 'Name it first'} kind={title.trim() ? 'primary' : 'secondary'} onPress={add} />
       </Stack>
 

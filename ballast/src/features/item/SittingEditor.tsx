@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, View } from 'react-native';
-import { Stack, Text } from '@/components';
+import { Chip, DatePicker, Stack, Text } from '@/components';
 import { color, radius } from '@design/tokens';
 import { DAY_LETTER, dayIndex, formatShort, parseISO, startOfWeek } from '@/lib/dates';
 import { bestStart, bookingDays, loadOnDay, sittingStarts } from '@/lib/prep';
@@ -36,7 +36,16 @@ export function SittingEditor({
   origin,
   maxHours,
   onChange,
+  mode = 'sitting',
+  calendar = false,
+  anytime = false,
 }: {
+  /** Offer a month calendar for any later date, as well as the two weeks. */
+  calendar?: boolean;
+  /** Offer "any time that day" - a day without a set time. */
+  anytime?: boolean;
+  /** A sitting of owing work, or one thing being moved - which keeps its length and has no due day unless it has a deadline. */
+  mode?: 'sitting' | 'item';
   item: Item;
   /** The week without this sitting, with every other draft laid in. */
   busy: Item[];
@@ -53,12 +62,15 @@ export function SittingEditor({
 }) {
   const capacity = capacityOf(useStore((state) => state.ceilings));
   const days = bookingDays(today);
-  const due = item.deadline ?? item.date;
+  const due: string | undefined = mode === 'item' ? item.deadline : item.deadline ?? item.date;
   const nextMonday = startOfWeek(days[days.length - 1]);
   const weeks = [days.filter((d) => d < nextMonday), days.filter((d) => d >= nextMonday)].filter((w) => w.length);
   const notBefore = (date: string) => (date === today ? nowHour : undefined);
   const startsFor = (date: string, hours: number) => sittingStarts(busy, date, hours, notBefore(date));
   const options = startsFor(value.date, value.hours);
+  // The calendar opens by itself when the day is beyond the two weeks shown.
+  const [onCalendar, setOnCalendar] = useState(() => calendar && !days.includes(value.date));
+  const dayLoad = Math.round((loadOnDay(base, value.date) / capacity) * 100);
   const index = value.startHour === undefined ? -1 : options.indexOf(value.startHour);
 
   const adds = sittingLoad(item, value.hours);
@@ -93,18 +105,35 @@ export function SittingEditor({
 
   return (
     <Stack gap={4} className="rounded-md border border-line-hairline bg-page p-4">
-      {/* Which day: this week and next, one row each. Late days are marked, full days greyed. */}
+      {/* Which day: this week and next, one row each - or, further out, a calendar. Late days are marked, full days greyed. */}
       <Stack gap={2}>
-        <Text variant="micro" tone="subtle">DAY · DUE {formatShort(due).toUpperCase()}</Text>
-        {weeks.map((week, w) => (
+        <Stack direction="row" justify="between" align="center">
+          <Text variant="micro" tone="subtle">{onCalendar ? 'DAY · ANY DATE' : due ? `DAY · DUE ${formatShort(due).toUpperCase()}` : 'DAY · HOW FULL EACH ONE IS'}</Text>
+          {calendar ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={onCalendar ? 'Show this week and next' : 'Pick another date'}
+              onPress={() => { tapFeedback(); setOnCalendar(!onCalendar); }}
+              className="min-h-min justify-center active:opacity-60"
+            >
+              <Text variant="caption" weight="semibold" className="underline">{onCalendar ? '🗓 This week & next' : '📅 Another date'}</Text>
+            </Pressable>
+          ) : null}
+        </Stack>
+        {onCalendar ? (
+          <Stack gap={2}>
+            <DatePicker value={value.date} min={today} onChange={pickDay} />
+            <Text variant="micro" tone="subtle">{formatShort(value.date).toUpperCase()} · USES {dayLoad}% ALREADY</Text>
+          </Stack>
+        ) : weeks.map((week, w) => (
           <Stack key={week[0]} gap={1}>
             <Text variant="micro" tone="subtle">{w === 0 && week[0] < nextMonday ? 'THIS WEEK' : 'NEXT WEEK'}</Text>
             <Stack direction="row" gap={1}>
               {week.map((date) => {
                 const selected = date === value.date;
                 const full = startsFor(date, value.hours).length === 0;
-                const isDue = date === due;
-                const late = date > due;
+                const isDue = !!due && date === due;
+                const late = !!due && date > due;
                 const load = Math.round((loadOnDay(base, date) / capacity) * 100);
                 return (
                   <Pressable
@@ -121,7 +150,8 @@ export function SittingEditor({
                       {isDue ? 'DUE' : date === today ? 'NOW' : DAY_LETTER[dayIndex(date)]}
                     </Text>
                     <Text variant="callout" weight="bold" tone={selected ? 'inverse' : 'default'}>{parseISO(date).getUTCDate()}</Text>
-                    <Text variant="micro" tone={selected ? 'inverse' : 'subtle'}>{full ? '–' : `${load}%`}</Text>
+                    {/* The load shows either way; a day with no gap long enough is greyed, not blanked. */}
+                    <Text variant="micro" tone={selected ? 'inverse' : 'subtle'}>{`${load}%`}</Text>
                   </Pressable>
                 );
               })}
@@ -130,7 +160,7 @@ export function SittingEditor({
             </Stack>
           </Stack>
         ))}
-        {value.date > due ? <Text variant="micro" tone="heavy">After it’s due · {formatShort(due)}</Text> : null}
+        {due && value.date > due ? <Text variant="micro" tone="heavy">After it’s due · {formatShort(due)}</Text> : null}
       </Stack>
 
       {/* What time. Drag the block, or step through the starts that fit. */}
@@ -142,7 +172,9 @@ export function SittingEditor({
         <Stack direction="row" gap={2} align="center">
           <Nudge label="Earlier" glyph="‹" disabled={index <= 0} onPress={() => nudge(-1)} />
           <Stack grow align="center" gap={1}>
-            <Text variant="heading" tone={value.startHour === undefined ? 'heavy' : 'default'}>{spanLabel(value)}</Text>
+            <Text variant="heading" tone={value.startHour === undefined && !anytime ? 'heavy' : 'default'}>
+              {value.startHour === undefined && anytime ? 'Any time that day' : spanLabel(value)}
+            </Text>
             <Text variant="micro" tone="subtle">
               {gap ? `GAP ${formatHour(gap.start)}–${formatHour(gap.end)}` : options.length ? 'PICK A TIME' : 'NO GAP THIS LONG'}
             </Text>
@@ -156,10 +188,17 @@ export function SittingEditor({
           options={options}
           onPick={(startHour) => { tapFeedback(); onChange({ ...value, startHour }); }}
         />
+        {anytime ? (
+          <Chip
+            label="Any time that day"
+            tone={value.startHour === undefined ? 'selected' : 'plain'}
+            onPress={() => { tapFeedback(); onChange({ ...value, startHour: undefined }); }}
+          />
+        ) : null}
       </Stack>
 
-      {/* How long. Lengths that cannot fit on this day are shown, not offered. */}
-      <Stack gap={2}>
+      {/* How long. Lengths that cannot fit on this day are shown, not offered. A thing being moved keeps its own. */}
+      {mode === 'sitting' ? <Stack gap={2}>
         <Text variant="micro" tone="subtle">LENGTH</Text>
         <Stack direction="row" gap={2} wrap>
           {lengths.map((hours) => {
@@ -182,7 +221,7 @@ export function SittingEditor({
             );
           })}
         </Stack>
-      </Stack>
+      </Stack> : null}
 
       {/* The day after this lands on it. */}
       <Stack direction="row" gap={2} align="center" className="rounded-md bg-sunken px-3 py-3">
@@ -199,7 +238,7 @@ export function SittingEditor({
           onPress={() => { tapFeedback(); onChange({ ...origin! }); }}
           className="min-h-min justify-center self-start active:opacity-60"
         >
-          <Text variant="caption" tone="muted" className="underline">↺ Back to the suggestion</Text>
+          <Text variant="caption" tone="muted" className="underline">{mode === 'item' ? '↺ Back to where it was' : '↺ Back to the suggestion'}</Text>
         </Pressable>
       ) : null}
     </Stack>

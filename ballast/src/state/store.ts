@@ -13,11 +13,12 @@ import type {
   MoodQuadrant, Dread as DreadLevel, ErrandCategory, Invite, Module, Moment, Prescription,
   RecoveryEntry, SimAction, Trade, Mix, CustomFlag, FlagId, Group, PlanActivity, ShareRules, ShareWindow, Outcome,
   GroupInvite, Notice, ReceivedInvite,
-  CalDecision, CalendarEvent, CalendarLink, CalTemplate,
+  CalDecision, CalendarEvent, CalendarLink, CalTemplate, CommitmentKind, Importance,
 } from '@/lib/types';
 import { DEFAULT_SHARE_RULES, type PhoneContact, type ShareMode } from '@/lib/sharing';
 import type { Collection, GroupDTO, InviteDTO, MeDTO, PendingRequestDTO } from '@shared/contract';
 import { DEMO_ANSWER_MS, firstName, initialsOf, nameFromEmail } from '@/lib/people';
+import { wantFor } from '@/lib/importance';
 import { DEFAULT_CEILINGS, DEFAULT_OVERALL_CEILING } from '@/lib/load';
 import { mergeInto } from './snapshot';
 import { REST_LOAD_PER_HOUR, loadOf, percentByBucket, overallOf, isMovable, recalibrate } from '@/lib/load';
@@ -182,6 +183,8 @@ interface State {
 
   addItem: (item: Omit<Item, 'id'>) => void;
   setDread: (id: string, dread: Dread) => void;
+  /** Can it move, and how much it matters - the two answers the lists sort on. */
+  setItemTraits: (id: string, traits: { commitment?: CommitmentKind; importance?: Importance }) => void;
   applyTrades: (trades: Trade[]) => void;
   dropSwap: (id: string) => void;
   addFriend: (contactId: string) => void;
@@ -329,8 +332,10 @@ const newFriend = (request: PendingRequestDTO): CircleMember => ({
 });
 
 /** A plan as the block it becomes in your week. */
+// Fixed: a time friends agreed on is not something to do earlier or shuffle on your own.
 const planAsItem = (plan: { id: string; title: string; date: string; startHour: number; hours: number }): Item => ({
-  id: plan.id, title: plan.title, bucket: 'social', hours: plan.hours, dread: 1, commitment: 'soft', date: plan.date, startHour: plan.startHour,
+  id: plan.id, title: plan.title, bucket: 'social', hours: plan.hours, dread: 1, commitment: 'fixed', importance: 3, want: 4,
+  date: plan.date, startHour: plan.startHour,
 });
 
 /** "Dinner with Amin and Ravi" → "Dinner", for a line that has to stay short. */
@@ -418,6 +423,15 @@ export const useStore = create<State>()(
    * re-price the assignment and leave its booked hours at the old price. The
    * ones still ahead follow it now; a sitting already done keeps what it cost.
    */
+  setItemTraits: (id, traits) =>
+    set((state) => ({
+      items: state.items.map((item) => (item.id !== id ? item : {
+        ...item,
+        ...(traits.commitment ? { commitment: traits.commitment } : {}),
+        ...(traits.importance ? { importance: traits.importance, want: wantFor(traits.importance) } : {}),
+      })),
+    })),
+
   setDread: (id, dread) =>
     set((state) => ({
       items: state.items.map((i) =>
@@ -1349,9 +1363,11 @@ export const useStore = create<State>()(
       let items = state.items.flatMap((item) => {
         const plan = going.get(item.id) ?? (item.id.startsWith('inv-') ? hosting.get(item.id) : undefined);
         if (plan) {
-          if (item.title === plan.title && item.date === plan.date && item.startHour === plan.startHour && item.hours === plan.hours) return [item];
+          if (item.title === plan.title && item.date === plan.date && item.startHour === plan.startHour && item.hours === plan.hours
+            && item.commitment === 'fixed') return [item];
           changed = true;
-          return [{ ...item, title: plan.title, date: plan.date, startHour: plan.startHour, hours: plan.hours }];
+          // A plan with friends is fixed - including ones saved before that was a choice.
+          return [{ ...item, title: plan.title, date: plan.date, startHour: plan.startHour, hours: plan.hours, commitment: 'fixed' as const }];
         }
         if (ahead(item) && (item.id.startsWith('going-inv-') || (item.id.startsWith('inv-') && !item.parentId))) {
           changed = true;
