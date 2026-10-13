@@ -17,7 +17,7 @@
 
 export const color = {
   band: {
-    steady:   { fill: '#2F8265', ink: '#1B5C46', wash: '#E8F2ED', onDark: '#5FBF98' },
+    steady:   { fill: '#2B7A5E', ink: '#1B5C46', wash: '#E8F2ED', onDark: '#5FBF98' },
     busy:     { fill: '#C4881B', ink: '#7A5200', wash: '#FBF0DC', onDark: '#E8B45C' },
     heavy:    { fill: '#B32540', ink: '#A31C38', wash: '#FBE9EC', onDark: '#E4607D' },
     recovery: { fill: '#6B95C9', ink: '#2C5C8F', wash: '#EAF1F9', onDark: '#9EC1E8' },
@@ -63,7 +63,7 @@ export const color = {
   ink: {
     default:       '#14161A',
     muted:         '#565A62',
-    subtle:        '#6B7079',
+    subtle:        '#5D626B',
     inverse:       '#F7F6F2',
     onNightMuted:  '#A8A9A3',
   },
@@ -73,7 +73,7 @@ export const color = {
     ceiling:  '#9A9790',
   },
   control: {
-    onFill:     '#2F8265',
+    onFill:     '#2B7A5E',
     offFill:    '#D8D5CE',
     lockedFill: '#EDEBE6',
     knob:       '#FFFFFF',

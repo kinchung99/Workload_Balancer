@@ -8,6 +8,7 @@ import { LENGTHS, TONES, TWEAKS, offlineDraft, offlineIdeas, offlineTweak, whatI
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { ComposeContext, ComposeIdea, MessageLength, ToneId } from '@shared/contract';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 type Source = 'claude' | 'phone';
 
@@ -317,8 +318,8 @@ function IdeaSkeleton({ delay }: { delay: number }) {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
-        Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.45, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: NATIVE_DRIVER }),
+        Animated.timing(pulse, { toValue: 0.45, duration: 600, useNativeDriver: NATIVE_DRIVER }),
       ]),
     );
     loop.start();
@@ -341,7 +342,7 @@ function ToneBubble({
 }: { emoji: string; label: string; note: string; selected: boolean; onPress: () => void }) {
   const scale = useRef(new Animated.Value(selected ? 1.12 : 1)).current;
   useEffect(() => {
-    Animated.spring(scale, { toValue: selected ? 1.12 : 1, friction: 5, tension: 180, useNativeDriver: true }).start();
+    Animated.spring(scale, { toValue: selected ? 1.12 : 1, friction: 5, tension: 180, useNativeDriver: NATIVE_DRIVER }).start();
   }, [selected, scale]);
   return (
     <Pressable
@@ -378,7 +379,7 @@ function Segmented<T extends string>({
   const index = Math.max(0, options.findIndex((option) => option.id === value));
   const slide = useRef(new Animated.Value(index)).current;
   useEffect(() => {
-    Animated.spring(slide, { toValue: index, friction: 7, tension: 140, useNativeDriver: true }).start();
+    Animated.spring(slide, { toValue: index, friction: 7, tension: 140, useNativeDriver: NATIVE_DRIVER }).start();
   }, [index, slide]);
   const cell = width / options.length;
 
@@ -481,8 +482,8 @@ function TypingDots() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(i * 140),
-          Animated.timing(dot, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0, duration: 260, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
+          Animated.timing(dot, { toValue: 0, duration: 260, easing: Easing.in(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
           Animated.delay((2 - i) * 140),
         ]),
       ),

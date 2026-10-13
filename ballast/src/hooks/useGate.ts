@@ -13,7 +13,7 @@
  */
 import { useEffect } from 'react';
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
-import { api, hasServer } from '@/lib/api';
+import { api, hasServer, hasSessionToken } from '@/lib/api';
 import { demoBuild, guestAllowed } from '@/lib/access';
 import { localISO } from '@/lib/marking';
 import { useStore } from '@/state/store';
@@ -26,6 +26,12 @@ export function useSession(): void {
     void (async () => {
       if (!hasServer()) {
         useStore.getState().setSessionChecked();
+        return;
+      }
+      // Nobody has ever signed in here - no token, no remembered account - so
+      // there is no session to restore, and asking would only earn a 401.
+      if (!(await hasSessionToken()) && !useStore.getState().lastAccountId) {
+        if (live) useStore.getState().setSessionChecked();
         return;
       }
       const me = await api.me();

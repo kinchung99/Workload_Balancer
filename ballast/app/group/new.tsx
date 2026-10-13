@@ -10,6 +10,7 @@ import { frequentFriends } from '@/lib/circle';
 import { PeopleList } from '@/features/social/PeopleList';
 import { GROUP_EMOJIS } from '@/features/social/groupArt';
 import { createGroupAndInvite } from '@/lib/social';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 /**
  * `/group/new` — a picture, a name, some people. Three things, one screen.
@@ -27,7 +28,7 @@ export default function NewGroup() {
   useEffect(() => {
     if (reduce) return;
     pop.setValue(0.75);
-    Animated.spring(pop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }).start();
+    Animated.spring(pop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: NATIVE_DRIVER }).start();
   }, [emoji, reduce, pop]);
 
   const ready = members.length > 0;

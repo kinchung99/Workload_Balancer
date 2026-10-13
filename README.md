@@ -1,5 +1,10 @@
 # 🔋 Ballast
 
+[![checks](https://github.com/kinchung99/Workload_Balancer/actions/workflows/ci.yml/badge.svg)](https://github.com/kinchung99/Workload_Balancer/actions/workflows/ci.yml)
+[![live monitor](https://github.com/kinchung99/Workload_Balancer/actions/workflows/monitor.yml/badge.svg)](https://github.com/kinchung99/Workload_Balancer/actions/workflows/monitor.yml)
+![accessibility](https://img.shields.io/badge/Lighthouse%20accessibility-100-2B7A5E)
+![best practices](https://img.shields.io/badge/Lighthouse%20best%20practices-100-2B7A5E)
+
 **Plan your week by how much it takes out of you, not how many hours it fills.**
 
 Most planners count hours. Ballast counts *energy*. Every class, deadline, shift and dinner costs a little of your battery, so you can see a bad week coming before it lands, and you get a plan for getting through it.
@@ -8,6 +13,7 @@ Most planners count hours. Ballast counts *energy*. Every class, deadline, shift
 |---|---|---|
 | 📱 **The app** | **https://load-balancer-ballast.expo.app** | The real app. Sign in with a judge account below. |
 | 🎮 **Instant demo** | **https://load-balancer-ballast--demo.expo.app** | No login. Opens on a sample student's week, and **resets every time you reload**, so you can't break it. |
+| 📄 **Quick guide (PDF)** | [docs/Ballast-Judges-Guide.pdf](docs/Ballast-Judges-Guide.pdf) | 12 pages: install, accounts, the key features, and known issues. |
 
 ---
 
@@ -410,6 +416,19 @@ Contact: **kcchung82@gmail.com** · [Privacy policy](https://ballast-ckc3.vercel
 
 ---
 
+## 🛠️ Built to be relied on
+
+| | |
+|---|---|
+| ✅ **Tested** | **1,100+ automated checks** on every push: 900+ for the app (the battery model, behaviours, every page rendered) and 200+ for the API against a real Postgres. CI must be green before anything deploys. |
+| 📡 **Monitored** | Every 30 minutes a GitHub Action signs in like a judge and checks the API, the database, the app, the demo, sync, friends and plans. A failure opens an issue; recovery closes it. |
+| 🧯 **Crash-safe** | A screen that breaks shows *"Something went wrong · Try again"* instead of a blank page, and reports itself to the API's logs, with no personal data. |
+| ♿ **Accessible** | Lighthouse accessibility **100** on all 24 screens tested: labels for screen readers, AA contrast, 24-point tap targets, pinch zoom allowed, reduced motion respected. |
+| ⚡ **Fast** | Local-first: your week is saved on the phone, so every tap updates instantly and syncs in the background. Almost no layout shift on load, and Lighthouse best practices **100** (clean console, no third-party cookies). |
+| 🚀 **Deployed by pipeline** | Push → checks → deploy (API to Vercel, app to Expo hosting) → live checks. |
+
+<img src="docs/architecture.svg" alt="How Ballast is built: the app, the shared contract, the API, its services, and the pipeline" width="100%">
+
 <details>
 <summary><b>For developers</b></summary>
 
@@ -424,7 +443,10 @@ npm run setup          # install everything
 npm run dev:api        # API on a local Postgres file, no accounts needed
 npm run dev:app        # the app
 npm run check          # every check: types, model, behaviour, render, API
+node scripts/monitor.mjs               # the live checks the monitor runs every 30 minutes
 npm --prefix ballast run judges:seed   # rebuild the five judge accounts around today's date
 ```
+
+Automatic deploys need two repository secrets: `EXPO_TOKEN` (app) and `VERCEL_TOKEN` (API). Until they're set, each half of the deploy workflow skips itself with a note. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 </details>

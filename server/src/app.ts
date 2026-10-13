@@ -14,7 +14,7 @@
 import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { initialsFrom, profileSchema, type MeDTO, type Visibility } from '../../shared/contract.js';
 import { makeAuth, type Auth } from './lib/auth.js';
 import { makeCode } from './lib/code.js';
@@ -28,6 +28,7 @@ import { sharing } from './routes/sharing.js';
 import { sync } from './routes/sync.js';
 import { composeRoutes, defaultWriter, suggestRoutes, type Writer } from './routes/compose.js';
 import { calendarRoutes } from './routes/calendar.js';
+import { report } from './routes/report.js';
 import { googleFromEnv, type GoogleCalendarClient } from './lib/google.js';
 
 export function createApp(
@@ -64,6 +65,21 @@ export function createApp(
   /** Liveness. Cheap on purpose - a health check that queries is a health check that pages you at 3am. */
   app.get('/health', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 
+  /**
+   * The deep check, for the monitor: the function is up *and* the database
+   * answers. Separate from /health so a slow database never fails the cheap one.
+   */
+  app.get('/health/db', async (c) => {
+    const started = Date.now();
+    try {
+      await db.execute(sql`select 1`);
+      return c.json({ ok: true, db: true, ms: Date.now() - started });
+    } catch (err) {
+      console.error('[health]', err);
+      return c.json({ ok: false, db: false }, 503);
+    }
+  });
+
   /*
    * Somebody opened the API in a browser.
    *
@@ -78,8 +94,23 @@ export function createApp(
     health: '/health',
   }));
 
-  // Better Auth owns everything under /api/auth: sign-up, sign-in, sessions, OAuth.
-  app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
+  /*
+   * Better Auth owns everything under /api/auth: sign-up, sign-in, sessions, OAuth.
+   *
+   * From another site - the app, on its own domain - the session travels as a
+   * bearer token in `set-auth-token`, so the cookie Better Auth also sets is a
+   * third-party cookie nobody uses: Safari drops it, Chrome flags it, and it is
+   * the last cookie left. It is removed whenever the token is there instead.
+   */
+  app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
+    const res = await auth.handler(c.req.raw);
+    const origin = c.req.header('origin');
+    const crossSite = !!origin && (() => { try { return new URL(origin).host !== new URL(c.req.url).host; } catch { return false; } })();
+    if (!crossSite || !res.headers.has('set-auth-token') || !res.headers.has('set-cookie')) return res;
+    const headers = new Headers(res.headers);
+    headers.delete('set-cookie');
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  });
 
   /**
    * The gate.
@@ -190,6 +221,8 @@ export function createApp(
   app.route('/api/compose', composeRoutes(writer));
   app.route('/api/suggest', suggestRoutes(writer));
   app.route('/api/calendar', calendarRoutes(google));
+  // No session needed: the sign-in screen can crash too.
+  app.route('/api/report', report);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

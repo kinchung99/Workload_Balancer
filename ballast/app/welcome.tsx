@@ -124,7 +124,7 @@ export default function Welcome() {
         {server ? (
           <Stack gap={4}>
             {/* Two mutually exclusive forms are one segmented control. */}
-            <Stack direction="row" gap={0} className="rounded-pill border-2 border-line-strong bg-sunken p-1">
+            <Stack direction="row" gap={0} accessibilityRole="tablist" className="rounded-pill border-2 border-line-strong bg-sunken p-1">
               {(['up', 'in'] as const).map((option) => (
                 <Pressable
                   key={option}

@@ -1,5 +1,7 @@
 import '../global.css';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { color } from '@design/tokens';
@@ -11,9 +13,9 @@ import { useCalendarSync } from '@/hooks/useCalendarSync';
 import { Platform, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { keepTokenIn } from '@/lib/api';
-import { Mascot } from '@/components';
+import { reportError, reportUncaught } from '@/lib/report';
+import { Button, Mascot, Stack as Column, Text } from '@/components';
 import { useHydrated } from '@/hooks/useHydrated';
-import { isClient } from '@/state/storage';
 
 /**
  * Root layout.
@@ -37,6 +39,31 @@ if (Platform.OS !== 'web') {
   });
 }
 
+/**
+ * When a screen throws.
+ *
+ * Instead of a blank page: what happened in one line, a way back, and a quiet
+ * report to the server so it gets fixed without anyone having to describe it.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => { reportError('crash', error); }, [error]);
+  return (
+    <View className="flex-1 items-center justify-center bg-page px-8">
+      <Column gap={4} align="center">
+        <Mascot charge={18} loadPercent={92} size={110} />
+        <Text variant="title" className="text-center">Something went wrong</Text>
+        <Text variant="callout" tone="muted" className="text-center">It's been reported. Your week is safe.</Text>
+        <Button label="Try again" onPress={() => void retry()} />
+        <Button
+          label="Back to Home"
+          kind="secondary"
+          onPress={() => { if (Platform.OS === 'web') globalThis.location?.assign('/'); else void retry(); }}
+        />
+      </Column>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   useSession();
   useGate();
@@ -47,16 +74,20 @@ export default function RootLayout() {
   const waiting = useWaitingForSession();
   /*
    * Every page is prerendered from the sample week, because the build has no
-   * account to render. Until this device's own state is read back, the
-   * battery covers it - otherwise the first thing anyone opening the app saw
-   * was a stranger's Monday, for the moment before their own week (or the
-   * sign-in screen) replaced it.
+   * account to render. The HTML shell covers it (see +html) until this
+   * device's own state is read back, and it is lifted here - outside React,
+   * so the page underneath never has to mismatch the HTML to hide it.
    */
   const hydrated = useHydrated();
-  const cover = !isClient || !hydrated || waiting;
+  useEffect(() => { if (Platform.OS === 'web') reportUncaught(); }, []);
+  useEffect(() => {
+    if (hydrated && Platform.OS === 'web') globalThis.document?.getElementById('boot-cover')?.remove();
+  }, [hydrated]);
 
   return (
     <SafeAreaProvider>
+      {/* A name in the tab and for screen readers, on every page. */}
+      <Head><title>Ballast</title></Head>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -68,8 +99,8 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ animation: 'default' }} />
       </Stack>
-      {/* Opening, or coming back signed in: a moment with the battery while your own state loads. */}
-      {cover ? (
+      {/* Coming back signed in: a moment with the battery while the session is confirmed. */}
+      {waiting ? (
         <View className="absolute inset-0 items-center justify-center bg-page">
           <Mascot charge={72} loadPercent={28} size={120} />
         </View>

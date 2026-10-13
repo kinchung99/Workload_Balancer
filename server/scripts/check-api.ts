@@ -113,6 +113,8 @@ section('Health and the gate');
 {
   const health = await call('/health');
   check('health answers without a session', health.status, 200);
+  const deep = await call('/health/db');
+  check('the deep check reaches the database', [deep.status, ((await deep.json()) as { db: boolean }).db], [200, true]);
 
   for (const path of ['/api/me', '/api/sync', '/api/circle', '/api/sharing/presence', '/api/invites']) {
     const res = await call(path);
@@ -704,6 +706,31 @@ section('Google Calendar, read-only');
   check('and forgets it here', (await db.select().from(schema.calendarLinks).where(eq(schema.calendarLinks.userId, amira.id))).length, 0);
 }
 
+section('From the app, the session is a token, not a cookie');
+{
+  const res = await call('/api/auth/sign-in/email', {
+    method: 'POST',
+    headers: { origin: 'https://load-balancer-ballast.expo.app' },
+    body: JSON.stringify({ email: 'amira@example.edu', password: 'correct-horse-battery' }),
+  });
+  check('signing in from the app hands over a token', [res.status, !!res.headers.get('set-auth-token')], [200, true]);
+  check('and no third-party cookie', res.headers.get('set-cookie'), null);
+  const token = res.headers.get('set-auth-token');
+  check('the token alone is a session', (await call('/api/me', { headers: { authorization: `Bearer ${token}` } })).status, 200);
+}
+
+section('The app reports its own errors');
+{
+  const crash = { kind: 'crash', message: 'TypeError: x is undefined', path: '/plans', build: 'test' };
+  check('a crash report is taken without a session', (await post('/api/report', crash)).status, 204);
+  check('one with no message is refused', (await post('/api/report', { kind: 'crash' })).status, 400);
+  check('and a novel is refused', (await post('/api/report', { ...crash, message: 'x'.repeat(501) })).status, 400);
+  let last = 204;
+  for (let i = 0; i < 25; i += 1) last = (await call('/api/report', { method: 'POST', body: JSON.stringify(crash), headers: { 'x-forwarded-for': '203.0.113.9' } })).status;
+  check('a crash loop is slowed down, per address', last, 429);
+  check('without slowing anyone else', (await call('/api/report', { method: 'POST', body: JSON.stringify(crash), headers: { 'x-forwarded-for': '203.0.113.10' } })).status, 204);
+}
+
 section('The deployment routes every path to the function');
 {
   /*
@@ -723,7 +750,7 @@ section('The deployment routes every path to the function');
     config.rewrites.some((r) => new RegExp(`^${r.source}$`).test(path));
 
   for (const path of [
-    '/', '/health',
+    '/', '/health', '/health/db', '/api/report',
     '/api/auth/sign-up/email', '/api/auth/sign-in/anonymous', '/api/auth/sign-out',
     '/api/me', '/api/sync', '/api/circle', '/api/circle/request',
     '/api/sharing/presence', '/api/invites', '/api/compose/ideas', '/api/compose/draft', '/api/calendar/callback', '/api/suggest/recovery',

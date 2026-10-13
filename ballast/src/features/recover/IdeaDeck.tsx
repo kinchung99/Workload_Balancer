@@ -6,6 +6,7 @@ import { GIVES_BACK } from '@/lib/rest';
 import { tapFeedback } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { Prescription } from '@/lib/types';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 /** Far enough that a swipe was meant, not a scroll that wandered. */
 const THRESHOLD = 90;
@@ -48,8 +49,8 @@ export function IdeaDeck({
     tapFeedback();
     if (reduce) { then(); return; }
     Animated.parallel([
-      Animated.timing(x, { toValue: direction * 420, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(x, { toValue: direction * 420, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
+      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: NATIVE_DRIVER }),
     ]).start(() => {
       then();
       if (direction === 1) {
@@ -67,8 +68,8 @@ export function IdeaDeck({
     x.setValue(60);
     fade.setValue(0);
     Animated.parallel([
-      Animated.spring(x, { toValue: 0, friction: 7, tension: 90, useNativeDriver: true }),
-      Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.spring(x, { toValue: 0, friction: 7, tension: 90, useNativeDriver: NATIVE_DRIVER }),
+      Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }),
     ]).start();
   }, [entry?.id, reduce, x, fade]);
 
@@ -80,9 +81,9 @@ export function IdeaDeck({
       onPanResponderRelease: (_e, g) => {
         if (g.dx < -THRESHOLD) leave(-1, () => live.current.onNext());
         else if (g.dx > THRESHOLD) leave(1, () => live.current.onPick());
-        else Animated.spring(x, { toValue: 0, friction: 6, useNativeDriver: true }).start();
+        else Animated.spring(x, { toValue: 0, friction: 6, useNativeDriver: NATIVE_DRIVER }).start();
       },
-      onPanResponderTerminate: () => Animated.spring(x, { toValue: 0, useNativeDriver: true }).start(),
+      onPanResponderTerminate: () => Animated.spring(x, { toValue: 0, useNativeDriver: NATIVE_DRIVER }).start(),
     }),
   ).current;
 
@@ -186,8 +187,8 @@ function Skeleton() {
   const pulse = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0.5, duration: 600, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: NATIVE_DRIVER }),
+      Animated.timing(pulse, { toValue: 0.5, duration: 600, useNativeDriver: NATIVE_DRIVER }),
     ]));
     loop.start();
     return () => loop.stop();

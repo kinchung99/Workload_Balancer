@@ -5,6 +5,7 @@ import { Stack, Sticker, Text } from '@/components';
 import { color, motion } from '@design/tokens';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { DECORATIVE } from '@/components/charts/decorative';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 const CONFETTI = [
   { x: 6, y: 6, fill: color.band.steady.fill, r: 3 },
@@ -28,7 +29,7 @@ export function Cheer({ title, sub }: { title: string; sub?: string }) {
 
   useEffect(() => {
     if (reduceMotion) { pop.setValue(1); return; }
-    Animated.timing(pop, { toValue: 1, duration: motion.meter, easing: Easing.out(Easing.back(2)), useNativeDriver: true }).start();
+    Animated.timing(pop, { toValue: 1, duration: motion.meter, easing: Easing.out(Easing.back(2)), useNativeDriver: NATIVE_DRIVER }).start();
   }, [reduceMotion, pop]);
 
   return (

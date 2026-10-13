@@ -16,6 +16,7 @@ import { Animated, Easing, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { color, motion } from '@design/tokens';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 const CONFETTI = [
   { x: 10, y: 4, fill: color.band.steady.fill, r: 3 },
@@ -37,9 +38,9 @@ export function Burst({ show, label }: { show: boolean; label: string }) {
     }
     pop.setValue(0);
     Animated.sequence([
-      Animated.timing(pop, { toValue: 1, duration: motion.meter, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
+      Animated.timing(pop, { toValue: 1, duration: motion.meter, easing: Easing.out(Easing.back(2)), useNativeDriver: NATIVE_DRIVER }),
       Animated.delay(900),
-      Animated.timing(pop, { toValue: 0, duration: motion.meter, useNativeDriver: true }),
+      Animated.timing(pop, { toValue: 0, duration: motion.meter, useNativeDriver: NATIVE_DRIVER }),
     ]).start();
   }, [show, reduceMotion, pop]);
 

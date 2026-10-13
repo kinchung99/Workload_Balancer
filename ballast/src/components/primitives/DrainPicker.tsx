@@ -27,6 +27,7 @@ import { DECORATIVE } from '../charts/decorative';
 import { DrainFace } from './AreaDial';
 import { Stack } from './Stack';
 import { Text } from './Text';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 const BAND = { steady: color.band.steady, busy: color.band.busy, heavy: color.band.heavy } as const;
 
@@ -65,7 +66,7 @@ export function DrainPicker({
     if (first.current) { first.current = false; return; }
     if (reduce) return;
     pop.setValue(0.8);
-    Animated.spring(pop, { toValue: 1, friction: 4, tension: 170, useNativeDriver: true }).start();
+    Animated.spring(pop, { toValue: 1, friction: 4, tension: 170, useNativeDriver: NATIVE_DRIVER }).start();
   }, [value, reduce, pop]);
 
   const face = compact ? 40 : 50;

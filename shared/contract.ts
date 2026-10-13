@@ -526,3 +526,18 @@ export interface ApiError {
   error: string;
   detail?: string;
 }
+
+/* ------------------------------------------------------------------ report */
+
+/**
+ * Something broke on a phone. What, where and which build - and nothing about
+ * the person or their week.
+ */
+export const clientErrorSchema = z.object({
+  kind: z.enum(['crash', 'error', 'rejection']),
+  message: z.string().min(1).max(500),
+  stack: z.string().max(4000).optional(),
+  path: z.string().max(200).optional(),
+  build: z.string().max(40).optional(),
+});
+export type ClientError = z.infer<typeof clientErrorSchema>;

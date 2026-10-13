@@ -20,6 +20,7 @@ import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useStore } from '@/state/store';
 import type { Item } from '@/lib/types';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 export function MarkNotice({ due, onOpen }: { due: Item[]; onOpen: (item: Item) => void }) {
   const { markItem, moveItem, snoozeMarks, marksSnoozed, today } = useStore();
@@ -34,11 +35,11 @@ export function MarkNotice({ due, onOpen }: { due: Item[]; onOpen: (item: Item) 
     if (!item) return;
     drop.setValue(reduceMotion ? 0 : -200);
     const show = setTimeout(() => {
-      if (!reduceMotion) Animated.spring(drop, { toValue: 0, useNativeDriver: true, friction: 8, tension: 60 }).start();
+      if (!reduceMotion) Animated.spring(drop, { toValue: 0, useNativeDriver: NATIVE_DRIVER, friction: 8, tension: 60 }).start();
     }, 600);
     const hide = setTimeout(() => {
       if (reduceMotion) { setTucked(item.id); return; }
-      Animated.timing(drop, { toValue: -200, duration: 260, useNativeDriver: true }).start(() => setTucked(item.id));
+      Animated.timing(drop, { toValue: -200, duration: 260, useNativeDriver: NATIVE_DRIVER }).start(() => setTucked(item.id));
     }, 9000);
     return () => { clearTimeout(show); clearTimeout(hide); };
   }, [item?.id, drop, reduceMotion]);

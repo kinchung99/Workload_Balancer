@@ -19,6 +19,7 @@ import { useStore } from '@/state/store';
 import type { Detected } from '@/lib/gcal';
 import { useCalendar } from './useCalendar';
 import { KIND_STICKER, KIND_WASH } from './EventCard';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 const SHOWN = 3;
 
@@ -50,7 +51,7 @@ export function CalendarNudge() {
     if (!showFresh && !showPromo) return;
     if (reduce) { drop.setValue(1); return; }
     drop.setValue(0);
-    Animated.spring(drop, { toValue: 1, friction: 7, tension: 80, useNativeDriver: true }).start();
+    Animated.spring(drop, { toValue: 1, friction: 7, tension: 80, useNativeDriver: NATIVE_DRIVER }).start();
   }, [showFresh, showPromo, reduce, drop]);
 
   if (!showFresh && !showPromo) return null;
@@ -77,7 +78,7 @@ export function CalendarNudge() {
             <Text variant="micro" tone="subtle">Classes, shifts, deadlines</Text>
           </Stack>
           <Text variant="caption" weight="bold">Connect ›</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Not now" onPress={() => { tapFeedback(); hidePromo(); }} hitSlop={10} className="pl-1">
+          <Pressable accessibilityRole="button" accessibilityLabel="Not now" onPress={() => { tapFeedback(); hidePromo(); }} hitSlop={10} className="pl-1" style={{ minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' }}>
             <Text variant="caption" tone="subtle">✕</Text>
           </Pressable>
         </Pressable>

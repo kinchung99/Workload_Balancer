@@ -27,10 +27,12 @@ export interface SectionProps {
   /** One quiet link on the right, for "see all" and the like. */
   action?: { label: string; onPress: () => void };
   gap?: SpaceStep;
+  /** Content a little wider than the header: for a strip that needs every point of width. */
+  wide?: boolean;
   children: ReactNode;
 }
 
-export function Section({ family, title, sticker, meta, action, gap = 3, children }: SectionProps) {
+export function Section({ family, title, sticker, meta, action, gap = 3, wide = false, children }: SectionProps) {
   const { wash, sticker: drawing } = FAMILY[family];
   return (
     <View style={{ borderRadius: radius.xl, overflow: 'hidden' }}>
@@ -54,7 +56,7 @@ export function Section({ family, title, sticker, meta, action, gap = 3, childre
             </Pressable>
           ) : null}
         </Stack>
-        <Stack gap={gap}>{children}</Stack>
+        <Stack gap={gap} style={wide ? { marginHorizontal: -6 } : undefined}>{children}</Stack>
       </Stack>
     </View>
   );

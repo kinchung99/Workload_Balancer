@@ -20,11 +20,12 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         {/*
           `viewport-fit=cover` lets the layout reach under a notch, which is what
-          makes an installed app look installed rather than like a page.
+          makes an installed app look installed rather than like a page. Pinch
+          zoom stays on: blocking it fails exactly the people who need it.
         */}
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
         />
 
         <link rel="manifest" href="/manifest.json" />
@@ -41,8 +42,37 @@ export default function Root({ children }: PropsWithChildren) {
 
         {/* Keeps body scroll from fighting the app's own scroll containers. */}
         <ScrollViewStyleReset />
+        {/*
+          iPhone Safari zooms into any field under 16px when it is tapped, and
+          with pinch zoom allowed it stays zoomed. 16px on iOS only, so a tap
+          types instead of jumping.
+        */}
+        <style dangerouslySetInnerHTML={{ __html: '@supports (-webkit-touch-callout: none) { input, textarea, select { font-size: 16px !important; } }' }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/*
+          Render, don't hydrate. Every page is prerendered from the sample week,
+          and the first thing the app draws is this device's own state - the two
+          never match, so hydrating them made React throw away the page and log
+          an error on every load. Drawing fresh behind the cover below is the
+          same picture with nothing to reconcile. Runs after the flag Expo sets
+          in the head, and before the app's script.
+        */}
+        <script type="module" dangerouslySetInnerHTML={{ __html: 'globalThis.__EXPO_ROUTER_HYDRATE__=false;' }} />
+        {/*
+          The moment before the app is running. Outside React on purpose: the
+          prerendered pages are built from the sample week, and this keeps it
+          out of sight until the app has read this device's own state and
+          lifts it (see app/_layout).
+        */}
+        <div
+          id="boot-cover"
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF' }}
+        >
+          <img src="/icon-192.png" alt="" width={96} height={96} style={{ borderRadius: 22 }} />
+        </div>
+      </body>
     </html>
   );
 }

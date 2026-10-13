@@ -88,15 +88,16 @@ export default function Plan() {
 
         {/* The fortnight is a picker: tap a day and the panel below becomes it.
             The one warning sits with the strip, next to the days it is about. */}
-        <Section family="week" title="Pick a day">
-          <Card gap={4}>
+        <Section family="week" title="Pick a day" wide>
+          {/* A slim card: fourteen days across a phone need the width to stay 24 points a tap. */}
+          <Card gap={4} pad={1} className="py-4">
             <ForecastStrip
               days={marked}
               spoken={speakForecast(marked, collision)}
               selected={selected}
               onSelect={setSelected}
             />
-            <Stack direction="row" justify="between">
+            <Stack direction="row" justify="between" className="px-3">
               <Text variant="footnote" weight="semibold" tone={TONE[bandFor(thisWeek.overall)]}>This week {chargeOf(thisWeek.overall)}%</Text>
               <Text variant="footnote" weight="semibold" tone={TONE[bandFor(next.overall)]}>Next {chargeOf(next.overall)}%</Text>
             </Stack>

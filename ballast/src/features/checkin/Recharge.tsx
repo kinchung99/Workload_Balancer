@@ -15,6 +15,7 @@ import { gainLabel, signedLabel } from '@/lib/checkin';
 import { tapFeedback } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { BandName, MealStatus, MoodQuadrant } from '@/lib/types';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 /** Hours slept, as faces. */
 export const SLEEP = [
@@ -227,9 +228,9 @@ export function GainToast({ text, stamp, down = false }: { text: string | null; 
     if (reduce) { pop.setValue(1); return; }
     pop.setValue(0);
     Animated.sequence([
-      Animated.spring(pop, { toValue: 1, friction: 5, tension: 160, useNativeDriver: true }),
+      Animated.spring(pop, { toValue: 1, friction: 5, tension: 160, useNativeDriver: NATIVE_DRIVER }),
       Animated.delay(1100),
-      Animated.timing(pop, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(pop, { toValue: 0, duration: 220, useNativeDriver: NATIVE_DRIVER }),
     ]).start();
   }, [text, stamp, reduce, pop]);
 

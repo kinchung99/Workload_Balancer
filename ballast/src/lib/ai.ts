@@ -9,7 +9,7 @@
  * ever happens on a preview link.
  */
 import { useEffect, useRef, useState } from 'react';
-import { api, hasServer } from './api';
+import { api, hasServer, hasSessionToken } from './api';
 import { guestAllowed } from './access';
 import { useStore } from '@/state/store';
 
@@ -29,8 +29,11 @@ export async function ensureAi(): Promise<boolean> {
   if (state.account) return true;
   if (!(state.guest && guestAllowed())) return false;
   pass ??= (async () => {
-    const me = await api.me();
-    if (me.ok) return true;
+    // A guest pass from earlier is reused; with none, asking first would only earn a 401.
+    if (await hasSessionToken()) {
+      const me = await api.me();
+      if (me.ok) return true;
+    }
     return (await api.signInGuest()).ok;
   })().catch(() => false);
   const ok = await pass;

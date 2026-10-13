@@ -57,7 +57,7 @@ export function ForecastStrip({
       <Stack gap={3}>
         <Stack
           direction="row"
-          gap={1}
+          gap={0}
           align="end"
           className="w-full"
           style={{ height: barToken.forecast }}
@@ -78,7 +78,8 @@ export function ForecastStrip({
           })}
         </Stack>
 
-        <Stack direction="row" gap={1} className="w-full">
+        {/* No gap: fourteen days across a phone is only just 24 points a tap, the accessible minimum. */}
+        <Stack direction="row" gap={0} className="w-full">
           {days.map((day) => {
             const isSelected = day.date === selected;
             const label = (

@@ -295,14 +295,14 @@ function Hero({
         {/* Why it is first: the three things pushing hardest, each with its strength. */}
         {pushes.length ? (
           <Stack gap={2}>
-            <Text variant="micro" tone="subtle">WHY IT’S FIRST</Text>
+            <Text variant="micro" tone="muted">WHY IT’S FIRST</Text>
             {pushes.map((push) => (
               <Stack key={push.key} direction="row" gap={3} align="center">
                 <Text variant="callout">{push.emoji}</Text>
                 <Text variant="footnote" weight="semibold" tone={push.key === 'risk' ? 'heavy' : 'default'} className="flex-1">
                   {push.label}
                 </Text>
-                <Stack direction="row" gap={1} accessible accessibilityLabel={`${push.strength} of 3`}>
+                <Stack direction="row" gap={1} accessible accessibilityRole="image" accessibilityLabel={`${push.strength} of 3`}>
                   {[1, 2, 3].map((dot) => (
                     <View
                       key={dot}

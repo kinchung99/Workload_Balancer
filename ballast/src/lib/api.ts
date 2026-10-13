@@ -105,6 +105,11 @@ export function keepTokenIn(store: TokenStore): void {
   tokenNow = null;
 }
 
+/** Whether this device holds a session token at all. */
+export async function hasSessionToken(): Promise<boolean> {
+  return !!(await currentToken());
+}
+
 /** Remember (or, with null, forget) the session token. */
 export async function setSessionToken(token: string | null): Promise<void> {
   tokenNow = Promise.resolve(token);

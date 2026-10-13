@@ -18,6 +18,7 @@ import { color, motion, radius } from '@design/tokens';
 import { bandFor } from '@/lib/load';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { DECORATIVE } from './decorative';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 export type Mood = 'great' | 'good' | 'tired' | 'spent';
 

@@ -42,7 +42,7 @@ export default function Plans() {
         <PageHeader sticker="heart" wash={color.decor.candy} eyebrow="Friends" title="Plans" />
 
         {/* Received, or sent: one tap between them, each with its count. */}
-        <Stack direction="row" gap={0} className="rounded-pill border-2 border-line-strong bg-sunken p-1">
+        <Stack direction="row" gap={0} accessibilityRole="tablist" className="rounded-pill border-2 border-line-strong bg-sunken p-1">
           {([
             ['received', `📥 Received${fresh ? ` · ${fresh}` : ''}`],
             ['sent', `📤 Sent${sortedSent.length ? ` · ${sortedSent.length}` : ''}`],

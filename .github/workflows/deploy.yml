@@ -1,0 +1,95 @@
+# Deploy on every push to main, once the checks pass.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   EXPO_TOKEN    - an Expo access token, for the app (expo.dev → Access tokens)
+#   VERCEL_TOKEN  - a Vercel token, for the API (vercel.com → Account → Tokens)
+# Each half skips itself, with a note in the run, while its secret is missing -
+# so this file is safe to have before the secrets exist.
+#
+# The API is deployed from a copy without git history: Vercel refuses deploys
+# whose commit author is not on the Vercel team, and the code is the same either
+# way. Production is sign-in only; the preview and demo links are built with the
+# guest flags, exactly as in the README.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  api:
+    name: api → Vercel
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Skip without a token
+        if: env.VERCEL_TOKEN == ''
+        run: echo "::notice::VERCEL_TOKEN is not set - API deploy skipped."
+      - uses: actions/checkout@v4
+        if: env.VERCEL_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.VERCEL_TOKEN != ''
+        with:
+          node-version: 24
+      - name: Deploy
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          out="$RUNNER_TEMP/api"
+          mkdir -p "$out/.vercel"
+          cp -R api server shared public package.json package-lock.json tsconfig.json vercel.json .vercelignore "$out/"
+          echo '{"projectId":"prj_vc4wQXpJRutE2QwnnSN4IQCnTzLz","orgId":"team_3CxxHX3xFkl6k2rzIhMNXMiA"}' > "$out/.vercel/project.json"
+          cd "$out" && npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
+
+  app:
+    name: app → Expo hosting
+    needs: api
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      API: https://ballast-ckc3.vercel.app
+    defaults:
+      run:
+        working-directory: ballast
+    steps:
+      - name: Skip without a token
+        if: env.EXPO_TOKEN == ''
+        working-directory: .
+        run: echo "::notice::EXPO_TOKEN is not set - app deploy skipped."
+      - uses: actions/checkout@v4
+        if: env.EXPO_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.EXPO_TOKEN != ''
+        with:
+          node-version: 24
+      - if: env.EXPO_TOKEN != ''
+        working-directory: .
+        run: npm ci && npm ci --prefix ballast
+      - name: Production (sign-in only)
+        if: env.EXPO_TOKEN != ''
+        run: |
+          EXPO_PUBLIC_API_URL=$API npx expo export --platform web --clear
+          npx eas-cli deploy --prod --non-interactive
+      - name: Preview (guest allowed)
+        if: env.EXPO_TOKEN != ''
+        run: |
+          EXPO_PUBLIC_API_URL=$API EXPO_PUBLIC_GUEST=1 npx expo export --platform web --clear
+          npx eas-cli deploy --alias preview --non-interactive
+      - name: Demo (opens on the sample week)
+        if: env.EXPO_TOKEN != ''
+        run: |
+          EXPO_PUBLIC_API_URL=$API EXPO_PUBLIC_GUEST=1 EXPO_PUBLIC_DEMO=1 npx expo export --platform web --clear
+          npx eas-cli deploy --alias demo --non-interactive
+      - name: Live checks after deploying
+        if: env.EXPO_TOKEN != ''
+        working-directory: .
+        run: sleep 60 && node scripts/monitor.mjs

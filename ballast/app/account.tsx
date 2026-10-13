@@ -260,7 +260,7 @@ export default function Account() {
         </Stack>
 
         {/* A segmented control, because two mutually exclusive modes always are one. */}
-        <Stack direction="row" gap={0} className="rounded-pill border-2 border-line-strong bg-sunken p-1">
+        <Stack direction="row" gap={0} accessibilityRole="tablist" className="rounded-pill border-2 border-line-strong bg-sunken p-1">
           {(['in', 'up'] as const).map((option) => (
             <Pressable
               key={option}

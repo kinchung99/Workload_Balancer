@@ -16,6 +16,7 @@ import { bandFor } from '@/lib/load';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { PatternFill } from './BandPattern';
 import { DECORATIVE } from './decorative';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 export interface BatterySegment {
   key: string;

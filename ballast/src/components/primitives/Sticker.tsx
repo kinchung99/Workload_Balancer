@@ -19,6 +19,7 @@ import { Animated, Easing, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import { color } from '@design/tokens';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { NATIVE_DRIVER } from '@/lib/nativeDriver';
 
 export type StickerName =
   | 'assignment' | 'class' | 'shift' | 'move' | 'people' | 'chore'
@@ -59,8 +60,8 @@ export function Sticker({ name, size = 44, wiggle = false }: { name: StickerName
     // A slow lean either side. Enough to catch the eye once, not enough to nag.
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(tilt, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(tilt, { toValue: -1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(tilt, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
+        Animated.timing(tilt, { toValue: -1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
       ]),
     );
     loop.start();
