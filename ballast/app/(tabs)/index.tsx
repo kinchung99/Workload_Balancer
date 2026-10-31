@@ -12,7 +12,7 @@ import { breakdown } from '@/lib/breakdown';
 import { useBells } from '@/features/notify/useBells';
 import { CalendarNudge } from '@/features/calendar/CalendarNudge';
 import { BatterySplit } from '@/features/battery/BatterySplit';
-import { addDays } from '@/lib/dates';
+import { addDays, formatShort } from '@/lib/dates';
 import { formatHour } from '@/lib/schedule';
 import { CalmMode } from '@/features/home/CalmMode';
 import { EveningReview } from '@/features/home/EveningReview';
@@ -28,7 +28,7 @@ import { updatedToday } from '@/lib/circle';
 import { findCollision, leadLabel } from '@/lib/forecast';
 import { itemsOnDay } from '@/state/store';
 import { tapFeedback } from '@/lib/haptics';
-import { WEEK_NUMBER } from '@/data/seed';
+import { weekWord } from '@/lib/timetable';
 import { useHydrated } from '@/hooks/useHydrated';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
@@ -52,7 +52,7 @@ export default function Home() {
   const router = useRouter();
   const { items, today, onboarded, recovery, overallCeiling, minimumViableWeek,
     showEverythingAnyway, setShowEverything, setMinimumViableWeek, dayReports, circle,
-    reportDay, markItem, ceilings, moods, sleepHours, requests, groupInvites, received } = useStore();
+    reportDay, markItem, ceilings, moods, sleepHours, requests, groupInvites, received, modules } = useStore();
   const [marking, setMarking] = useState<string | null>(null);
   const { items: withLogs, percents, overall, week } = useReading();
   const { update, unseen: bellCount } = useBells();
@@ -126,7 +126,7 @@ export default function Home() {
             <PageHeader
               sticker={timeSticker(hour)}
               wash={color.decor.lemon}
-              eyebrow={`Week ${WEEK_NUMBER}`}
+              eyebrow={weekWord(modules, today, formatShort(today))}
               title={greeting(hour)}
             />
           </View>

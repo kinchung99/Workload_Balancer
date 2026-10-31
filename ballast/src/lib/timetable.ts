@@ -115,6 +115,34 @@ export function moduleTerm(module: Module, today: string): { week: number; weeks
 }
 
 /**
+ * Where the term is, from the student's own modules: the teaching week most
+ * of them agree on. Null with no module that knows its length - then the
+ * screens say the date instead of inventing a week.
+ */
+export function termOf(modules: Module[], today: string): { week: number; weeks: number } | null {
+  const terms = modules.map((module) => moduleTerm(module, today)).filter((term): term is { week: number; weeks: number } => !!term);
+  if (!terms.length) return null;
+  const count = new Map<number, number>();
+  for (const term of terms) count.set(term.week, (count.get(term.week) ?? 0) + 1);
+  const week = [...count.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
+  return { week, weeks: Math.max(...terms.map((term) => term.weeks)) };
+}
+
+/** "Week 10" on Home - or the date, when no module says which week it is. */
+export const weekWord = (modules: Module[], today: string, fallback: string): string => {
+  const term = termOf(modules, today);
+  return term ? `Week ${term.week}` : fallback;
+};
+
+/** "Week 10 to 12" over the fortnight Plan shows, never past the end of term. */
+export const fortnightWord = (modules: Module[], today: string, fallback: string): string => {
+  const term = termOf(modules, today);
+  if (!term) return fallback;
+  const last = Math.min(term.week + 2, term.weeks);
+  return last > term.week ? `Week ${term.week} to ${last}` : `Week ${term.week}`;
+};
+
+/**
  * The best attendance still possible: every class left signed into.
  *
  * Classes left are this week's not yet marked, plus the same number of classes

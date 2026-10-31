@@ -87,6 +87,7 @@ export function NoteCard() {
               key={option}
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
+              aria-checked={!!(on)}
               accessibilityLabel={`Feeling ${option}`}
               onPress={() => { tapFeedback(); setEmoji(on ? null : option); setShared(false); }}
               className="items-center justify-center active:opacity-60"

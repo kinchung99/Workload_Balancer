@@ -245,6 +245,16 @@ export const shortTitle = (title: string): string => {
 };
 
 /**
+ * Whether a block's time is any use to a row on the list: coursework has to be
+ * done before its deadline, so only a slot before that day counts; a task can
+ * be done on its own day or earlier.
+ */
+export const dueAfter = (row: Ranked, block: Pick<Item, 'date'>): boolean => {
+  const due = row.item.deadline ?? row.item.date;
+  return row.kind === 'owing' ? block.date < due : row.kind === 'loose' ? block.date <= due : false;
+};
+
+/**
  * Which thing on the list could use a block's time.
  *
  * In list order, the first that still needs time, is not due before the block
@@ -256,9 +266,8 @@ function takerFor(block: Item, first: Ranked[], items: Item[], taken: Set<string
   // Something not yet offered a slot goes first, so the suggestions spread across the list.
   const order = [...first.filter((row) => !taken.has(row.item.id)), ...first.filter((row) => taken.has(row.item.id))];
   for (const row of order) {
-    const due = row.item.deadline ?? row.item.date;
+    if (!dueAfter(row, block)) continue;
     if (row.kind === 'owing') {
-      if (block.date >= due) continue;
       const need = row.need ?? 0;
       if (need > 0) return { id: row.item.id, title: row.item.title, hours: Math.min(block.hours, need) };
       // All of it booked: a sitting later than this block could be brought forward into it.
@@ -266,7 +275,7 @@ function takerFor(block: Item, first: Ranked[], items: Item[], taken: Set<string
       if (later) return { id: row.item.id, title: row.item.title, hours: Math.min(block.hours, later.hours) };
       continue;
     }
-    if (row.kind === 'loose' && row.item.hours <= block.hours + 0.01 && block.date <= due) {
+    if (row.kind === 'loose' && row.item.hours <= block.hours + 0.01) {
       return { id: row.item.id, title: row.item.title, hours: row.item.hours };
     }
   }

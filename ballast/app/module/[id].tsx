@@ -82,6 +82,7 @@ export default function ModuleSettings() {
                 key={emoji}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: on }}
+                aria-checked={!!(on)}
                 accessibilityLabel={`Picture ${emoji}`}
                 onPress={() => { tapFeedback(); updateModule(module.id, { emoji }); }}
                 className="items-center justify-center rounded-pill active:opacity-60"
@@ -136,6 +137,7 @@ export default function ModuleSettings() {
                   key={level}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: module.importance === level }}
+                  aria-checked={!!(module.importance === level)}
                   accessibilityLabel={IMPORTANCE[level - 1]}
                   onPress={() => { tapFeedback(); setModuleImportance(module.id, level); }}
                   className="min-h-min min-w-min items-center justify-center active:opacity-60"

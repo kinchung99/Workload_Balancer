@@ -48,9 +48,10 @@ export function buildTrades(week: Item[]): Trade[] {
     });
   }
 
-  // Push the self-imposed thing you will mind least losing this week.
+  // Push the self-imposed thing you will mind least losing this week - one big
+  // enough to feel: an hour of notes moves the battery by less than it shows.
   const pushable = week
-    .filter((i) => i.commitment === 'self' && !i.repeats && !i.isRecovery && i.bucket === 'mental')
+    .filter((i) => i.commitment === 'self' && !i.repeats && !i.isRecovery && i.bucket === 'mental' && loadOf(i) >= WORTH_A_MESSAGE)
     .sort((a, b) => a.dread - b.dread || loadOf(a) - loadOf(b))[0];
   if (pushable) {
     trades.push({

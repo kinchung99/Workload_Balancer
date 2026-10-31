@@ -240,6 +240,7 @@ function Kind({ on, emoji, title, sub, onPress }: { on: boolean; emoji: string; 
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected: on }}
+      aria-checked={!!(on)}
       accessibilityLabel={title}
       onPress={onPress}
       className={`min-h-row flex-1 items-center gap-1 rounded-xl border-2 px-3 py-4 active:opacity-70 ${on ? 'border-inverse bg-inverse' : 'border-line-hairline bg-raised'}`}

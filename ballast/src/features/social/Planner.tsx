@@ -76,14 +76,20 @@ export function Planner({
   const [making, setMaking] = useState(false);
 
   const [choice, setChoice] = useState<PlanBlock | null>(null);
-  const [week, setWeek] = useState(0);
+  // Null until a week is tapped: then the page opens on the first week anyone can make.
+  const [weekPick, setWeek] = useState<number | null>(null);
   const [sent, setSent] = useState<{ title: string; count: number } | null>(null);
   const [failed, setFailed] = useState(false);
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(today, week * 7 + i)), [today, week]);
-  // The week as blocks the length of the plan: green for everyone, blue for some.
-  const blocks = useMemo(() => planBlocks(items, chosen, days, plan.hours), [items, chosen, days, plan]);
-  const forEveryone = blocks.filter((block) => block.everyone).length;
+  // Both weeks as blocks the length of the plan: green for everyone, blue for some.
+  const weeks = useMemo(() => [0, 1].map((w) => {
+    const days = Array.from({ length: 7 }, (_, i) => addDays(today, w * 7 + i));
+    const blocks = planBlocks(items, chosen, days, plan.hours);
+    return { days, blocks, everyone: blocks.filter((block) => block.everyone).length };
+  }), [items, chosen, today, plan]);
+  // Nothing works for everyone this week but something does next week: start there.
+  const week = weekPick ?? (weeks[0].everyone === 0 && weeks[1].everyone > 0 ? 1 : 0);
+  const { days, blocks, everyone: forEveryone } = weeks[week];
 
   const reset = () => { setChoice(null); setSent(null); };
 
@@ -139,10 +145,11 @@ export function Planner({
                 key={person.id}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
+                aria-checked={!!(on)}
                 accessibilityLabel={`${person.name}, ${person.charge}% battery. ${on ? 'Invited' : 'Not invited'}`}
                 onPress={() => toggle(person.id)}
-                className={`items-center gap-1 rounded-lg border-2 px-2 py-3 active:opacity-70 ${on ? 'border-inverse bg-raised' : 'border-line-hairline bg-raised'}`}
-                style={{ width: '31%', opacity: on ? 1 : 0.55 }}
+                className={`items-center gap-1 rounded-lg border-2 px-2 py-3 active:opacity-70 ${on ? 'border-inverse bg-raised' : 'border-line-hairline bg-sunken'}`}
+                style={{ width: '31%' }}
               >
                 <Avatar initials={person.initials} band={person.band} size={42} pic={person.pic} />
                 <Text variant="caption" weight="semibold">{person.name}</Text>
@@ -151,7 +158,7 @@ export function Planner({
                   className="absolute items-center justify-center rounded-pill"
                   style={{
                     top: 6, right: 6, width: 20, height: 20,
-                    backgroundColor: on ? color.surface.inverse : color.surface.sunken,
+                    backgroundColor: on ? color.surface.inverse : color.surface.raised,
                   }}
                 >
                   <Text variant="micro" tone={on ? 'inverse' : 'subtle'}>{on ? '✓' : '＋'}</Text>
@@ -350,6 +357,7 @@ function WeekBlocks({
                     key={block.start}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on }}
+                    aria-checked={!!(on)}
                     accessibilityLabel={`${formatShort(date)} ${formatHour(block.start)} to ${formatHour(block.end)}, ${block.everyone ? 'everyone free' : `${block.who.join(', ')} free`}`}
                     onPress={() => onPick(block)}
                     className="items-center justify-center active:opacity-70"
@@ -413,6 +421,7 @@ function ActivityMaker({
             key={option}
             accessibilityRole="radio"
             accessibilityState={{ selected: option === emoji }}
+            aria-checked={!!(option === emoji)}
             accessibilityLabel={`Activity picture ${option}`}
             onPress={() => { tapFeedback(); setEmoji(option); }}
             className="items-center justify-center rounded-md active:opacity-60"

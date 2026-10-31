@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Bar, Screen, Stack, Text } from '@/components';
-import { formatLong } from '@/lib/dates';
+import { formatLong, formatShort } from '@/lib/dates';
 import { bandFor } from '@/lib/load';
 import { CHARGE_LABEL, chargeOf } from '@/lib/battery';
 import { itemsOnDay, liveCeiling, useStore, weekReading } from '@/state/store';
 import { useReading } from '@/state/selectors';
-import { WEEK_NUMBER } from '@/data/seed';
+import { weekWord } from '@/lib/timetable';
 import { addDays } from '@/lib/dates';
 
 const FELT = ['Fine', 'Meh', 'Hard'] as const;
@@ -23,7 +23,7 @@ const FELT = ['Fine', 'Meh', 'Hard'] as const;
  * notification.
  */
 export default function Widget() {
-  const { items, ceilings, today, reportDay, dayReports, overallCeiling } = useStore();
+  const { items, ceilings, today, reportDay, dayReports, overallCeiling, modules } = useStore();
   const { overall } = useReading();
   const [answered, setAnswered] = useState<(typeof FELT)[number] | null>(null);
   const band = bandFor(overall);
@@ -49,7 +49,7 @@ export default function Widget() {
           <Stack gap={4}>
             <Stack direction="row" justify="between" align="center">
               <Text variant="caption" tone="nightMuted">Ballast</Text>
-              <Text variant="caption" tone="nightMuted">week {WEEK_NUMBER}</Text>
+              <Text variant="caption" tone="nightMuted">{weekWord(modules, today, formatShort(today))}</Text>
             </Stack>
             <Stack direction="row" gap={4} align="center">
               <Text variant="display" tone="heavy">{chargeOf(overall)}%</Text>

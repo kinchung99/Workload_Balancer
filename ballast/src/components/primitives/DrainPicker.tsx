@@ -85,6 +85,7 @@ export function DrainPicker({
               key={level}
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
+              aria-checked={!!(on)}
               accessibilityLabel={`${DRAIN[level].word}, ${DRAIN[level].like}${costs ? `. Costs ${costLabel(costs[level])} ${costOf}` : ''}`}
               onPress={() => { tapFeedback(); onChange(level); }}
               className="min-h-min items-center gap-1 active:opacity-70"

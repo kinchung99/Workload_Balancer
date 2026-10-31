@@ -122,6 +122,7 @@ export default function CalendarPage() {
                     key={cal.id}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: cal.on }}
+                    aria-checked={!!(cal.on)}
                     accessibilityLabel={cal.name}
                     onPress={() => {
                       tapFeedback();

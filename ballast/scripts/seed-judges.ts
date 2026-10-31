@@ -9,7 +9,8 @@
  * with deadlines and hours of work, shifts, plans and a few moods - and days
  * that look like Klang Valley: roti canai, futsal, the pasar malam, teh tarik. Their weeks
  * are built around *today*, so run this again whenever the dates go stale.
- * Rebuilding deletes the five accounts first (needs server/.env DATABASE_URL),
+ * Rebuilding deletes the five accounts first (needs DATABASE_URL, from the
+ * environment or server/.env),
  * which also undoes anything the judges changed.
  *
  * Between them they show every social state: everyone is friends; one group
@@ -26,6 +27,7 @@ import { chargeOf } from '@/lib/battery';
 import { published, DEFAULT_SHARE_RULES } from '@/lib/sharing';
 import type { Item, Module, MoodCheckIn, RecoveryEntry, SessionKind } from '@/lib/types';
 import { bookSittings, fillDays, type Filler } from '@/data/dayFiller';
+import { isMarkable } from '@/lib/marking';
 
 const API = process.env.API ?? 'https://ballast-ckc3.vercel.app';
 const ORIGIN = 'https://load-balancer-ballast.expo.app';
@@ -38,6 +40,8 @@ const W0 = startOfWeek(TODAY);
 const at = (week: number, day: number) => addDays(W0, week * 7 + day);
 /** Week 10 of 12 right now, so "week 10 of 12" reads true on every module. */
 const TERM_START = addDays(W0, -63);
+/** How many weeks of classes and ordinary days each account gets, from this Monday. */
+const WEEKS = 6;
 
 /* ------------------------------------------------------- a day in Klang Valley */
 
@@ -358,8 +362,8 @@ const limitsOf = (p: Persona) =>
 function weekOf(p: Persona): { items: Item[]; modules: Module[]; moods: MoodCheckIn[] } {
   const modules: Module[] = p.modules.map((m) => ({ ...m, weeks: 12, startDate: TERM_START }));
   const items: Item[] = [];
-  // Classes for this week and the next three - so the app is full however long judging takes.
-  for (let week = 0; week < 4; week += 1) {
+  // Classes for this week and the next five - so the app is full however long judging takes.
+  for (let week = 0; week < WEEKS; week += 1) {
     for (const c of p.classes) {
       const module = modules.find((m) => m.id === c.module)!;
       const slot: ClassSlot = { day: c.day, startHour: c.start, hours: c.hours, kind: c.kind, room: c.room };
@@ -374,7 +378,7 @@ function weekOf(p: Persona): { items: Item[]; modules: Module[]; moods: MoodChec
   });
   // Every day lived in: a few of the ordinary things around the classes, and
   // study sessions booked for each piece of work - how a planned week looks.
-  const days = Array.from({ length: 28 }, (_, i) => addDays(W0, i));
+  const days = Array.from({ length: WEEKS * 7 }, (_, i) => addDays(W0, i));
   // Tuesday and Thursday evenings stay clear of the filler and the study
   // sessions, for everyone - so friends planning together find real evenings
   // when they are all free, the way a group of friends would keep one.
@@ -383,6 +387,10 @@ function weekOf(p: Persona): { items: Item[]; modules: Module[]; moods: MoodChec
   }) as Item);
   items.push(...fillDays([...items, ...kept], days, p.key, KL_DAY));
   items.push(...bookSittings([...items, ...kept], TODAY, now.getHours() + now.getMinutes() / 60, p.key));
+  // A student who keeps up: everything before yesterday is already answered. Yesterday's
+  // stays open, so the morning-after guesses ("to confirm") still have something to show.
+  const answered = addDays(TODAY, -1);
+  for (const item of items) if (item.date < answered && isMarkable(item) && !item.parentId) item.outcome = 'done';
   const moods: MoodCheckIn[] = p.moods.map((m, i) => ({
     id: `${p.key}-mood-${i}`, date: addDays(TODAY, -m.daysAgo), at: `${m.daysAgo === 1 ? 'Yesterday' : `${m.daysAgo} days ago`} 9:00 PM`,
     quadrant: m.quadrant, tags: m.tags,
@@ -409,9 +417,10 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
 
 /** Delete the five accounts (and so everything they made) straight from the database. */
 async function wipe(): Promise<void> {
-  const env = readFileSync(join(process.cwd(), '..', 'server', '.env'), 'utf8');
-  const url = env.match(/^DATABASE_URL=(.+)$/m)?.[1]?.trim();
-  if (!url) throw new Error('server/.env has no DATABASE_URL');
+  // From the environment in CI (the judges workflow), from server/.env on a laptop.
+  const url = process.env.DATABASE_URL
+    ?? readFileSync(join(process.cwd(), '..', 'server', '.env'), 'utf8').match(/^DATABASE_URL=(.+)$/m)?.[1]?.trim();
+  if (!url) throw new Error('No DATABASE_URL in the environment or server/.env');
   const { neon } = await import('@neondatabase/serverless');
   const sql = neon(url);
   const emails = PEOPLE.map((p) => p.email);

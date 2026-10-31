@@ -98,7 +98,7 @@
   <g font-size="12.5" fill="#FFFFFF">
     <rect x="62" y="630" width="250" height="50" rx="10" fill="#2B7A5E"/>
     <text x="76" y="651" font-weight="700">checks · every push</text>
-    <text x="76" y="669" fill="#DDEFE6">1,100+ checks · app and API</text>
+    <text x="76" y="669" fill="#DDEFE6">1,200+ checks · app and API</text>
     <rect x="336" y="630" width="250" height="50" rx="10" fill="#2C5C8F"/>
     <text x="350" y="651" font-weight="700">deploy · after checks pass</text>
     <text x="350" y="669" fill="#DCE8F5">API → Vercel · app → Expo hosting ×3</text>

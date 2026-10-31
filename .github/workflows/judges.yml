@@ -1,0 +1,50 @@
+# The five judge accounts, rebuilt around the current week.
+#
+# Their weeks are real dates, so they go stale as the days pass. This rebuilds
+# all five every Monday at 03:00 Malaysia time, and on demand (Actions → judges
+# → Run workflow) - exactly what `npm --prefix ballast run judges:seed` does on
+# a laptop, which also undoes anything changed in them.
+#
+# Needs one repository secret, DATABASE_URL (the Neon connection string in
+# server/.env). Without it the run skips itself with a note.
+name: judges
+
+on:
+  schedule:
+    - cron: '0 19 * * 0'   # Sunday 19:00 UTC = Monday 03:00 MYT
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: judges
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: rebuild judge accounts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # The weeks are built around today in Malaysia, not in UTC.
+      TZ: Asia/Kuala_Lumpur
+    steps:
+      - name: Skip without the database secret
+        if: env.DATABASE_URL == ''
+        run: echo "::notice::DATABASE_URL is not set - judge accounts not rebuilt."
+      - uses: actions/checkout@v4
+        if: env.DATABASE_URL != ''
+      - uses: actions/setup-node@v4
+        if: env.DATABASE_URL != ''
+        with:
+          node-version: 24
+      - name: Install
+        if: env.DATABASE_URL != ''
+        run: |
+          npm ci
+          npm ci --prefix ballast
+      - name: Rebuild the five accounts
+        if: env.DATABASE_URL != ''
+        run: npm --prefix ballast run judges:seed

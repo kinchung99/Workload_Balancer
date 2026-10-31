@@ -2,6 +2,32 @@
 
 All notable changes to Ballast. Dates are when the change went live.
 
+## v1.1.0 · 2026-10-31 · Final deployment
+
+**Fixes**
+- Nothing is lost to a reload or a closed tab: edits not yet sent are kept on the device for each account and go first on the next open, and closing a page sends them at once.
+- Home, Plan and the widget show the student's own teaching week, worked out from their modules (or the date when there are none), instead of always "Week 10".
+- The wall is named by the calendar ("Wednesday to Friday **next** week" on a Saturday), and **Lighten** works on the week the wall is actually in, offering only what is still ahead.
+- **Move it** offers only work due *after* the slot, so coursework is never moved past its deadline.
+- Recovery: the preview shows what booking gives back (it said "No change"), and the suggested time is never one that has already passed.
+- Typed capture keeps the title clean: "Return library books tomorrow 1h" becomes *Return library books*, tomorrow, 1h.
+- Lighten never offers a push too small to feel (under 6 load).
+- Accessibility back to 100 on every page tested: each checkbox, radio and switch now announces whether it's on (it was silent when off), and nothing fades text below AA contrast (plan-together faces, Lighten's *before* gauge, the swap card).
+
+**Product**
+- **Plan together** opens on next week when nothing suits everyone this week.
+- A day's untimed things are shown open when there are only a few.
+- Lighten's cards show how important each thing is, replacing the old "want to be there" chip.
+
+**Judge accounts and operations**
+- Rebuilt around the current week, with six weeks of classes, and everything before yesterday already answered - no pile of thirty guesses to confirm.
+- `judges` workflow: rebuilds the five accounts every Monday at 03:00 Malaysia time, and on demand (needs a `DATABASE_URL` repository secret).
+- Every screen crawled as all five accounts, and the cross-account journeys driven end to end: 0 script errors, 0 failed requests.
+
+**Documentation**
+- README organised around the problem statement and the judging criteria: the problem and how each feature answers it, accounts, a tour, the guide, reliability, architecture.
+- `ballast/README.md` is now a concise developer guide (architecture, the model in one page, verification); the design journal moved to `docs/engineering-notes.md`.
+
 ## v1.0.0 · 2026-10-13 · Final submission
 
 **Reliability and operations**

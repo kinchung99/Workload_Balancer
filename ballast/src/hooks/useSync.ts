@@ -10,7 +10,8 @@
  * background chore that either happens or does not.
  */
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SyncDoc } from '@shared/contract';
 import { api, hasServer } from '@/lib/api';
 import { bandFor } from '@/lib/load';
@@ -27,6 +28,28 @@ import { applyInvites } from '@/lib/social';
 
 /** How often to look for other people's changes when nothing of ours moved. */
 const PULL_EVERY_MS = 60_000;
+
+/*
+ * Edits not on the server yet, kept on the device for each account.
+ *
+ * A push waits a moment so a burst of taps goes up as one, and a signed-in week
+ * is not saved on the device - so a tab closed or reloaded in that moment used
+ * to lose the last thing done. Now the queue is written down as it changes and
+ * goes up first the next time this account opens here.
+ */
+const pendingKey = (accountId: string) => `ballast/pending/${accountId}`;
+function savePending(accountId: string, queue: Record<string, SyncDoc>): void {
+  const key = pendingKey(accountId);
+  const write = Object.keys(queue).length ? AsyncStorage.setItem(key, JSON.stringify(queue)) : AsyncStorage.removeItem(key);
+  void write.catch(() => { /* storage full or blocked: the push itself still runs */ });
+}
+async function loadPending(accountId: string): Promise<Record<string, SyncDoc>> {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(pendingKey(accountId))) ?? '{}') as Record<string, SyncDoc>;
+  } catch {
+    return {};
+  }
+}
 
 export function useSync(): void {
   const lastSnapshot = useRef<Snapshot | null>(null);
@@ -78,6 +101,7 @@ export function useSync(): void {
       queue.current = Object.fromEntries(
         Object.entries(queue.current).filter(([k]) => !sent.has(k)),
       );
+      savePending(state.account.id, queue.current);
 
       if (res.data.changes.length) {
         const { upserts, deletes } = applyPull(res.data.changes);
@@ -143,7 +167,14 @@ export function useSync(): void {
         lastSnapshot.current = next;
         queue.current = {};
         cursor.current = null;
-        schedule(0);
+        const accountId = state.account?.id;
+        // Whatever this device had not sent last time goes up first, with its own times.
+        if (accountId) {
+          void loadPending(accountId).then((saved) => {
+            queue.current = { ...saved, ...queue.current };
+            schedule(0);
+          });
+        } else schedule(0);
         return;
       }
       if (lastSnapshot.current) {
@@ -153,15 +184,33 @@ export function useSync(): void {
         }
       }
       lastSnapshot.current = next;
-      if (Object.keys(queue.current).length) schedule(DEBOUNCE_MS);
+      if (Object.keys(queue.current).length) {
+        if (state.account) savePending(state.account.id, queue.current);
+        schedule(DEBOUNCE_MS);
+      }
     };
 
     lastSnapshot.current = snapshotOf(useStore.getState());
     const unsubscribe = useStore.subscribe(onStoreChange);
 
+    /*
+     * Leaving - switching away, a reload, a closed tab: push what is queued now,
+     * with a request that outlives the page. The copy on the device covers the
+     * case where even that does not arrive.
+     */
+    const flush = () => {
+      const state = useStore.getState();
+      const sending = Object.values(queue.current);
+      if (state.mode !== 'live' || !state.account || !sending.length) return;
+      void api.sync(cursor.current, sending, { keepalive: true });
+    };
+    const onPageHide = () => flush();
+    if (Platform.OS === 'web') globalThis.addEventListener?.('pagehide', onPageHide);
+
     // Coming back to the app is the moment a friend's reading is most stale.
     const app = AppState.addEventListener('change', (status) => {
       if (status === 'active') schedule(0);
+      else flush();
     });
 
     const poll = setInterval(() => schedule(0), PULL_EVERY_MS);
@@ -170,6 +219,7 @@ export function useSync(): void {
     return () => {
       unsubscribe();
       app.remove();
+      if (Platform.OS === 'web') globalThis.removeEventListener?.('pagehide', onPageHide);
       clearInterval(poll);
       if (timer.current) clearTimeout(timer.current);
     };

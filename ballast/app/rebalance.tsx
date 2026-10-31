@@ -9,8 +9,8 @@ import { SCREEN } from '@design/screens';
 import { bandFor, capacityOf, loadOf } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
 import { askFor, buildTrades } from '@/lib/rebalance';
-import { CLUSTER_MIN_ITEMS, clusterCount, findCollision } from '@/lib/forecast';
-import { DAY_LETTER, dayIndex, formatShort } from '@/lib/dates';
+import { CLUSTER_MIN_ITEMS, clusterCount, findCollision, weekOf } from '@/lib/forecast';
+import { DAY_LETTER, dayIndex, formatShort, startOfWeek } from '@/lib/dates';
 import { formatHour, weekDays } from '@/lib/schedule';
 import { SPEND, spendKey } from '@/lib/breakdown';
 import { itemsInWeek, nextWeek, useStore, weekReading } from '@/state/store';
@@ -23,14 +23,17 @@ import { rebalanceContext } from '@/lib/coach';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
 import { useAiAnswer } from '@/lib/ai';
 import type { Item, Trade } from '@/lib/types';
+import { IMPORTANCE_LEVELS, importanceOf } from '@/lib/importance';
 
 const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
 
 
 /**
- * Lighten next week - trading, not deleting, and never in bulk.
+ * Lighten the week with the wall in it - trading, not deleting, and never in bulk.
  *
- * One picture first: next week's battery before, and now, with the seven days
+ * The week is the one the forecast warned about (this week, next, or the one
+ * after), or next week when there is no wall. One picture first: that week's
+ * battery before, and now, with the seven days
  * underneath showing which ones got lighter. Then the things you could put
  * down, one at a time: what it is, what it gives back, who should hear first.
  * Write to them, put it down (after one step that says what will happen), or
@@ -42,24 +45,26 @@ export default function Rebalance() {
   const withLogs = useItemsWithLogs();
   const capacity = capacityOf(ceilings);
   const pct = (load: number) => (load / capacity) * 100;
-  const anchor = nextWeek(today);
-  const days = weekDays(anchor);
-
   /*
    * The week as it was when you opened this, and the trades priced from it.
    * Held still while you decide: each one taken changes the week underneath,
    * but the list you are working through should not reshuffle under your thumb.
    */
   const live = useMemo(() => {
+    const wall = findCollision(items, today);
+    // The wall's own week, so "Lighten" on a Monday works on this week's Wednesday.
+    const anchor = wall ? startOfWeek(wall.from) : nextWeek(today);
     const week = itemsInWeek(countedOnce(items), anchor);
     return {
+      anchor,
       week,
-      trades: buildTrades(week),
+      // Only what is still ahead can be put down.
+      trades: buildTrades(week.filter((item) => item.date >= today)),
       byId: Object.fromEntries(items.map((item) => [item.id, item])) as Record<string, Item>,
       overall: weekReading(items, anchor, ceilings).overall,
-      wall: findCollision(items, today),
+      wall,
     };
-  }, [items, anchor, ceilings, today]);
+  }, [items, ceilings, today]);
   // Follows the week until the first answer (a signed-in week can arrive a beat
   // after the page), then holds still while you work through the list.
   const [frozen, setFrozen] = useState<typeof live | null>(null);
@@ -68,6 +73,10 @@ export default function Rebalance() {
   const open = start.trades.filter((t) => !t.locked);
   const locked = start.trades.filter((t) => t.locked);
   const itemOf = (trade: Trade): Item | undefined => start.byId[trade.itemId.split(',')[0]];
+  // Held with the rest, so taking things off never moves the page to another week.
+  const anchor = start.anchor;
+  const days = useMemo(() => weekDays(anchor), [anchor]);
+  const which = weekOf(anchor, today);
 
   /** What you said to each: put down, or kept. And who you already wrote to. */
   const [decided, setDecided] = useState<Record<string, 'down' | 'kept'>>({});
@@ -152,8 +161,8 @@ export default function Rebalance() {
       <Stack gap={5} className="pt-2">
         <PageHeader
           {...SCREEN.rebalance}
-          eyebrow="Next week"
-          title="Lighten next week"
+          eyebrow={which.charAt(0).toUpperCase() + which.slice(1)}
+          title={`Lighten ${which}`}
           sub={advice ? `✨ ${advice.headline}` : undefined}
         />
 
@@ -228,6 +237,7 @@ export default function Rebalance() {
               trade={current}
               item={itemOf(current)}
               percent={pct(current.saves)}
+              which={which}
               suggest={pick(current.id)}
               wrote={!!wrote[current.id]}
               confirming={confirming}
@@ -283,10 +293,13 @@ export default function Rebalance() {
 /** One battery, a word over it and its number under it. */
 function Gauge({ label, charge, overall, faded = false }: { label: string; charge: number; overall: number; faded?: boolean }) {
   return (
-    <Stack gap={1} align="center" style={{ opacity: faded ? 0.55 : 1 }}>
-      <Text variant="micro" tone="subtle">{label}</Text>
-      <Battery charge={charge} loadPercent={overall} width={92} height={46} label={`${label.toLowerCase()} ${charge} percent`} />
-      <Text variant="title" tone={TONE[bandFor(overall)]}>{charge}%</Text>
+    <Stack gap={1} align="center">
+      <Text variant="micro" tone="muted">{label}</Text>
+      {/* Before is faded as a picture only: its number stays readable. */}
+      <View style={{ opacity: faded ? 0.5 : 1 }}>
+        <Battery charge={charge} loadPercent={overall} width={92} height={46} label={`${label.toLowerCase()} ${charge} percent`} />
+      </View>
+      <Text variant="title" tone={faded ? 'muted' : TONE[bandFor(overall)]}>{charge}%</Text>
     </Stack>
   );
 }
@@ -324,9 +337,9 @@ function WeekBars({ days, now, next }: { days: string[]; now: Record<string, num
  * has been told, when it leaves, what comes back - so nothing goes on a tap.
  */
 function Decision({
-  trade, item, percent, suggest, wrote, confirming, onWrite, onAsk, onBack, onDown, onKeep,
+  trade, item, percent, which, suggest, wrote, confirming, onWrite, onAsk, onBack, onDown, onKeep,
 }: {
-  trade: Trade; item?: Item; percent: number; suggest?: { why: string; take?: boolean }; wrote: boolean; confirming: boolean;
+  trade: Trade; item?: Item; percent: number; which: string; suggest?: { why: string; take?: boolean }; wrote: boolean; confirming: boolean;
   onWrite: () => void; onAsk: () => void; onBack: () => void; onDown: () => void; onKeep: () => void;
 }) {
   const ask = askFor(trade, item);
@@ -361,7 +374,10 @@ function Decision({
       <Stack direction="row" gap={2} wrap>
         {item ? <Chip label={`${{ fixed: '📌 Fixed', hard: '🔒 Hard', soft: '↔️ Can move', self: '🙋 Your own goal' }[item.commitment]}`} readOnly /> : null}
         {shouldTell ? <Chip label={`✉️ ${ask.tell} should hear first`} tone="busy" readOnly /> : null}
-        {item?.want ? <Chip label={item.want >= 4 ? '💛 You want to be there' : item.want <= 2 ? '🤷 You don’t mind missing it' : '😐 Either way'} readOnly /> : null}
+        {item ? (() => {
+          const level = IMPORTANCE_LEVELS.find((entry) => entry.value === importanceOf(item));
+          return level ? <Chip label={`${level.emoji} ${level.word}`} readOnly /> : null;
+        })() : null}
         {suggest ? <Chip label={suggest.take ? '✨ Worth putting down' : '✨ Worth keeping'} tone={suggest.take ? 'steady' : 'plain'} readOnly /> : null}
       </Stack>
       {suggest?.why ? <Text variant="footnote" tone="muted">✨ {suggest.why}</Text> : null}
@@ -391,7 +407,7 @@ function Decision({
           <Stack direction="row" gap={3} align="center">
             <Text variant="callout">{costs ? '🌿' : '⚡'}</Text>
             <Text variant="callout" weight="semibold" tone={costs ? 'heavy' : 'steady'} className="flex-1">
-              {costs ? `Costs ${back.slice(3)} of next week` : `${back.slice(3)} back next week`}
+              {costs ? `Costs ${back.slice(3)} of ${which}` : `${back.slice(3)} back ${which}`}
             </Text>
           </Stack>
           <Stack direction="row" gap={2}>

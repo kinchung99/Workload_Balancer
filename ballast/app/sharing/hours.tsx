@@ -132,6 +132,7 @@ export default function ShareHours() {
                   key={ahead}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: rules.ahead === ahead }}
+                  aria-checked={!!(rules.ahead === ahead)}
                   onPress={() => { tapFeedback(); edit(() => setShareRules({ ahead })); }}
                   className={`min-h-min flex-1 items-center justify-center rounded-md border-2 py-3 ${rules.ahead === ahead ? 'border-inverse bg-decor-cream' : 'border-line-hairline'}`}
                 >

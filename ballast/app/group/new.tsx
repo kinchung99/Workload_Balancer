@@ -71,6 +71,7 @@ export default function NewGroup() {
                 key={option}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: option === emoji }}
+                aria-checked={!!(option === emoji)}
                 accessibilityLabel={`Picture ${option}`}
                 onPress={() => { tapFeedback(); setEmoji(option); }}
                 className="items-center justify-center rounded-md active:opacity-60"

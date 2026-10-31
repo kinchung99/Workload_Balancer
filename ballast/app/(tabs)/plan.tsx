@@ -7,7 +7,7 @@ import {
 } from '@/components';
 import { threshold } from '@design/tokens';
 import { SCREEN } from '@design/screens';
-import { buildForecast, findCollision, leadLabel, speakForecast } from '@/lib/forecast';
+import { buildForecast, findCollision, leadLabel, speakForecast, weekOf } from '@/lib/forecast';
 import { bandFor, capacityOf, loadOf } from '@/lib/load';
 import { chargeOf } from '@/lib/battery';
 import { dayHours, endHour, formatHour, freeSlots, slotHours } from '@/lib/schedule';
@@ -16,7 +16,7 @@ import { successFeedback } from '@/lib/haptics';
 import { countedOnce, openPrep, remaining } from '@/lib/prep';
 import { nextWeek, useStore, weekReading } from '@/state/store';
 import { useItemsWithLogs, useReading } from '@/state/selectors';
-import { WEEK_NUMBER } from '@/data/seed';
+import { fortnightWord } from '@/lib/timetable';
 import { clockHour, toMark } from '@/lib/marking';
 import { MarkSheet } from '@/features/marking/MarkSheet';
 import { useCalendar } from '@/features/calendar/useCalendar';
@@ -35,7 +35,7 @@ const TONE = { steady: 'steady', busy: 'busy', heavy: 'heavy' } as const;
  */
 export default function Plan() {
   const router = useRouter();
-  const { ceilings, today, customFlags } = useStore();
+  const { ceilings, today, customFlags, modules } = useStore();
   const { calendar, picture, expired } = useCalendar();
   const items = useItemsWithLogs();
 
@@ -77,12 +77,12 @@ export default function Plan() {
   return (
     <Screen
       // Adding lives on Home and in the day's free gaps; this page's own button is the fix for a wall.
-      footer={collision ? <Button label="Rebalance next week" onPress={() => router.push('/rebalance')} /> : undefined}
+      footer={collision ? <Button label={`Rebalance ${weekOf(collision.from, today)}`} onPress={() => router.push('/rebalance')} /> : undefined}
     >
       <Stack gap={5} className="pt-4">
         <PageHeader
           {...SCREEN.plan}
-          eyebrow={`Week ${WEEK_NUMBER} to ${WEEK_NUMBER + 2}`}
+          eyebrow={fortnightWord(modules, today, `${formatShort(today)} to ${formatShort(addDays(today, 13))}`)}
           title={`Next ${threshold.forecastDays} days`}
         />
 
@@ -93,7 +93,7 @@ export default function Plan() {
           <Card gap={4} pad={1} className="py-4">
             <ForecastStrip
               days={marked}
-              spoken={speakForecast(marked, collision)}
+              spoken={speakForecast(marked, collision, today)}
               selected={selected}
               onSelect={setSelected}
             />

@@ -19,6 +19,7 @@ export function Checkbox({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
+      aria-checked={!!checked}
       accessibilityLabel={label}
       onPress={() => { tapFeedback(); onPress(); }}
       className="min-h-min justify-center active:opacity-70"

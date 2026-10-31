@@ -66,6 +66,7 @@ export default function Sharing() {
                 key={option.value}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: picked }}
+                aria-checked={!!(picked)}
                 accessibilityLabel={`${option.word}. ${option.note}`}
                 onPress={() => {
                   tapFeedback();

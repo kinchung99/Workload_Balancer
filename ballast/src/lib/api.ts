@@ -209,8 +209,9 @@ export const api = {
 
   /* ------------------------------------------------------------------ sync */
 
-  sync: (since: string | null, changes: SyncDoc[]) =>
-    post<SyncResponse>('/api/sync', { since, changes }),
+  sync: (since: string | null, changes: SyncDoc[], options: { keepalive?: boolean } = {}) =>
+    // keepalive: a push started as the page goes away still arrives.
+    request<SyncResponse>('/api/sync', { method: 'POST', body: JSON.stringify({ since, changes }), keepalive: options.keepalive }),
 
   exportAll: () => request<{ exportedAt: string; documents: SyncDoc[] }>('/api/sync/export'),
 

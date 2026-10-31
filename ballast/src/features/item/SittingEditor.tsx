@@ -162,6 +162,7 @@ export function SittingEditor({
                     key={date}
                     accessibilityRole="radio"
                     accessibilityState={{ selected, disabled: full }}
+                    aria-checked={!!selected}
                     accessibilityLabel={`${formatShort(date)}, uses ${load} percent${isDue ? ', due day' : late ? ', after it is due' : ''}${full ? ', no gap long enough' : ''}`}
                     disabled={full}
                     onPress={() => pickDay(date)}
@@ -247,6 +248,7 @@ export function SittingEditor({
                 key={hours}
                 accessibilityRole="radio"
                 accessibilityState={{ selected, disabled: !fits }}
+                aria-checked={!!selected}
                 accessibilityLabel={durationLabel(hours)}
                 disabled={!fits && !selected}
                 onPress={() => pickLength(hours)}

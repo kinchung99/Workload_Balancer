@@ -159,6 +159,7 @@ function PopupSwitch() {
     <Pressable
       accessibilityRole="switch"
       accessibilityState={{ checked: on }}
+      aria-checked={!!(on)}
       accessibilityLabel="Pop-ups for classes and tasks"
       disabled={on || permission === 'denied'}
       onPress={async () => {

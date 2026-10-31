@@ -186,10 +186,10 @@ const EXPECTATIONS = [
     'STEP 2 OF 2 \u00b7 WHEN',
     'When does it go?',
     'DAY \u00b7 HOW FULL EACH ONE IS', 'NEXT WEEK',   // recovery uses the same picker, two weeks ahead
-    'TIME \u00b7 DRAG TO MOVE', 'GAP 12pm\u20131pm',
+    'TIME \u00b7 DRAG TO MOVE', 'GAP 3pm\u20134pm',
     'Pick a slot',
-    'IF YOU BOOK IT', 'Where it lands', 'Today 12pm\u20131pm',   // battery and timeline before committing
-    'Book Today at 12pm',                     // defaults into the window a walk belongs in
+    'IF YOU BOOK IT', '+2% battery', 'Where it lands', 'Tomorrow 3pm\u20134pm',   // the same +2% as the idea, before committing
+    'Book Tomorrow at 3pm',                   // never a time already gone: at 2:30pm today is full, so tomorrow
   ]],
   ['decline/w11-birthday.html', 'Drafter', [
     'The app writes it. It never sends it.', "Aisyah's birthday dinner",
@@ -200,7 +200,7 @@ const EXPECTATIONS = [
     "Actually, I'm going", 'Open in WhatsApp',
   ]],
   ['message.html', 'Message', ['Write a message', 'Pick a friend or a plan first.']],
-  ['widget.html', 'Widget', ['Ballast', 'week 10', 'One thing today. The networks lab report', 'How was today?', '48%', 'Draining', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
+  ['widget.html', 'Widget', ['Ballast', 'Week 10', 'One thing today. The networks lab report', 'How was today?', '48%', 'Draining', 'Fine', 'Meh', 'Hard', 'That tap is the entire daily commitment']],
   ['timetable.html', 'Timetable · week', [
     'Week', 'Modules', 'Add',                 // three views of one screen, not a sequence
     'TIMETABLE', 'This week',
@@ -443,7 +443,7 @@ const EXPECTATIONS = [
     'MAKE ROOM', 'Swap this time',                       // give a movable block to something that matters more
     'Week 10 catch-up revision', 'back',                 // the block, and what it gives back
     'Pick',                                              // the first of three steps
-    'Use this time for\u2026', 'Emails I have been avoiding', 'gets',   // the same list as what to do first
+    'Use this time for\u2026', 'Chapter 9 reading', 'Group presentation',   // the same list, only what is due after this slot
     'Leave it empty \u00b7 just move it',
   ]],
 ];

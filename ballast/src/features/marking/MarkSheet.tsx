@@ -221,6 +221,7 @@ function Body({
                 key={level}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: chosen }}
+                aria-checked={!!(chosen)}
                 accessibilityLabel={DRAIN[level].word}
                 onPress={() => onDread(level)}
                 className="min-h-min items-center gap-1 active:opacity-60"
@@ -267,6 +268,7 @@ function Answer({ icon, label, chosen, tone, onPress }: {
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected: chosen }}
+      aria-checked={!!(chosen)}
       accessibilityLabel={label}
       onPress={onPress}
       className={`min-h-row flex-1 flex-row items-center justify-center gap-2 rounded-lg border-2 px-3 py-4 active:opacity-70 ${

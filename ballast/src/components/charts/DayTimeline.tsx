@@ -136,7 +136,8 @@ export function DayTimeline({
   capacity?: number;
 }) {
   const cost = (item: Item) => (capacity ? <CostChip percent={(loadOf(item) / capacity) * 100} /> : null);
-  const [trays, setTrays] = useState({ day: false, owing: false });
+  // The day's untimed things open by themselves while there are only a few; a tap decides after that.
+  const [trays, setTrays] = useState<{ day: boolean | null; owing: boolean }>({ day: null, owing: false });
   const { timed, anytime } = daySchedule(items, date);
   const gaps = showGaps ? freeSlots(items, date, 1) : [];
   const statusOf = (item: Item): MarkStatus | undefined => (clock ? markStatus(item, clock.today, clock.hour) : undefined);
@@ -299,8 +300,8 @@ export function DayTimeline({
               wash={color.decor.lemon}
               title="This day"
               meta={`${anytime.length} · no time yet`}
-              open={trays.day}
-              onToggle={() => setTrays({ ...trays, day: !trays.day })}
+              open={trays.day ?? anytime.length <= 3}
+              onToggle={() => setTrays({ ...trays, day: !(trays.day ?? anytime.length <= 3) })}
             >
               {anytime.map((item) => {
                 const status = statusOf(item);

@@ -125,6 +125,11 @@ export function titleFrom(text: string): string {
   const cleaned = head
     .replace(/\b(due|by|before)\b.*/i, '')
     .replace(/\b\d+(\.\d+)?\s*(h|hr|hrs|hour|hours|m|min|mins|minutes)\b/i, '')
+    // When it is, already read into the date chip: "tomorrow", "next week", "on Thursday".
+    .replace(/\b(today|tonight|tomorrow)\b/gi, '')
+    .replace(/\b(this|next) week\b/gi, '')
+    .replace(/\b(on |this |next )?(mon|tues?|wed(nes)?|thur?s?|fri|sat(ur)?|sun)(day)?\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
   const title = cleaned || head || 'Untitled';
   return title.charAt(0).toUpperCase() + title.slice(1);

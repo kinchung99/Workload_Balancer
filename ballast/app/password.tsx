@@ -105,6 +105,7 @@ export default function Password() {
             <Pressable
               accessibilityRole="switch"
               accessibilityState={{ checked: show }}
+              aria-checked={!!(show)}
               onPress={() => { tapFeedback(); setShow(!show); }}
               className="min-h-min justify-center self-start active:opacity-60"
             >

@@ -21,6 +21,7 @@ function Tile({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
+      aria-checked={!!selected}
       accessibilityLabel={label}
       onPress={() => { tapFeedback(); onPress(); }}
       className={`min-h-min flex-1 items-center gap-1 rounded-lg border-2 px-1 py-3 active:opacity-70 ${

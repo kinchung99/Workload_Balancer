@@ -146,6 +146,7 @@ export default function CalendarSetup() {
                   key={kind}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on }}
+                  aria-checked={!!(on)}
                   accessibilityLabel={KIND[kind].label}
                   onPress={() => pickKind(kind)}
                   className="items-center gap-1 rounded-lg border-2 px-1 py-3 active:opacity-70"

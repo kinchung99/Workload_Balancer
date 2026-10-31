@@ -93,9 +93,9 @@ function Side({ word, emoji, title, keep = false }: { word: string; emoji: strin
   return (
     <View
       className="flex-1 gap-1 rounded-lg px-3 py-3"
-      style={{ backgroundColor: color.surface.raised, borderWidth: 2, borderColor: keep ? color.band.recovery.fill : color.line.hairline, opacity: keep ? 1 : 0.75 }}
+      style={{ backgroundColor: keep ? color.surface.raised : color.surface.sunken, borderWidth: 2, borderColor: keep ? color.band.recovery.fill : color.line.hairline }}
     >
-      <Text variant="micro" tone={keep ? 'recovery' : 'subtle'}>{emoji} {word}</Text>
+      <Text variant="micro" tone={keep ? 'recovery' : 'muted'}>{emoji} {word}</Text>
       <Text variant="callout" weight="semibold" numberOfLines={3} className={keep ? '' : 'line-through'}>{title}</Text>
     </View>
   );

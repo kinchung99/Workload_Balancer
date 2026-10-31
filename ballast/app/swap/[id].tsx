@@ -8,7 +8,7 @@ import { sittingsOf } from '@/lib/prep';
 import type { Item } from '@/lib/types';
 import { formatHour } from '@/lib/schedule';
 import { batteryCost } from '@/lib/drain';
-import { prioritise, startLabel, type Ranked } from '@/lib/priority';
+import { dueAfter, prioritise, startLabel, type Ranked } from '@/lib/priority';
 import { clockHour } from '@/lib/marking';
 import { weightsFrom } from '@/lib/review';
 import { successFeedback, tapFeedback } from '@/lib/haptics';
@@ -84,7 +84,8 @@ export default function Swap() {
   // The one the priority page pointed at for this time comes first, marked.
   const taker = couldMove.find((row) => row.item.id === block.id)?.taker?.id;
   const options = first
-    .filter((row) => row.item.id !== block.id && give(row).label !== 'all done')
+    // Only what this time can still help: nothing due before the block happens.
+    .filter((row) => row.item.id !== block.id && dueAfter(row, slot) && give(row).label !== 'all done')
     .sort((a, b) => Number(b.item.id === taker) - Number(a.item.id === taker));
 
   const plan = () => {
@@ -144,7 +145,7 @@ export default function Swap() {
           <Stack gap={3}>
             <Text variant="heading">Use this time for…</Text>
             {!options.length ? (
-              <Text variant="footnote" tone="muted">Nothing is waiting for time - everything on your list is booked.</Text>
+              <Text variant="footnote" tone="muted">Nothing on your list can use this time - it’s all due before then, or booked.</Text>
             ) : null}
             {options.map((row, index) => {
               const share = give(row);

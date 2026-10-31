@@ -101,6 +101,7 @@ export function MoodTiles({
                 key={mood.id}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: on }}
+                aria-checked={!!(on)}
                 accessibilityLabel={mood.word}
                 onPress={() => { tapFeedback(); onPick(mood.id); }}
                 className="flex-1 items-center justify-center gap-1 active:opacity-70"
@@ -142,6 +143,7 @@ export function TileRow<T extends string | number>({
               key={String(option.id)}
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
+              aria-checked={!!(on)}
               accessibilityLabel={`${label} ${option.text}`}
               onPress={() => { tapFeedback(); onPick(option.id); }}
               className="flex-1 items-center gap-1 py-2 active:opacity-70"

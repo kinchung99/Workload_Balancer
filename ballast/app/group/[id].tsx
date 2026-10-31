@@ -102,6 +102,7 @@ export default function GroupPage() {
                     key={emoji}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: emoji === group.emoji }}
+                    aria-checked={!!(emoji === group.emoji)}
                     accessibilityLabel={`Picture ${emoji}`}
                     onPress={() => { tapFeedback(); void renameGroup(group.id, { emoji }); }}
                     className="items-center justify-center rounded-md active:opacity-60"

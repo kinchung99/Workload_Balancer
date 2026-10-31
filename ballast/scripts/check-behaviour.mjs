@@ -43,6 +43,7 @@ for (const [from, to] of [
   ['src/lib/swap.ts', 'swap.ts'],
   ['src/lib/importance.ts', 'importance.ts'],
   ['src/lib/replace.ts', 'replace.ts'],
+  ['src/lib/parser.ts', 'parser.ts'],
   ['src/lib/sharing.ts', 'sharing.ts'],
   ['src/lib/review.ts', 'review.ts'],
   ['src/lib/api.ts', 'api.ts'],
@@ -127,7 +128,7 @@ const { chargeOf } = await import(join(tmp, 'battery.ts'));
 const { daySchedule, freeSlots, overlap, startOptions, endHour, placeIn, sleepWindow, formatHour } = await import(join(tmp, 'schedule.ts'));
 const { categorise, errandLoad, outstandingLoad, openErrands } = await import(join(tmp, 'errands.ts'));
 const { buildTrades, totalSaved } = await import(join(tmp, 'rebalance.ts'));
-const { findCollision, clusterCount, CLUSTER_MIN_ITEMS } = await import(join(tmp, 'forecast.ts'));
+const { findCollision, clusterCount, CLUSTER_MIN_ITEMS, weekOf } = await import(join(tmp, 'forecast.ts'));
 const { countedOnce, openPrep, percentUndone, percentUnplanned, unplanned, scheduledHours, sittingsOf, remaining, planSessions, isAtRisk, loadOnDay } = await import(join(tmp, 'prep.ts'));
 const { dayFacts, whyThisDay, describeChange, durationLabel, nearestStart, nowHourFor } = await import(join(tmp, 'sittings.ts'));
 const { offlineIdeas, offlineDraft, offlineTweak, recipientOf, whatIsSent, TONES } = await import(join(tmp, 'compose.ts'));
@@ -140,7 +141,7 @@ const { CATALOGUE, rankRest, fromSeed, fromIdea, hoursFor } = await import(join(
 const { wireVisibility, DEFAULT_SHARE_RULES } = await import(join(tmp, 'sharing.ts'));
 const { MOMENT_KINDS, WHY_SUGGESTIONS, nextWorth, momentCredits } = await import(join(tmp, 'moments.ts'));
 const { parseTimetable, parseLine, toItems, classesOn, moduleWeek, attendanceRate, attendanceStatus, isProtectedClass } = await import(join(tmp, 'timetable.ts'));
-const { prioritise, rank, urgencyFactor, whyFirst, rowWeight, nextFit, weekAhead, hoursNeeded, startByFor, startWord, startLabel } = await import(join(tmp, 'priority.ts'));
+const { prioritise, rank, urgencyFactor, whyFirst, rowWeight, nextFit, weekAhead, hoursNeeded, startByFor, startWord, startLabel, dueAfter } = await import(join(tmp, 'priority.ts'));
 const { importanceOf, wantFor, IMPORTANCE_LEVELS } = await import(join(tmp, 'importance.ts'));
 const { isSwappable, swappableOn, withoutSwappable, displacedBy } = await import(join(tmp, 'replace.ts'));
 const { DRAIN, LEVELS, drainCosts, costLabel, withDrain, toggleArea, batteryCost } = await import(join(tmp, 'drain.ts'));
@@ -153,7 +154,7 @@ const { diff, mergeInto, snapshotOf } = await import(join(tmp, 'snapshot.ts'));
 const { addDays } = await import(join(tmp, 'dates.ts'));
 const { REST_LOAD_PER_HOUR, percentByBucket, overallPercent, overallOf, capacityOf, costPercent, loadOf, loadByBucket, mixShares, dreadFromMix, dominantArea, describeMix, notchAt, MIX_MAX } = await import(join(tmp, 'load.ts'));
 const { KIND, applyMark, autoMark, autoMarkedIn, canMark, clockHour, markKind, markStatus, outcomeWord, toMark } = await import(join(tmp, 'marking.ts'));
-const { moduleTerm, bestCase } = await import(join(tmp, 'timetable.ts'));
+const { moduleTerm, bestCase, termOf, weekWord, fortnightWord } = await import(join(tmp, 'timetable.ts'));
 const { moodEmoji } = await import(join(tmp, 'logs.ts'));
 const { demoBuild, guestAllowed } = await import(join(tmp, 'access.ts'));
 const { priorityContext, rebalanceContext } = await import(join(tmp, 'coach.ts'));
@@ -614,6 +615,12 @@ console.log('\nHow long a module runs');
   s().setModuleWeeks('os', 0);
   check('and never below one week', os().weeks, 1);
   s().reset();
+  check('the week on Home comes from the modules, not a constant', weekWord(s().modules, s().today, 'date'), 'Week 10');
+  check('and the fortnight on Plan stops at the end of term', fortnightWord(s().modules, s().today, 'dates'), 'Week 10 to 12');
+  check('two weeks later it has moved on', weekWord(s().modules, addDaysISO(s().today, 14), 'date'), 'Week 12');
+  check('in the last week, just that week', fortnightWord(s().modules, addDaysISO(s().today, 14), 'dates'), 'Week 12');
+  check('with no modules it says the date instead', [termOf([], s().today), weekWord([], s().today, 'Sat 31 Oct')], [null, 'Sat 31 Oct']);
+  s().reset();
   const days = Array.from({ length: 7 }, (_, i) => s().today.slice(0, 8) + String(10 + i).padStart(2, '0'));
   // 8 of 9 so far, 2 this week and 2 a week for two more weeks: at best 14 of 15.
   check('the best still possible, if every class left is signed into', bestCase(os(), s().items, days, s().today), 93);
@@ -723,6 +730,12 @@ console.log('\nApplying a rebalance actually changes the week');
 
   check('next week starts at 58% used', before, 58);
   check('four trades come pre-selected', trades.filter((t) => t.selected).length, 4);
+  {
+    const tiny = { id: 'tiny-notes', title: 'Review notes', bucket: 'mental', hours: 1, dread: 2, commitment: 'self', date: anchor, startHour: 9 };
+    const offered = buildTrades([...week(), tiny]);
+    check('an hour of notes is never offered as a push - too small to feel', offered.some((t) => t.itemId === 'tiny-notes'), false);
+    check('every push is worth the decision', offered.filter((t) => t.id.startsWith('push-')).every((t) => t.saves >= 6), true);
+  }
 
   // Exactly what the screen passes: the selection travels on the trades.
   s().applyTrades(trades);
@@ -746,6 +759,30 @@ console.log('\nApplying a rebalance actually changes the week');
   const surfaced = findCollision(s().items, s().today);
   check('a smaller one surfaces underneath', surfaced !== null, true);
   check('and it is a different window', surfaced.from !== target.from, true);
+}
+
+console.log('\nTyping it how you would say it');
+{
+  const { parse, titleFrom } = await import(join(tmp, 'parser.ts'));
+  const sat = '2026-10-31';
+  const readme = parse('Networks lab report, Thursday, 5h, dreading it', sat);
+  check('the README example: date, hours, dread, coursework', [readme.date, readme.hours, readme.dread, readme.prep], ['2026-11-05', 5, 5, true]);
+  check('its title is just the thing', titleFrom('Networks lab report, Thursday, 5h, dreading it'), 'Networks lab report');
+  const books = parse('Return library books tomorrow 1h', sat);
+  check('tomorrow and an hour, without commas', [books.date, books.hours, books.bucket], ['2026-11-01', 1, 'errands']);
+  check('and the title drops the date and the length', titleFrom('Return library books tomorrow 1h'), 'Return library books');
+  check('a weekday said in the middle comes out too', titleFrom('Dinner with Amin on Friday'), 'Dinner with Amin');
+  check('a plan with somebody is fixed', parse('Dinner with Amin on Friday', sat).commitment, 'fixed');
+  check('words that only start like a day are left alone', [titleFrom('Sunway Pyramid trip'), titleFrom('Wedding photos')], ['Sunway Pyramid trip', 'Wedding photos']);
+}
+
+console.log('\nWhich week a wall is in, by the calendar');
+{
+  check('on a Saturday, Wednesday four days away is next week', weekOf('2026-11-04', '2026-10-31'), 'next week');
+  check('on a Monday, Wednesday is this week', weekOf('2026-10-28', '2026-10-26'), 'this week');
+  check('ten days from a Saturday is the week after', weekOf('2026-11-10', '2026-10-31'), 'the week after');
+  s().reset();
+  check("the sample week's wall reads as next week", findCollision(s().items, s().today).headline.includes('next week'), true);
 }
 
 console.log('\nPressing apply twice does not move things');
@@ -2431,6 +2468,10 @@ console.log('\nWhat to do first, by when it has to start');
     const sitting = { id: 'tk-essay-s', title: 'Essay: final draft', bucket: 'mental', hours: 2, dread: 3, commitment: 'hard', date: addDaysISO(today, 3), startHour: 10, parentId: 'tk-essay' };
     const nap = { id: 'tk-free', title: 'Free afternoon', bucket: 'mental', hours: 2, dread: 1, commitment: 'self', date: addDaysISO(today, 1), startHour: 14 };
     const lists = prioritise([essay, sitting, nap], today, 7, undefined, 9);
+    const essayRow = lists.first.find((r) => r.item.id === 'tk-essay');
+    check('a slot after the deadline is no use to the work', dueAfter(essayRow, { date: addDaysISO(today, 6) }), false);
+    check('and the deadline day itself is too late for coursework', dueAfter(essayRow, { date: addDaysISO(today, 5) }), false);
+    check('the day before still counts', dueAfter(essayRow, { date: addDaysISO(today, 4) }), true);
     check('fully booked work can still take a flexible slot before its next sitting', lists.couldMove.find((r) => r.item.id === 'tk-free')?.taker?.id, 'tk-essay');
   }
   check('a flexible block is not called heavy', both.couldMove.some((r) => r.moveReasons.some((x) => /heaviest|lighter day/.test(x))), false);

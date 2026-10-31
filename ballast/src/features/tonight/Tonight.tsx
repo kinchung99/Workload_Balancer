@@ -249,6 +249,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                     key={option}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: chosen }}
+                    aria-checked={!!(chosen)}
                     accessibilityLabel={`${label}, ${formatShort(option)}`}
                     onPress={() => { tapFeedback(); setDay(option); }}
                     className={`min-h-row flex-1 items-center justify-center gap-1 rounded-lg border-2 px-2 py-4 active:opacity-70 ${
@@ -351,6 +352,7 @@ export function Tonight({ initialStep = 0 }: { initialStep?: number }) {
                     key={preset.id}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: active }}
+                    aria-checked={!!(active)}
                     accessibilityLabel={`${preset.label}. ${preset.note}. Would leave you at ${outcome} percent.`}
                     onPress={() => {
                       successFeedback();

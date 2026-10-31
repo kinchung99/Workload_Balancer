@@ -136,6 +136,7 @@ export default function Profile() {
                 key={face}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: pic === face }}
+                aria-checked={!!(pic === face)}
                 accessibilityLabel={`Picture ${face}`}
                 onPress={() => { tapFeedback(); setPic(face); }}
                 className="items-center justify-center rounded-pill active:opacity-60"

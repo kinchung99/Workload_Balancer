@@ -41,6 +41,7 @@ export function Toggle({ state, onPress, label }: ToggleProps) {
       accessibilityRole="switch"
       accessibilityLabel={label}
       accessibilityState={{ checked: state === 'on', disabled }}
+      aria-checked={!!(state === 'on')}
       accessibilityHint={HINT[state]}
       disabled={disabled}
       onPress={() => { tapFeedback(); onPress?.(); }}

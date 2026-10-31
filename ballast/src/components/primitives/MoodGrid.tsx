@@ -57,6 +57,7 @@ export function MoodGrid({
                   key={quadrant.id}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
+                  aria-checked={!!selected}
                   accessibilityLabel={quadrant.label}
                   onPress={() => { tapFeedback(); onChange(quadrant.id); }}
                   style={{ height: CELL }}

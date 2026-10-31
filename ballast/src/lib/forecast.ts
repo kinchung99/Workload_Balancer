@@ -6,7 +6,7 @@
  * enough to change it.
  */
 import { threshold } from '@design/tokens';
-import { addDays, dayName, daysBetween, formatShort, range } from './dates';
+import { addDays, dayName, daysBetween, formatShort, isSameWeek, range } from './dates';
 import { bandFor, loadOf, sumLoad } from './load';
 import type { Item } from './types';
 
@@ -72,6 +72,13 @@ export interface Collision {
   detail: string;
 }
 
+/**
+ * Which week a day is in, said the way a person would: by the calendar, not by
+ * distance. On a Saturday, Wednesday four days away is already next week.
+ */
+export const weekOf = (date: string, today: string): string =>
+  isSameWeek(date, today) ? 'this week' : isSameWeek(date, addDays(today, 7)) ? 'next week' : 'the week after';
+
 export function findCollision(items: Item[], today: string, horizon = threshold.forecastDays): Collision | null {
   const windowDays = Math.round(threshold.clusterWindowHours / 24);
   const candidates = items.filter((item) => !item.repeats && loadOf(item) >= CLUSTER_MIN_LOAD);
@@ -102,7 +109,7 @@ export function findCollision(items: Item[], today: string, horizon = threshold.
       to,
       items: inWindow,
       leadDays: daysBetween(today, from),
-      headline: `${dayName(from)} to ${dayName(to)} ${offset >= 7 ? 'next week' : 'this week'} is a wall.`,
+      headline: `${dayName(from)} to ${dayName(to)} ${weekOf(from, today)} is a wall.`,
       detail: `${count(inWindow.length)} things inside seventy-two hours. Spread across the fortnight, an ordinary two weeks.`,
     };
   }
@@ -117,11 +124,12 @@ const count = (n: number): string => WORDS[n] ?? String(n);
  * The forecast strip spoken as a sentence, for the same reason every other chart
  * is: a chart that only works as a picture is a chart half the users can't use.
  */
-export function speakForecast(days: ForecastDay[], collision: Collision | null): string {
+export function speakForecast(days: ForecastDay[], collision: Collision | null, today?: string): string {
   const heavy = days.filter((day) => bandFor(day.percent) === 'heavy');
   const head = `Next ${days.length} days.`;
   if (!collision) return `${head} ${heavy.length} heavy days, none of them clustered.`;
-  return `${head} ${count(heavy.length)} heavy days clustered ${dayName(collision.from)} to ${dayName(collision.to)}${collision.leadDays >= 7 ? ' next week' : ''}.`;
+  const when = today ? weekOf(collision.from, today) : collision.leadDays >= 7 ? 'next week' : '';
+  return `${head} ${count(heavy.length)} heavy days clustered ${dayName(collision.from)} to ${dayName(collision.to)}${when && when !== 'this week' ? ` ${when}` : ''}.`;
 }
 
 /** "In 8 days". Long enough to email a tutor, swap a shift or move a deadline. */

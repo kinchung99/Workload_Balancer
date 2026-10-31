@@ -7,7 +7,7 @@ import {
 import { color } from '@design/tokens';
 import { SCREEN } from '@design/screens';
 import { BUCKETS, BUCKET_LABEL, REST_LOAD_PER_HOUR, bandFor, capacityOf } from '@/lib/load';
-import { formatHour, freeSlots, placeIn, startOptions } from '@/lib/schedule';
+import { formatHour, freeSlots, placeIn } from '@/lib/schedule';
 import { SittingEditor } from '@/features/item/SittingEditor';
 import { clockHour } from '@/lib/marking';
 import { addDays, formatShort } from '@/lib/dates';
@@ -75,10 +75,10 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   const shown = useRef<string[]>([]);
   const [index, setIndex] = useState(0);
   const [hours, setHours] = useState(1);
-  const [day, setDay] = useState(today);
-  useEffect(() => { setDay(today); }, [today]);
+  // Null until a day is picked: then today, or tomorrow once today has no room left.
+  const [dayPick, setDay] = useState<string | null>(null);
+  useEffect(() => { setDay(null); }, [today]);
   const [start, setStart] = useState<number | null>(null);
-  const dayOptions = Array.from({ length: 5 }, (_, offset) => addDays(today, offset));
   const [justBooked, setJustBooked] = useState<RestEntry | null>(null);
   // Two questions, asked one at a time: what would help, then when it goes.
   const [step, setStep] = useState(initialStep);
@@ -150,11 +150,11 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
   };
 
 
-  // Real gaps in today, long enough for the length currently selected.
-  const gaps = useMemo(() => freeSlots(items, day, hours), [items, day, hours]);
-  const starts = useMemo(() => startOptions(items, day, hours), [items, day, hours]);
+  // Never a time that has already gone: today starts from now.
+  const notBefore = (date: string) => (date === today ? clockHour(today) : undefined);
+  const day = dayPick ?? (chosen && placeIn(items, today, hours, chosen.preferred, notBefore(today)) === undefined ? addDays(today, 1) : today);
   // Defaults into the window the activity belongs in - a nap at 7am is not a nap.
-  const slot = start ?? (chosen ? placeIn(items, day, hours, chosen.preferred) ?? null : null);
+  const slot = start ?? (chosen ? placeIn(items, day, hours, chosen.preferred, notBefore(day)) ?? null : null);
 
   /** The week as it would be with this block in it. Nothing is written yet. */
   const preview = useMemo(() => {
@@ -169,6 +169,8 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
       date: day,
       startHour: slot,
       isRecovery: true,
+      // Priced exactly as booking prices it (see bookRecovery), or the preview says "no change".
+      loadOverride: -Math.round(REST_LOAD_PER_HOUR * hours * 10) / 10,
     };
     return { reading: readingFrom([...items, candidate], today, ceilings), candidate };
   }, [chosen, slot, hours, day, items, today, ceilings]);
@@ -336,7 +338,7 @@ export function Prescribe({ initialStep = 0 }: { initialStep?: number }) {
           {chosen ? (
             <SittingEditor
               mode="item"
-              item={{ id: 'preview-recovery', title: chosen.title, bucket: chosen.refills, hours, dread: 1, commitment: 'self', date: day, isRecovery: true }}
+              item={{ id: 'preview-recovery', title: chosen.title, bucket: chosen.refills, hours, dread: 1, commitment: 'self', date: day, isRecovery: true, loadOverride: -Math.round(REST_LOAD_PER_HOUR * hours * 10) / 10 }}
               busy={items}
               base={items}
               today={today}

@@ -293,6 +293,7 @@ function IdeaCard({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
+      aria-checked={!!selected}
       accessibilityLabel={`${title}. ${detail}`}
       onPress={onPress}
       className={`min-h-row gap-2 rounded-lg border-2 p-4 active:opacity-70 ${selected ? 'border-inverse' : 'border-line-hairline bg-raised'}`}
@@ -348,6 +349,7 @@ function ToneBubble({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
+      aria-checked={!!selected}
       accessibilityLabel={`${label}. ${note}`}
       onPress={onPress}
       className="min-h-min items-center gap-2 active:opacity-70"
@@ -405,6 +407,7 @@ function Segmented<T extends string>({
           key={option.id}
           accessibilityRole="radio"
           accessibilityState={{ selected: option.id === value }}
+          aria-checked={!!(option.id === value)}
           onPress={() => onChange(option.id)}
           className="min-h-min flex-1 items-center justify-center"
         >

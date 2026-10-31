@@ -160,6 +160,7 @@ function ModuleBlock({ module, classes, open, onToggle }: {
                     key={index}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on }}
+                    aria-checked={!!(on)}
                     accessibilityLabel={DAYS[index]}
                     onPress={() => { tapFeedback(); setDay(on ? null : index); }}
                     className={`min-h-min flex-1 items-center justify-center rounded-md py-3 active:opacity-70 ${on ? 'bg-inverse' : 'bg-sunken'}`}
@@ -179,6 +180,7 @@ function ModuleBlock({ module, classes, open, onToggle }: {
                     key={hour}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on }}
+                    aria-checked={!!(on)}
                     accessibilityLabel={`Starts ${formatHour(hour)}`}
                     onPress={() => { tapFeedback(); setStart(hour); }}
                     className="min-h-min items-center justify-center rounded-pill px-4 active:opacity-70"
@@ -199,6 +201,7 @@ function ModuleBlock({ module, classes, open, onToggle }: {
                     key={length}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on }}
+                    aria-checked={!!(on)}
                     accessibilityLabel={`Lasts ${hoursLabel(length)}`}
                     onPress={() => { tapFeedback(); setHours(length); }}
                     className="min-h-min flex-1 items-center justify-center gap-1 rounded-md py-2 active:opacity-70"
@@ -286,6 +289,7 @@ function NewModule({ onMade, onCancel }: { onMade: (id: string) => void; onCance
             key={option}
             accessibilityRole="radio"
             accessibilityState={{ selected: option === emoji }}
+            aria-checked={!!(option === emoji)}
             accessibilityLabel={`Picture ${option}`}
             onPress={() => { tapFeedback(); setEmoji(option); }}
             className="items-center justify-center rounded-pill active:opacity-60"
